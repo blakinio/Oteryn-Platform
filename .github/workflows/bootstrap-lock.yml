@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - task/OTERYN-20260718-laravel-bootstrap
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
