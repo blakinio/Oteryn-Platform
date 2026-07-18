@@ -1,0 +1,40 @@
+name: Temporary DB privilege boundary formatter
+
+on:
+  push:
+    branches:
+      - task/OTERYN-20260718-db-privilege-boundary
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: task/OTERYN-20260718-db-privilege-boundary
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Format changed PHP files
+        run: vendor/bin/pint app/CanaryIntegration/CanaryDatabasePrivilegeVerifier.php routes/console.php tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php
+
+      - name: Remove temporary workflow and commit
+        run: |
+          rm .github/workflows/db-privilege-boundary-format.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/CanaryIntegration/CanaryDatabasePrivilegeVerifier.php routes/console.php tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php .github/workflows/db-privilege-boundary-format.yml
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "style: format database privilege boundary"
+          git push origin HEAD:task/OTERYN-20260718-db-privilege-boundary
