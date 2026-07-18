@@ -8,7 +8,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 ## Current phase
 
-**Phase 0 — Architecture and agent bootstrap**
+**Phase 0 — Architecture and agent bootstrap: COMPLETE**
+
+**Next phase — Phase 1: Laravel application bootstrap**
 
 ## What exists on main
 
@@ -21,9 +23,10 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - data ownership rules;
 - test strategy;
 - delivery roadmap;
-- initial Canary data contract placeholder;
-- initial web-to-game authentication contract placeholder;
-- ADRs for Laravel modular monolith, separate Canary repository and deferred payments.
+- Canary data integration discovery contract;
+- web-to-game authentication discovery contract;
+- ADRs for Laravel modular monolith, separate Canary repository and deferred payments;
+- project changelog and durable current-state documentation.
 
 ## What does not exist yet
 
@@ -46,23 +49,29 @@ Unless source is added after this state update, the following are **not implemen
 
 Agents must verify repository source before relying on this list because later tasks may supersede it.
 
-## Current active task
+## Next planned task
 
-- `OTERYN-20260718-platform-architecture-bootstrap`
-  - record: `docs/agents/tasks/active/OTERYN-20260718-platform-architecture-bootstrap.md`
-  - objective: finish durable architecture/governance bootstrap.
+`OTERYN-20260718-laravel-bootstrap`
 
-See `docs/agents/ACTIVE_WORK.md` as a convenience index, then verify the individual task record/live PR.
+Objective:
 
-## Next recommended work
+- bootstrap the maintained Laravel/PHP application stack;
+- establish Blade, tests, CI and safe environment configuration;
+- do not implement speculative Canary shared auth/data writes.
 
-After architecture bootstrap is complete:
+See `docs/agents/ACTIVE_WORK.md`, then verify the individual task record and live PR/Git state.
 
-1. create a dedicated **Phase 1 Laravel bootstrap** task;
-2. select the currently maintained Laravel/PHP version based on official support at implementation time;
-3. create the application skeleton, test baseline and CI;
-4. in parallel or immediately after, create bounded Canary/login-server discovery tasks;
-5. do not implement speculative shared credential/schema mutations before contracts are proven.
+## Work after Laravel bootstrap
+
+Create bounded discovery tasks for:
+
+1. actual Oteryn Canary account/player/guild schema;
+2. actual login-server component and authentication/session flow;
+3. password/hash compatibility and migration constraints;
+4. game session/token creation/revocation behavior;
+5. single-world versus multi-world requirement.
+
+Do not implement speculative shared credential/schema mutations before required contracts are proven.
 
 ## High-priority unknowns
 
