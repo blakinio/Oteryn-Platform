@@ -4,12 +4,15 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-| Task | Status | Scope | Record |
-|---|---|---|---|
-| OTERYN-20260718-game-read-model | implementing | Evidence-backed read-only highscores, character profiles, guilds and configured channel/server metadata; no shared writes and no unproven global online list | `docs/agents/tasks/active/OTERYN-20260718-game-read-model.md` |
+No active task is currently claimed.
+
+## Recommended next task
+
+Create `OTERYN-20260718-online-status-discovery` to prove one authoritative cluster-wide online-character identity source plus freshness and failure semantics before implementing an online-list route. Inspect `players_online`, `cluster_sessions`, process-local status and multichannel runtime state read-only; do not guess.
 
 ## Recently completed
 
+- `OTERYN-20260718-game-read-model` — read-only level highscores, active character profiles, guild details/membership and configured channel metadata implemented with a dedicated Canary connection and query-only integration tests; global online list remains intentionally unimplemented; archive record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-auth-discovery` — current web/login-server/Canary credential and game-session paths mapped; credential migration remains blocked; target authoritative Identity contract documented; archive record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-canary-schema-discovery` — evidence-backed Canary data contract pinned to Canary SHA `6df7f906ed6f8fef0aa326439a5494bd1e3d523c`; read boundaries proven, direct shared writes remain blocked, one tournament-coin schema/code conflict recorded; archive record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-laravel-bootstrap` — Laravel 13 / PHP 8.5 application foundation, Blade, health route, lockfile, tests and CI; archive record under `docs/agents/tasks/archive/`.
