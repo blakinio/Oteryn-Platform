@@ -4,7 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 | Task | Status | Scope | Record |
 |---|---|---|---|
-| OTERYN-20260718-platform-architecture-bootstrap | implementing | Agent governance, product architecture, security, contracts, roadmap and ADR bootstrap | `docs/agents/tasks/active/OTERYN-20260718-platform-architecture-bootstrap.md` |
+| OTERYN-20260718-laravel-bootstrap | ready | Bootstrap maintained Laravel/PHP application, Blade, test baseline and CI; no speculative Canary auth/data integration | `docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md` |
+
+## Recently completed
+
+- `OTERYN-20260718-platform-architecture-bootstrap` — architecture/governance baseline completed; archive record under `docs/agents/tasks/archive/`.
 
 ## Coordination rule
 
