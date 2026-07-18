@@ -4,6 +4,7 @@
     "type": "project",
     "description": "The Oteryn web and application platform.",
     "keywords": ["oteryn", "laravel"],
+    "license": "proprietary",
     "require": {
         "php": "^8.5",
         "laravel/framework": "^13.8"
