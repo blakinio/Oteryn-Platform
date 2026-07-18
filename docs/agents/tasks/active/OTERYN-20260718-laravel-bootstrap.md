@@ -94,10 +94,10 @@ Exact commands must come from the bootstrapped repository. Expected categories:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-18T21:15:00+02:00
-head: 99e6893e0eed0e4716ef4474a73a2273fca07a93
+updated_at: 2026-07-18T22:10:00+02:00
+head: fa7a0591c722175b3b13747284fcaba7d5a9a54a
 branch: task/OTERYN-20260718-laravel-bootstrap
-pr: none
+pr: 1
 status: implementing
 context_routes:
   - architecture
@@ -134,20 +134,41 @@ proven:
   - Official Laravel 13 release notes list Laravel 13 as released on 2026-03-17, requiring PHP 8.3 or newer and supporting PHP 8.3-8.5.
   - Official PHP supported-versions information lists PHP 8.5 under active support through 2027-12-31 and security support through 2029-12-31.
   - The target stack selected for this bootstrap is Laravel 13 on PHP 8.5.
+  - A draft PR exists as PR #1 from task/OTERYN-20260718-laravel-bootstrap to main.
+  - The initial scaffold intentionally contains no account/user model and no auth/account migrations.
 derived:
-  - The bootstrap can remain independent of Canary and login-server schema/auth decisions.
-  - Laravel Pint plus Composer validation and PHP syntax checks provide a useful baseline without introducing a separate static-analysis dependency before domain code exists.
+  - The bootstrap remains independent of Canary and login-server schema/auth decisions.
+  - Laravel Pint plus Composer validation and PHPUnit provide a useful baseline; separate static analysis is deferred until substantive application/domain code exists.
 unknown:
   - Final resolved Composer dependency graph and lockfile until generated on PHP 8.5.
-  - CI result on the task branch until the workflow runs.
+  - CI result for the scaffold commit.
 conflicts: []
 first_failure:
   marker: LOCAL_RUNTIME_PHP_VERSION
   evidence: The available sandbox runtime is PHP 8.4.16 and has no Composer binary, so PHP 8.5 dependency resolution and full Laravel execution must be validated in GitHub Actions.
 rejected_hypotheses:
   - Use Laravel 12: rejected because Laravel 13 is the current maintained major release and has a longer support window.
-  - Add Larastan immediately: deferred because the bootstrap has no substantive domain code yet; formatter, syntax lint, Composer validation and PHPUnit provide the initial baseline.
+  - Add Larastan immediately: deferred because the bootstrap has no substantive domain code yet; formatter, Composer validation and PHPUnit provide the initial baseline.
+  - Keep Laravel's default users/auth migration scaffold: rejected to avoid implying a shared account schema before Canary/Auth discovery.
 changed_paths:
+  - .editorconfig
+  - .env.example
+  - .gitattributes
+  - .gitignore
+  - .github/workflows/bootstrap-lock.yml
+  - README.md
+  - artisan
+  - composer.json
+  - phpunit.xml
+  - app/**
+  - bootstrap/**
+  - config/**
+  - database/.gitignore
+  - public/**
+  - resources/views/**
+  - routes/**
+  - storage/**
+  - tests/**
   - docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md
 validation:
   - command: official Laravel/PHP support verification
@@ -160,5 +181,5 @@ validation:
     result: NOT_AVAILABLE
     evidence: Composer is not installed in the sandbox.
 blockers: []
-next_action: Add the minimal Laravel 13 application scaffold, Blade home/status routes, safe environment template, baseline tests and temporary lock-generation CI on the dedicated task branch.
+next_action: Commit the scaffold, inspect the GitHub Actions run, download the generated composer.lock artifact, and fix any dependency, formatting, or test failures before replacing the temporary workflow with final CI.
 ```
