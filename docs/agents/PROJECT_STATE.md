@@ -4,7 +4,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 ## Last architecture-state update
 
-2026-07-18
+2026-07-19
 
 ## Current phase
 
@@ -16,7 +16,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Authentication / web-to-game session discovery: COMPLETE**
 
-**Next work — evidence-backed read-only PublicGameData implementation.**
+**Initial read-only PublicGameData implementation: COMPLETE**
+
+**Next work — bounded cluster-wide online-status discovery.**
 
 ## What exists on main after the current delivery PR is merged
 
@@ -31,20 +33,47 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - Blade as the initial server-rendered UI layer;
 - safe `.env.example` local defaults/placeholders with no committed application secret;
 - committed Composer lockfile;
-- SQLite as the default local/test database connection;
+- SQLite as the default Platform local/test database connection;
 - `GET /health` application availability route;
-- baseline unit and feature tests;
-- Laravel Pint formatting checks;
-- GitHub Actions CI using PHP 8.5 and lockfile-backed `composer install`;
-- documented local setup and validation commands;
+- Laravel Pint formatting checks and GitHub Actions CI;
 - evidence-backed Canary data contract with approved read boundaries and zero approved direct shared-data writes;
 - evidence-backed current web/login-server/Canary authentication contract;
 - documented target direction for one authoritative Identity policy and short-lived atomic game-login authorization;
-- documented production-auth blockers including alternate login paths, SHA-1 compatibility, credential hash logging and incomplete revocation semantics.
+- dedicated Canary read connection configured independently from the Platform-owned database;
+- read-only public level highscores at `GET /highscores`;
+- read-only active character profiles at `GET /characters/{name}`;
+- read-only public guild details and membership at `GET /guilds/{name}`;
+- read-only configured channel metadata at `GET /servers`;
+- integration tests that exercise PublicGameData routes after placing an isolated Canary SQLite connection in `query_only` mode.
+
+## PublicGameData implementation summary
+
+The initial PublicGameData implementation is intentionally narrow and read-only.
+
+Proven implementation properties:
+
+- shared Canary tables are accessed through a dedicated query service using Laravel query builder rather than mutation-capable shared Eloquent models;
+- deployment documentation requires a separate least-privilege SELECT-only Canary database credential;
+- character/highscore/guild member reads filter `players.deletion = 0`;
+- highscores select only public fields, use deterministic `level DESC, name ASC` ordering and paginate 50 rows;
+- public character profiles expose only `id`, `name`, `level` and `vocation` to the query layer, while the view renders only name/level/vocation;
+- guild details exclude `guilds.balance` and membership data is joined in one paginated read path without per-member N+1 queries;
+- Blade output escapes guild content by default and XSS regression coverage exists for MOTD rendering;
+- server/channel page exposes configured enabled channel metadata and maintenance state only;
+- no `players_online`, `cluster_sessions` or cluster-wide online-character list is exposed by PublicGameData;
+- no application caching is used yet because accepted staleness semantics are not defined.
+
+Known PublicGameData unknowns:
+
+- authoritative cluster-wide online-character identity source;
+- freshness and failure semantics for online identity/availability;
+- transport from Canary multichannel runtime state to Oteryn Platform;
+- privileged/group-hidden character filtering policy for public rankings;
+- production cache/staleness expectations.
 
 ## Canary data-contract summary
 
-`docs/contracts/CANARY_DATA_CONTRACT.md` is partially proven and suitable as the baseline for read-only integration design.
+`docs/contracts/CANARY_DATA_CONTRACT.md` is partially proven and is the baseline for read-only integration design.
 
 Key proven points:
 
@@ -53,52 +82,45 @@ Key proven points:
 - persistent channel identity is `channels.id`;
 - modern protocol world-list index is transient and must not be persisted as `channels.id`;
 - guild ownership/membership/rank tables and constraints are documented;
-- account/IP bans, namelocks and lazy expiration behavior are documented;
+- account/IP bans, namelocks and session structures are documented;
 - `account_sessions` and `cluster_sessions` are separate concepts;
-- current per-process and multichannel status sources are documented;
 - there are no approved direct Oteryn Platform writes to shared Canary data.
 
 Known data-contract blockers/unknowns:
 
-- `schema.sql` defines `accounts.tournament_coins`, while current Canary repository code expects `accounts.coins_tournament` for tournament coin access;
+- `schema.sql` defines `accounts.tournament_coins`, while Canary repository code expects `accounts.coins_tournament` for tournament coin access;
 - actual deployed database shape for that field is not proven;
 - cluster-wide public online-character identity source/freshness policy is not yet contracted;
 - product initialization rules for Platform-driven character creation are not proven.
 
 ## Authentication contract summary
 
-`docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md` now maps current behavior and separately documents a recommended target contract.
+`docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md` maps current behavior and separately documents a recommended target contract.
 
-Key proven current-state points:
+Credential migration remains blocked because:
 
-- native Canary password login and external `opentibiabr/login-server` login can coexist in repository-supported topology;
+- native Canary and external login-server authentication paths can coexist;
 - current native Canary verifies custom Argon2 then SHA-1 fallback;
 - current upstream external login-server verifies SHA-1 only;
 - standard Laravel Argon2id stored-string compatibility with Canary is not proven;
-- Canary can issue 60-second process-local single-use login tokens in session mode;
-- current external login-server issues replayable DB-backed `account_sessions` with 24-hour expiry;
-- failed one-time token redemption can fall back to DB-backed session authentication;
-- old protocols use direct password authentication;
-- character ownership/deletion and account-ban gates remain enforced by Canary at world entry;
-- password change/reset revocation across all game-login credential classes is not proven;
+- password/reset revocation across all game-login credential classes is not proven;
 - no inspected current game-login path globally enforces MFA or email verification;
 - failed native Canary password authentication logs the stored credential hash value and requires a separate Canary security fix.
-
-Credential migration remains blocked until the authoritative Identity topology, legacy compatibility and revocation behavior are implemented and tested.
 
 ## What does not exist yet
 
 Unless source is added after this state update, the following are **not implemented**:
 
-- production website/CMS beyond the bootstrap Blade page;
+- full production public website/CMS;
 - real Oteryn Platform account authentication/login;
 - password/hash migration;
 - MFA;
 - account management;
-- character management;
-- highscores/guilds/character pages;
+- character creation/delete/rename;
+- cluster-wide online character list;
+- live multichannel availability integration;
 - admin/RBAC/audit UI;
-- Canary integration code or shared-data write paths;
+- Canary/shared-data write paths;
 - login-server integration code owned by Oteryn Platform;
 - production Cloudflare/deployment configuration;
 - payments/shop.
@@ -107,28 +129,27 @@ Agents must verify repository source before relying on this list because later t
 
 ## Next planned task
 
-`OTERYN-20260718-game-read-model`
+`OTERYN-20260718-online-status-discovery`
 
 Objective:
 
-- implement read-only highscores;
-- implement public character profiles from explicit approved fields;
-- implement public guild read models;
-- implement channel/server-status reads only where the data contract proves source semantics;
-- use pagination and avoid N+1 queries;
-- add caching only where staleness semantics are explicit;
-- do not expose private/account/security fields;
-- do not implement cluster-wide online character identity until its source/freshness contract is proven;
-- perform no Canary/shared-data mutations.
+- inspect current Canary source read-only;
+- prove the lifecycle and semantics of `players_online`;
+- prove whether and how `cluster_sessions` can represent online character identity without exposing stale/unsafe runtime state;
+- inspect `channel_runtime_status`, Redis `ChannelRuntimeRegistry` and process-local `ProtocolStatus` behavior;
+- define freshness, stale-data and dependency-failure semantics;
+- select one evidence-backed cluster-wide online-character source/aggregation contract, or retain the feature as `UNKNOWN` if no safe source exists;
+- update `docs/contracts/CANARY_DATA_CONTRACT.md` when new durable facts are proven;
+- do not implement an online-list route until the contract is proven.
 
 ## High-priority unknowns and blockers
 
+- cluster-wide online-character identity source/freshness/failure policy;
 - exact deployed production authentication topology and login-server image digest;
 - password hash compatibility/migration rollout;
 - password reset/change and global revocation behavior;
 - MFA/email-verification enforcement across every login path;
 - tournament-coin schema/code conflict;
-- cluster-wide online-character identity source/freshness policy;
 - final production hosting/network topology;
 - production mail/cache/queue providers.
 
