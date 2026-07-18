@@ -41,8 +41,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T00:14:00+02:00
-head: 655fcd1c7b048f4e6b71988127094e7fd80eaf4c
+updated_at: 2026-07-19T00:18:00+02:00
+head: a5fc6e211510e9f7a550743eee7e1f281df46de8
 branch: task/OTERYN-20260718-online-status-discovery
 pr: 5
 status: completed
@@ -77,8 +77,8 @@ proven:
   - ProtocolStatus remains process-local, and Game::getPlayerStats() aggregates only the current process local player map.
   - docs/contracts/CANARY_DATA_CONTRACT.md is pinned to current Canary SHA be7842412beb5d240e76ffd4cd18aacdc3a2dcca and now records the approved bounded cluster-wide online read contract.
   - docs/agents/PROJECT_STATE.md now records online-status discovery as complete and OTERYN-20260719-online-list-read-model as the next planned task.
-  - PR #5 changed only docs/agents/ACTIVE_WORK.md, docs/agents/PROJECT_STATE.md, this task record lifecycle, and docs/contracts/CANARY_DATA_CONTRACT.md; no application or Canary source was changed.
-  - GitHub Actions CI run #37 on substantive documentation HEAD 655fcd1c7b048f4e6b71988127094e7fd80eaf4c completed successfully; its test job passed Composer metadata/lockfile validation, dependency install, formatting and tests.
+  - PR #5 changes only docs/agents/ACTIVE_WORK.md, docs/agents/PROJECT_STATE.md, this archived task record, and docs/contracts/CANARY_DATA_CONTRACT.md; no application or Canary source is changed.
+  - GitHub Actions CI run #40 on closure HEAD a5fc6e211510e9f7a550743eee7e1f281df46de8 completed successfully; its test job passed Composer metadata/lockfile validation, dependency install, formatting and tests.
 derived:
   - The approved cluster-wide online-character identity backend source is cluster_sessions joined to public player fields, restricted to status = ONLINE, expires_at greater than read-time epoch milliseconds, and players.deletion = 0.
   - Raw cluster_sessions security/session fields remain non-public; a public adapter may expose only an explicit public player allowlist plus durable channels.id/approved channel metadata.
@@ -114,15 +114,15 @@ validation:
     evidence: current Canary HEAD be7842412beb5d240e76ffd4cd18aacdc3a2dcca verified; compare from prior baseline found documentation-only changes; exact current source inspected for players_online, cluster_sessions, ChannelRuntimeRegistry, channel_runtime_status and ProtocolStatus semantics
   - command: full PR changed-file list and diff inspection
     result: PASS
-    evidence: PR #5 changed only owned documentation/task paths and contained no unrelated or forbidden application/Canary changes
-  - command: GitHub Actions CI run #37 on 655fcd1c7b048f4e6b71988127094e7fd80eaf4c
+    evidence: PR #5 changes only owned documentation/task paths and contains no unrelated or forbidden application/Canary changes
+  - command: GitHub Actions CI run #40 on a5fc6e211510e9f7a550743eee7e1f281df46de8
     result: PASS
     evidence: workflow completed successfully; test job passed Composer metadata/lockfile validation, dependency installation, formatting and tests
   - command: local repository validation
     result: UNAVAILABLE
     evidence: execution environment has no local repository checkout, so local working tree/remotes/worktrees and local commands could not be inspected/run; remote GitHub CI is the validation source
 blockers:
-  - none for merge; local checkout is unavailable but this is documented and current-head GitHub CI is required before merge
+  - none for merge; local checkout is unavailable but this is documented and GitHub CI on the final PR head is required before merge
 next_action: Create OTERYN-20260719-online-list-read-model from the approved cluster_sessions status/expiry/deletion and dependency-failure contract after PR #5 is merged.
 ```
 
