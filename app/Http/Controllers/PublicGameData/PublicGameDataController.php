@@ -7,9 +7,7 @@ use Illuminate\Contracts\View\View;
 
 final class PublicGameDataController
 {
-    public function __construct(private readonly CanaryGameDataRepository $gameData)
-    {
-    }
+    public function __construct(private readonly CanaryGameDataRepository $gameData) {}
 
     public function highscores(): View
     {
