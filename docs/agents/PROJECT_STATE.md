@@ -12,11 +12,11 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Phase 1 — Laravel application bootstrap: COMPLETE**
 
-**Next work — bounded Canary data-contract discovery, followed by authentication/session discovery.**
+**Canary data-contract discovery: COMPLETE**
 
-## What exists on main
+**Next work — bounded authentication/identity and web-to-game session discovery.**
 
-After completion of the Laravel bootstrap delivery PR, the repository contains:
+## What exists on main after the current delivery PR is merged
 
 - root agent governance in `AGENTS.md`;
 - repository map and context routing;
@@ -24,7 +24,6 @@ After completion of the Laravel bootstrap delivery PR, the repository contains:
 - target system architecture and module boundaries;
 - security architecture and data ownership rules;
 - test strategy and delivery roadmap;
-- Canary data and web-to-game authentication discovery contracts;
 - ADRs for Laravel modular monolith, separate Canary repository and deferred payments;
 - Laravel 13 application foundation targeting PHP 8.5;
 - Blade as the initial server-rendered UI layer;
@@ -35,7 +34,35 @@ After completion of the Laravel bootstrap delivery PR, the repository contains:
 - baseline unit and feature tests;
 - Laravel Pint formatting checks;
 - GitHub Actions CI using PHP 8.5 and lockfile-backed `composer install`;
-- documented local setup and validation commands.
+- documented local setup and validation commands;
+- evidence-backed Canary data contract pinned to `blakinio/canary` commit `6df7f906ed6f8fef0aa326439a5494bd1e3d523c`;
+- proven read-oriented account/player/guild/ban/session/channel schema boundaries;
+- explicit zero-approved-direct-shared-write policy pending operation-level contracts;
+- documented tournament-coin schema/code `CONFLICT` and remaining online/character-creation `UNKNOWN` items.
+
+## Canary data-contract summary
+
+`docs/contracts/CANARY_DATA_CONTRACT.md` is now partially proven and suitable as the baseline for read-only integration design.
+
+Key proven points:
+
+- accounts and characters are global across channels;
+- `players.account_id` owns the account-to-character relationship;
+- persistent channel identity is `channels.id`;
+- modern protocol world-list index is transient and must not be persisted as `channels.id`;
+- guild ownership/membership/rank tables and constraints are documented;
+- account/IP bans, namelocks and lazy expiration behavior are documented;
+- `account_sessions` and `cluster_sessions` are separate concepts;
+- current per-process and multichannel status sources are documented;
+- there are no approved direct Oteryn Platform writes to shared Canary data.
+
+Known contract blockers/unknowns:
+
+- `schema.sql` defines `accounts.tournament_coins`, while current Canary repository code expects `accounts.coins_tournament` for tournament coin access;
+- actual deployed database shape for that field is not proven;
+- legacy `players_online` writer lifecycle is not proven;
+- cluster-wide public online-character identity source/freshness policy is not yet contracted;
+- product initialization rules for Platform-driven character creation are not proven.
 
 ## What does not exist yet
 
@@ -58,25 +85,25 @@ Agents must verify repository source before relying on this list because later t
 
 ## Next planned task
 
-`OTERYN-20260718-canary-schema-discovery`
+`OTERYN-20260718-auth-discovery`
 
 Objective:
 
-- inspect the actual current `blakinio/canary` schema/source as read-only evidence;
-- prove account, player, guild, world/server, online, ban and session-related structures;
-- classify every contract statement as `PROVEN`, `DERIVED`, `UNKNOWN` or `CONFLICT`;
-- update `docs/contracts/CANARY_DATA_CONTRACT.md`;
-- do not implement shared-data write paths until the contract is proven.
-
-After that, create the separate authentication/identity discovery task to prove the actual login-server, credential verification and game-session flow.
+- prove which login-server/auth path is actually used;
+- prove how credentials are verified and which hash formats are accepted;
+- prove web/game session and token creation, TTL, replay/single-use and revocation behavior;
+- prove logout, password-change/reset, ban and bypass-path interactions;
+- separate current `PROVEN` behavior from recommended target behavior;
+- update `docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md`;
+- do not implement credential migration until a separately approved task.
 
 ## High-priority unknowns
 
-- exact Oteryn Canary account/player/guild schema;
-- actual login-server component and current authentication flow;
+- actual login-server component and current end-to-end authentication flow;
 - password hash compatibility/migration requirements;
 - game session/token creation, TTL, replay and revocation semantics;
-- single-world versus multi-world requirements;
+- password reset/change behavior across web and game login;
+- email verification and MFA enforcement/bypass behavior;
 - final production hosting/network topology;
 - production mail/cache/queue providers.
 
