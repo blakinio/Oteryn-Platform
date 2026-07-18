@@ -4,11 +4,9 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-No active task is currently claimed.
-
-## Recommended next task
-
-Create `OTERYN-20260718-auth-discovery` to prove the current WWW/login-server/Canary credential and game-session flow and update `docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md` before implementing authentication or credential migration.
+| Task | Status | Scope | Record |
+|---|---|---|---|
+| OTERYN-20260718-auth-discovery | investigating | Read-only proof of current WWW/login-server/Canary credential verification, password compatibility and game-session/token flow; no credential migration or auth implementation | `docs/agents/tasks/active/OTERYN-20260718-auth-discovery.md` |
 
 ## Recently completed
 
