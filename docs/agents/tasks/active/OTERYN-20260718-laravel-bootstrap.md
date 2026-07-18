@@ -6,7 +6,7 @@ Create the initial maintained Laravel/PHP application foundation for Oteryn Plat
 
 ## Status
 
-Ready for a future agent to start.
+In progress.
 
 ## Required startup context
 
@@ -37,11 +37,10 @@ Load Canary/auth contracts only if the bootstrap task reaches an integration dec
 
 ## Owned paths
 
-Expected ownership after task begins:
-
 - Laravel scaffold/application paths
 - `composer.json`
 - `composer.lock`
+- `artisan`
 - `app/**`
 - `bootstrap/**`
 - `config/**`
@@ -52,10 +51,16 @@ Expected ownership after task begins:
 - `storage/**` tracked placeholders only
 - `tests/**`
 - `.env.example`
+- `.editorconfig`
+- `.gitattributes`
+- `.gitignore`
+- `phpunit.xml`
 - `.github/workflows/**`
-- bootstrap-related documentation
+- `README.md`
+- `docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md`
+- bootstrap-related narrow updates under `docs/agents/**`
 
-Before editing, verify no other active task owns overlapping paths.
+No other active task currently claims overlapping paths.
 
 ## Explicit non-goals
 
@@ -89,36 +94,71 @@ Exact commands must come from the bootstrapped repository. Expected categories:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-18T19:30:00Z
-head: 95430f1e257daf7fd7c230983e9a3fc0bcee3705
-branch: main
+updated_at: 2026-07-18T21:15:00+02:00
+head: 99e6893e0eed0e4716ef4474a73a2273fca07a93
+branch: task/OTERYN-20260718-laravel-bootstrap
 pr: none
-status: investigating
+status: implementing
 context_routes:
   - architecture
   - testing
   - security
-owned_paths: []
+owned_paths:
+  - composer.json
+  - composer.lock
+  - artisan
+  - app/**
+  - bootstrap/**
+  - config/**
+  - database/**
+  - public/**
+  - resources/**
+  - routes/**
+  - storage/**
+  - tests/**
+  - .env.example
+  - .editorconfig
+  - .gitattributes
+  - .gitignore
+  - phpunit.xml
+  - .github/workflows/**
+  - README.md
+  - docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md
 proven:
   - Phase 0 architecture and agent bootstrap is complete on main.
   - ADR 0001 selects a Laravel modular monolith with Blade as the initial direction.
   - Canary and login-server integration require separate evidence-backed contracts.
   - Payments are deferred.
+  - No open pull request was found for this task or another overlapping OTERYN task at startup.
+  - docs/agents/ACTIVE_WORK.md lists only this Laravel bootstrap task as active.
+  - Official Laravel 13 release notes list Laravel 13 as released on 2026-03-17, requiring PHP 8.3 or newer and supporting PHP 8.3-8.5.
+  - Official PHP supported-versions information lists PHP 8.5 under active support through 2027-12-31 and security support through 2029-12-31.
+  - The target stack selected for this bootstrap is Laravel 13 on PHP 8.5.
 derived:
-  - The next safe implementation step is framework/application bootstrap without shared auth/data integration.
+  - The bootstrap can remain independent of Canary and login-server schema/auth decisions.
+  - Laravel Pint plus Composer validation and PHP syntax checks provide a useful baseline without introducing a separate static-analysis dependency before domain code exists.
 unknown:
-  - Current maintained Laravel/PHP version to select at task execution time.
-  - Exact CI toolchain choices for linting/static analysis.
+  - Final resolved Composer dependency graph and lockfile until generated on PHP 8.5.
+  - CI result on the task branch until the workflow runs.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
-rejected_hypotheses: []
-changed_paths: []
+  marker: LOCAL_RUNTIME_PHP_VERSION
+  evidence: The available sandbox runtime is PHP 8.4.16 and has no Composer binary, so PHP 8.5 dependency resolution and full Laravel execution must be validated in GitHub Actions.
+rejected_hypotheses:
+  - Use Laravel 12: rejected because Laravel 13 is the current maintained major release and has a longer support window.
+  - Add Larastan immediately: deferred because the bootstrap has no substantive domain code yet; formatter, syntax lint, Composer validation and PHPUnit provide the initial baseline.
+changed_paths:
+  - docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md
 validation:
-  - command: not started
-    result: NOT_RUN
-    evidence: task prepared for future execution
+  - command: official Laravel/PHP support verification
+    result: PASS
+    evidence: Laravel 13 support policy and PHP supported-versions pages checked on 2026-07-18.
+  - command: php -v
+    result: PASS_WITH_LIMITATION
+    evidence: sandbox provides PHP 8.4.16, below selected project target PHP 8.5.
+  - command: composer --version
+    result: NOT_AVAILABLE
+    evidence: Composer is not installed in the sandbox.
 blockers: []
-next_action: Verify current repository and official Laravel/PHP support state, claim paths, create a dedicated task branch, then bootstrap the minimal Laravel application and CI baseline.
+next_action: Add the minimal Laravel 13 application scaffold, Blade home/status routes, safe environment template, baseline tests and temporary lock-generation CI on the dedicated task branch.
 ```
