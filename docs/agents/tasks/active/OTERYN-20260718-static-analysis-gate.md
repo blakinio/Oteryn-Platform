@@ -6,14 +6,14 @@ Add a mandatory PHP/Laravel static-analysis gate before Phase 3 Identity/Auth im
 
 ## Acceptance criteria
 
-- [ ] Add maintained PHPStan/Larastan dependencies compatible with the repository's Laravel 13 / PHP 8.5 stack.
-- [ ] Configure the strictest practical analysis level and analyse application code without suppressing new findings.
-- [ ] Add a Composer static-analysis script.
-- [ ] Make static analysis a mandatory CI step while preserving Composer validation, lockfile install, Pint and tests.
-- [ ] Keep `composer.lock` consistent with `composer.json`.
-- [ ] Run `composer validate --strict`, install from lockfile, format check, static analysis and full tests.
-- [ ] Record current-head GitHub Actions evidence and leave a complete handover with exactly one `next_action`.
-- [ ] Do not implement Identity/Auth, MFA, user sessions, password migration, payments, public-WWW features or Canary changes.
+- [x] Add maintained PHPStan/Larastan dependencies compatible with the repository's Laravel 13 / PHP 8.5 stack.
+- [x] Configure the strictest practical analysis level and analyse application code without suppressing new findings.
+- [x] Add a Composer static-analysis script.
+- [x] Make static analysis a mandatory CI step while preserving Composer validation, lockfile install, Pint and tests.
+- [x] Keep `composer.lock` consistent with `composer.json`.
+- [x] Run `composer validate --strict`, install from lockfile, format check, static analysis and full tests.
+- [x] Record current-head GitHub Actions evidence and leave a complete handover with exactly one `next_action`.
+- [x] Do not implement Identity/Auth, MFA, user sessions, password migration, payments, public-WWW features or Canary changes.
 
 ## Ownership
 
@@ -25,12 +25,15 @@ owned_paths:
   - phpstan-baseline.neon
   - .github/workflows/ci.yml
   - .github/workflows/static-analysis-lockfile.yml
+  - app/PublicGameData/CanaryGameDataRepository.php
+  - tests/Unit/BootstrapTest.php
   - docs/architecture/TEST_STRATEGY.md
   - docs/agents/tasks/active/OTERYN-20260718-static-analysis-gate.md
 modules:
   - CI
   - test infrastructure
   - PHP static analysis
+  - PublicGameData type annotations only
 dependencies:
   - none
 blockers:
@@ -43,11 +46,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-18T23:36:59+02:00
-head: 874215a0f962e8e8efd8873a2b3e58802ea141ce
+updated_at: 2026-07-18T23:45:35+02:00
+head: da22e7c4f85e7407e391ce0f1b93c4003c54ddc6
 branch: task/OTERYN-20260718-static-analysis-gate
-pr: none
-status: implementing
+pr: 6
+status: ready
 context_routes:
   - agent-governance
   - testing
@@ -59,41 +62,73 @@ owned_paths:
   - phpstan-baseline.neon
   - .github/workflows/ci.yml
   - .github/workflows/static-analysis-lockfile.yml
+  - app/PublicGameData/CanaryGameDataRepository.php
+  - tests/Unit/BootstrapTest.php
   - docs/architecture/TEST_STRATEGY.md
   - docs/agents/tasks/active/OTERYN-20260718-static-analysis-gate.md
 proven:
-  - main HEAD at task creation is 874215a0f962e8e8efd8873a2b3e58802ea141ce.
-  - The repository uses Laravel ^13.8 and PHP ^8.5, has Pint and PHPUnit, and has no PHPStan/Larastan dependency or static-analysis Composer script on main.
-  - Main CI validates Composer metadata/lockfile, installs from lockfile, runs Pint format check and runs the full Composer test script, but has no static-analysis step.
-  - Open PR #5 owns only online-status documentation/contract paths and does not overlap this task's Composer, PHPStan, CI or test-strategy paths.
-  - PR #5 owns docs/agents/ACTIVE_WORK.md and docs/agents/PROJECT_STATE.md, so this task will not edit those shared files.
-  - Larastan 3.x supports Laravel 11.16+ and PHP 8.2+, which includes this Laravel 13 / PHP 8.5 repository.
+  - main HEAD at task creation was 874215a0f962e8e8efd8873a2b3e58802ea141ce.
+  - The repository uses Laravel ^13.8 and PHP ^8.5; main had Pint and PHPUnit but no PHPStan/Larastan dependency, Composer analysis script or static-analysis CI step.
+  - Open PR #5 owns online-status documentation/contract paths only; it does not overlap this task's final Composer, PHPStan, CI, PublicGameData code, unit-test or test-strategy paths.
+  - PR #5 owns docs/agents/ACTIVE_WORK.md and docs/agents/PROJECT_STATE.md, so this task did not edit those shared files.
+  - Composer resolved larastan/larastan v3.10.0 and phpstan/phpstan 2.2.5 into the committed lockfile under the declared compatible constraints.
+  - phpstan.neon.dist runs Larastan/PHPStan at level 10 across app, bootstrap, config, database, routes and tests with no ignoreErrors and no baseline.
+  - The first level-10 run found exactly four actionable findings: three missing Laravel generic return types in CanaryGameDataRepository and one always-true placeholder BootstrapTest assertion.
+  - The three PublicGameData findings were fixed with precise stdClass paginator/collection PHPDoc generics without changing query behavior.
+  - The placeholder BootstrapTest was replaced with a runtime assertion that the PDO SQLite driver required by the repository's local/test database strategy is available.
+  - A second level-10 run rejected the initial phpversion assertion as statically always true; the PDO SQLite assertion removed the final finding without weakening PHPStan configuration.
+  - GitHub Actions CI run 29662164185 on head da22e7c4f85e7407e391ce0f1b93c4003c54ddc6 completed successfully through Composer validation, lockfile install, Pint, level-10 static analysis and full tests.
+  - The temporary lockfile/diagnostic workflow was removed; only the existing CI workflow remains in the final diff.
+  - No Identity/Auth, MFA, user-session, password-migration, payment, public-WWW or Canary changes were made.
 derived:
-  - A dedicated PHPStan 2.x plus Larastan 3.x gate is compatible with the current framework/runtime direction.
-  - Analysis should start at PHPStan level 10 with no baseline; a baseline is permitted only if actual legacy findings make it technically necessary.
-unknown:
-  - Exact findings produced by level 10 analysis on the current application code.
-  - Exact compatible dependency versions Composer will resolve into the lockfile.
+  - Level 10 is practical for the current codebase and does not require a baseline.
+  - New static-analysis findings will fail the mandatory CI job before tests can report success.
+  - The four initial findings were small enough to fix directly, so introducing a baseline would have hidden fixable debt without technical justification.
+unknown: []
 conflicts: []
 first_failure:
-  marker: local-checkout-unavailable
-  evidence: sandbox git clone failed because github.com DNS resolution is unavailable; GitHub API and GitHub Actions remain available for repository writes and validation
+  marker: static-analysis-level-10
+  evidence: GitHub Actions CI run 29662027410 failed at Run static analysis with four findings; Composer validation, lockfile install and Pint had already passed
 rejected_hypotheses:
-  - Static analysis was already added after the prompt was written: rejected by current main composer.json, CI workflow and repository search.
+  - Static analysis was already added after the prompt was written: rejected by current main composer.json, CI workflow and repository search at task start.
+  - A PHPStan baseline is required for legacy findings: rejected because all four initial findings and the one follow-up test finding were fixed directly and the level-10 gate passes with no baseline.
+  - PHPStan strictness needed to be reduced for PHPUnit PHPDoc certainty: rejected by replacing the placeholder assertion with a meaningful PDO SQLite runtime check.
 changed_paths:
+  - composer.json
+  - composer.lock
+  - phpstan.neon.dist
+  - .github/workflows/ci.yml
+  - app/PublicGameData/CanaryGameDataRepository.php
+  - tests/Unit/BootstrapTest.php
+  - docs/architecture/TEST_STRATEGY.md
   - docs/agents/tasks/active/OTERYN-20260718-static-analysis-gate.md
 validation:
   - command: startup repository/task/PR/ownership verification
     result: PASS
-    evidence: main HEAD, root governance, project state, repository map, context routing, security architecture, test strategy, active work, open PR #5, composer.json and CI inspected
+    evidence: main HEAD, root governance, project state, repository map, context routing, security architecture, test strategy, active work, open PR #5, composer.json, composer.lock intent and CI inspected before writes
   - command: local git checkout verification
     result: BLOCKED
-    evidence: execution sandbox cannot resolve github.com for git clone; no local working tree exists to inspect
+    evidence: execution sandbox could not resolve github.com for git clone; repository writes used GitHub API and executable PHP/Composer validation used GitHub Actions
+  - command: composer validate --strict
+    result: PASS
+    evidence: GitHub Actions run 29662164185 job 88126568895 on head da22e7c4f85e7407e391ce0f1b93c4003c54ddc6
+  - command: composer install --no-interaction --prefer-dist --no-progress
+    result: PASS
+    evidence: GitHub Actions run 29662164185 job 88126568895 on head da22e7c4f85e7407e391ce0f1b93c4003c54ddc6
+  - command: composer format:check
+    result: PASS
+    evidence: GitHub Actions run 29662164185 job 88126568895 on head da22e7c4f85e7407e391ce0f1b93c4003c54ddc6
+  - command: composer analyse
+    result: PASS
+    evidence: GitHub Actions run 29662164185 job 88126568895 on head da22e7c4f85e7407e391ce0f1b93c4003c54ddc6; PHPStan/Larastan level 10, no baseline
+  - command: composer test
+    result: PASS
+    evidence: GitHub Actions run 29662164185 job 88126568895 on head da22e7c4f85e7407e391ce0f1b93c4003c54ddc6
 blockers:
   - none
-next_action: Open the draft PR, then add PHPStan/Larastan configuration and use GitHub Actions to resolve and capture the updated Composer lockfile.
+next_action: Squash-merge PR #6 after confirming the final CI check is green on the live PR HEAD.
 ```
 
 ## Notes
 
-The temporary `static-analysis-lockfile.yml` path is owned only as a bootstrap mechanism if needed to resolve the lockfile in GitHub Actions; it must not remain in the final PR unless it has an independently justified permanent purpose.
+The execution sandbox could not create a local checkout because outbound DNS for `github.com` was unavailable. The same required commands were executed by the repository's GitHub Actions runner against the PR code. Temporary workflows were used only to generate the Composer lockfile and capture complete PHPStan diagnostics, then removed before final delivery.
