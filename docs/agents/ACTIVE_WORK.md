@@ -4,11 +4,9 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-No active task is currently claimed.
-
-## Recommended next task
-
-Create `OTERYN-20260718-game-read-model` to implement only evidence-backed read-only highscores, character profiles, guilds and channel/server-status surfaces from `docs/contracts/CANARY_DATA_CONTRACT.md`. Keep cluster-wide online character identity `UNKNOWN` until its source/freshness contract is proven.
+| Task | Status | Scope | Record |
+|---|---|---|---|
+| OTERYN-20260718-game-read-model | implementing | Evidence-backed read-only highscores, character profiles, guilds and configured channel/server metadata; no shared writes and no unproven global online list | `docs/agents/tasks/active/OTERYN-20260718-game-read-model.md` |
 
 ## Recently completed
 
