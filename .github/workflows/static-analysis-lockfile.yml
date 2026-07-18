@@ -1,0 +1,34 @@
+name: Static Analysis Lockfile Bootstrap
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Resolve static-analysis dependencies
+        run: composer update larastan/larastan phpstan/phpstan --with-all-dependencies --no-interaction --prefer-dist --no-progress
+
+      - name: Upload resolved lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: composer-lock
+          path: composer.lock
+          if-no-files-found: error
+          retention-days: 1
