@@ -46,10 +46,10 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-18T23:40:25+02:00
-head: d94915064e64b7cd6c02dcd91268743224289f76
+updated_at: 2026-07-18T23:45:38+02:00
+head: 12390969ea7a07f908733edb985eddb777d5568f
 branch: task/OTERYN-20260718-db-privilege-boundary
-pr: none
+pr: 7
 status: implementing
 context_routes:
   - agent-governance
@@ -75,32 +75,42 @@ proven:
   - The current contract approves `cluster_sessions` for a future bounded online-list read, but current main application code does not read that table; least privilege therefore does not justify granting it yet.
   - Current PublicGameData integration tests use SQLite `PRAGMA query_only = ON`, which protects the test connection but does not prove production MySQL/MariaDB credentials are read-only.
   - Canary is built with `libmariadb`; the Platform uses Laravel's MySQL driver, so the target privilege mechanism must stay within common MySQL/MariaDB grant semantics.
+  - Draft PR #7 exists from the dedicated task branch against main.
+  - Provisioning template grants direct SELECT only on players, guilds, guild_membership, guild_ranks and channels after explicitly revoking historical excess privileges from the dedicated account; it is a placeholder-only review artifact and is not auto-executed.
+  - The verifier inspects SHOW GRANTS FOR CURRENT_USER without performing writes and does not emit raw grant statements.
+  - The verifier accepts only account-level USAGE plus direct table-level SELECT on the exact five-table allowlist and fails closed on write/admin/DDL/global/schema-wide/extra-table/role/unrecognized grant shapes.
+  - Focused unit tests cover the exact valid grant set and rejection of write privilege, schema-wide SELECT, extra tables, missing required grants, role grants and GRANT OPTION.
 derived:
   - The current production read credential table allowlist should be exactly: players, guilds, guild_membership, guild_ranks, channels.
   - A future feature that starts reading `cluster_sessions` must update provisioning grants and privilege-verifier allowlist in the same reviewed change.
   - Deterministic fail-closed verification should accept only direct `USAGE` plus direct table-level `SELECT` grants on the exact allowlist and reject role-based or otherwise unrecognized grant forms rather than claiming they are safe.
 unknown:
-  - Exact production MySQL/MariaDB server product and version are not proven by the repository; provisioning must avoid version-specific privilege features and document this limitation.
+  - Exact production MySQL/MariaDB server product and version are not proven by the repository; provisioning avoids version-specific privilege features and the verifier rejects unsupported privilege models.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
+  marker: local-checkout-unavailable
+  evidence: local git access to github.com is unavailable due DNS; GitHub connector and GitHub Actions are the available write/validation paths
 rejected_hypotheses:
   - Treat the username `oteryn_readonly` as an enforced security control: rejected because the current configuration proves only a name, not database privileges.
   - Treat SQLite `PRAGMA query_only` tests as production enforcement: rejected because production uses a MySQL-driver Canary connection.
   - Pre-grant `cluster_sessions` because the contract approves a future read: rejected because no current main code reads it and least privilege requires grants to follow the implemented read surface.
 changed_paths:
+  - database/provisioning/canary-readonly.sql.template
+  - app/CanaryIntegration/CanaryDatabasePrivilegeVerifier.php
+  - routes/console.php
+  - tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php
   - docs/agents/tasks/active/OTERYN-20260718-db-privilege-boundary.md
+  - .github/workflows/db-privilege-boundary-contract-patch.yml (temporary self-removing patch helper; must not remain in final diff)
 validation:
   - command: startup repository/task/PR/ownership verification
     result: PASS
     evidence: root governance, required architecture/contracts, merged PR #5, open PR #6, current main, Canary connection, PublicGameData repository and tests inspected
   - command: local checkout validation
     result: UNAVAILABLE
-    evidence: this execution environment operates through the GitHub connector and has no local repository checkout; local Git/worktree commands cannot be claimed
+    evidence: git access to github.com cannot resolve DNS in the execution sandbox; local Git/worktree commands cannot be claimed
 blockers:
   - none
-next_action: Open a draft PR, then implement the exact five-table provisioning template and fail-closed grant verifier with tests.
+next_action: Inspect the temporary contract-patch workflow result, then inspect CI failures on the resulting implementation head and fix root causes.
 ```
 
 ## Notes
