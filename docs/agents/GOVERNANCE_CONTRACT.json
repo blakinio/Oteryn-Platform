@@ -5,6 +5,7 @@
     "version": 1,
     "reference": {
       "repository": "blakinio/canary",
+      "observed_at_canary_commit": "c1c0d10ed1e758cb72728be5fe22458cd9d9e61a",
       "checkpoint_version": 1
     },
     "required_fields": [
