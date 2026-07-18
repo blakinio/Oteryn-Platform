@@ -2,26 +2,56 @@
 
 Navigation map for autonomous agents. This is not an exhaustive inventory. Confirm current paths before editing.
 
+## Product/application paths
+
 | Area | Typical paths | Responsibility / cautions |
 |---|---|---|
-| Application core | `app/**` | Laravel application logic. Keep domain responsibilities explicit and avoid unrelated refactors. |
+| Application core | `app/**` | Laravel application logic. Keep domain/module responsibilities explicit and avoid unrelated refactors. |
 | HTTP / API | `routes/**`, `app/Http/**` | Public routes, middleware, controllers, request validation and API boundaries. Treat auth-sensitive endpoints as security-critical. |
-| Authentication / identity | `app/**/Auth/**`, `app/Models/**`, auth configuration | Passwords, sessions, MFA, verification, recovery, authorization. Never invent security state or bypass framework protections. |
-| Database | `database/migrations/**`, `database/seeders/**`, `database/factories/**` | Schema and data changes. Destructive production migrations require an explicit rollback plan and manual gate. |
-| Canary integration | `app/**`, `config/**`, `docs/contracts/**` | Contracts with Canary/login-server/database schema. Document cross-repository assumptions and version-sensitive fields. |
+| Authentication / identity | planned module paths under `app/**` plus auth configuration | Passwords, sessions, MFA, verification, recovery. Read security + game-login contract before implementation. |
+| Database | `database/migrations/**`, `database/seeders/**`, `database/factories/**` | Platform schema/data changes. Shared Canary schema is contract-controlled. |
+| Canary integration | planned integration adapters, `config/**`, `docs/contracts/**` | Never assume generic TFS/MyAAC schema. Verify Oteryn Canary evidence. |
 | Public web / CMS | `resources/views/**`, `resources/js/**`, `resources/css/**` | Blade/frontend/CMS. Escape untrusted output and preserve CSRF protections. |
-| Admin | admin-specific controllers/routes/policies/views | Privileged operations. Require explicit authorization policies and auditability. |
-| Tests | `tests/**` | Unit, feature, integration and security regression tests. |
+| Admin | planned admin controllers/routes/policies/views | Privileged operations. Explicit policies, MFA target and auditability required. |
+| Tests | `tests/**` | Unit, feature, integration, contract and security regression tests. |
 | Configuration | `config/**`, `.env.example` | Commit examples only. Never commit real credentials, tokens or production secrets. |
 | CI | `.github/workflows/**` | Required checks and deployment validation. Do not weaken checks to obtain green CI. |
-| Docs | `docs/**` | Architecture, contracts, ADRs, security decisions and operational handoffs. |
-| Agent memory | `AGENTS.md`, `docs/agents/**` | Coordination, routing, task records and durable continuation state. |
+
+## Architecture and durable project memory
+
+| Area | Path | Purpose |
+|---|---|---|
+| Current project state | `docs/agents/PROJECT_STATE.md` | Compact authoritative entry point for current phase, capabilities, unknowns and next work. |
+| Active work index | `docs/agents/ACTIVE_WORK.md` | Convenience index; verify individual task and PR. |
+| Active tasks | `docs/agents/tasks/active/**` | Authoritative task checkpoint/ownership records. |
+| Archived tasks | `docs/agents/tasks/archive/**` | Completed historical task records. |
+| System architecture | `docs/architecture/SYSTEM_ARCHITECTURE.md` | System context, trust boundaries and dependency rules. |
+| Module catalog | `docs/architecture/MODULE_CATALOG.md` | Module responsibility and ownership. |
+| Security architecture | `docs/architecture/SECURITY_ARCHITECTURE.md` | Mandatory security invariants. |
+| Data ownership | `docs/architecture/DATA_OWNERSHIP.md` | Platform/Canary/shared persistent data rules. |
+| Test strategy | `docs/architecture/TEST_STRATEGY.md` | Unit/feature/integration/contract/E2E strategy. |
+| Roadmap | `docs/architecture/ROADMAP.md` | Phased delivery order and exit gates. |
+| ADRs | `docs/architecture/adr/**` | Durable decisions and supersession history. |
+| Integration contracts | `docs/contracts/**` | Canary/login-server/shared schema/auth compatibility. |
+| Agent governance | `AGENTS.md`, `docs/agents/CONTEXT_*` | Coordination, routing and handoff rules. |
+
+## Mandatory discovery for shared data/auth
+
+Before implementing shared auth/account/character mutations, search/read:
+
+- `docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md`;
+- `docs/contracts/CANARY_DATA_CONTRACT.md`;
+- `docs/architecture/DATA_OWNERSHIP.md`;
+- `docs/architecture/SECURITY_ARCHITECTURE.md`.
+
+Then verify the actual external repository/schema evidence. Documentation placeholders do not prove compatibility.
 
 ## Discovery commands
 
 ```sh
 find . -name AGENTS.md -print
 find docs/agents/tasks/active -maxdepth 1 -type f -print
+rg -n "UNKNOWN|CONFLICT|DISCOVERY" docs/architecture docs/contracts docs/agents
 rg -n "auth|session|mfa|password|account|player|guild|canary|login-server" app routes config database tests docs
 rg -n "Route::|middleware|Gate::|Policy|Hash::|DB::transaction" app routes tests
 ```
