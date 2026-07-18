@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 | Task | Status | Scope | Record |
 |---|---|---|---|
-| OTERYN-20260718-laravel-bootstrap | ready | Bootstrap maintained Laravel/PHP application, Blade, test baseline and CI; no speculative Canary auth/data integration | `docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md` |
+| OTERYN-20260718-laravel-bootstrap | validating | Bootstrap maintained Laravel/PHP application, Blade, test baseline and CI; no speculative Canary auth/data integration | `docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md` |
 
 ## Recently completed
 

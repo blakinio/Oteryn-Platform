@@ -6,7 +6,7 @@ Create the initial maintained Laravel/PHP application foundation for Oteryn Plat
 
 ## Status
 
-In progress.
+Validation in progress.
 
 ## Required startup context
 
@@ -94,11 +94,11 @@ Exact commands must come from the bootstrapped repository. Expected categories:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-18T22:10:00+02:00
-head: fa7a0591c722175b3b13747284fcaba7d5a9a54a
+updated_at: 2026-07-18T22:20:00+02:00
+head: fabc91931bbbd1ed1158735091716d4decf0213b
 branch: task/OTERYN-20260718-laravel-bootstrap
 pr: 1
-status: implementing
+status: validating
 context_routes:
   - architecture
   - testing
@@ -123,42 +123,48 @@ owned_paths:
   - phpunit.xml
   - .github/workflows/**
   - README.md
-  - docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md
+  - docs/agents/**
 proven:
   - Phase 0 architecture and agent bootstrap is complete on main.
   - ADR 0001 selects a Laravel modular monolith with Blade as the initial direction.
   - Canary and login-server integration require separate evidence-backed contracts.
   - Payments are deferred.
   - No open pull request was found for this task or another overlapping OTERYN task at startup.
-  - docs/agents/ACTIVE_WORK.md lists only this Laravel bootstrap task as active.
+  - docs/agents/ACTIVE_WORK.md listed only this Laravel bootstrap task as active at startup.
   - Official Laravel 13 release notes list Laravel 13 as released on 2026-03-17, requiring PHP 8.3 or newer and supporting PHP 8.3-8.5.
   - Official PHP supported-versions information lists PHP 8.5 under active support through 2027-12-31 and security support through 2029-12-31.
   - The target stack selected for this bootstrap is Laravel 13 on PHP 8.5.
-  - A draft PR exists as PR #1 from task/OTERYN-20260718-laravel-bootstrap to main.
-  - The initial scaffold intentionally contains no account/user model and no auth/account migrations.
+  - Draft PR #1 exists from task/OTERYN-20260718-laravel-bootstrap to main.
+  - The application scaffold contains no account/user model and no auth/account migrations.
+  - Laravel's built-in health route is configured at /health and feature-tested for HTTP 200 without environment-key labels.
+  - Composer dependency resolution on PHP 8.5 succeeded and composer.lock is committed.
+  - The lockfile resolved laravel/framework v13.20.0, laravel/pint v1.29.3, phpunit/phpunit 12.5.31, nunomaduro/collision v8.9.5 and mockery/mockery 1.6.12.
+  - Bootstrap validation run 29659175593 completed successfully: dependency resolution, Composer validation, Pint check and tests all passed.
 derived:
   - The bootstrap remains independent of Canary and login-server schema/auth decisions.
-  - Laravel Pint plus Composer validation and PHPUnit provide a useful baseline; separate static analysis is deferred until substantive application/domain code exists.
+  - Laravel Pint plus Composer validation and PHPUnit provide a useful initial baseline; separate static analysis is deferred until substantive application/domain code exists.
+  - The final CI can now use composer install exclusively because composer.lock is present.
 unknown:
-  - Final resolved Composer dependency graph and lockfile until generated on PHP 8.5.
-  - CI result for the scaffold commit.
+  - Final CI result on the lockfile-backed current head.
 conflicts: []
 first_failure:
   marker: LOCAL_RUNTIME_PHP_VERSION
-  evidence: The available sandbox runtime is PHP 8.4.16 and has no Composer binary, so PHP 8.5 dependency resolution and full Laravel execution must be validated in GitHub Actions.
+  evidence: The available sandbox runtime is PHP 8.4.16 and has no Composer binary, so PHP 8.5 dependency installation and full Laravel execution are validated in GitHub Actions instead of the sandbox.
 rejected_hypotheses:
   - Use Laravel 12: rejected because Laravel 13 is the current maintained major release and has a longer support window.
   - Add Larastan immediately: deferred because the bootstrap has no substantive domain code yet; formatter, Composer validation and PHPUnit provide the initial baseline.
   - Keep Laravel's default users/auth migration scaffold: rejected to avoid implying a shared account schema before Canary/Auth discovery.
+  - Keep a write-capable bootstrap workflow: rejected after lock generation; final CI returns to contents: read and lockfile-only installation.
 changed_paths:
   - .editorconfig
   - .env.example
   - .gitattributes
   - .gitignore
-  - .github/workflows/bootstrap-lock.yml
+  - .github/workflows/ci.yml
   - README.md
   - artisan
   - composer.json
+  - composer.lock
   - phpunit.xml
   - app/**
   - bootstrap/**
@@ -169,6 +175,7 @@ changed_paths:
   - routes/**
   - storage/**
   - tests/**
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md
 validation:
   - command: official Laravel/PHP support verification
@@ -180,6 +187,18 @@ validation:
   - command: composer --version
     result: NOT_AVAILABLE
     evidence: Composer is not installed in the sandbox.
+  - command: composer update --no-interaction --prefer-dist --no-progress
+    result: PASS
+    evidence: GitHub Actions run 29659175593 on PHP 8.5 generated composer.lock.
+  - command: composer validate --strict
+    result: PASS
+    evidence: GitHub Actions run 29659175593.
+  - command: vendor/bin/pint --test
+    result: PASS
+    evidence: GitHub Actions run 29659175593.
+  - command: composer test
+    result: PASS
+    evidence: GitHub Actions run 29659175593.
 blockers: []
-next_action: Commit the scaffold, inspect the GitHub Actions run, download the generated composer.lock artifact, and fix any dependency, formatting, or test failures before replacing the temporary workflow with final CI.
+next_action: Run the final read-only lockfile-backed CI on the current PR head, inspect its exact result and the final PR diff, then complete the merge gate and handover.
 ```
