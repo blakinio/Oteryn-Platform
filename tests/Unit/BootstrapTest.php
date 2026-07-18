@@ -6,8 +6,11 @@ use PHPUnit\Framework\TestCase;
 
 class BootstrapTest extends TestCase
 {
-    public function test_unit_test_harness_is_available(): void
+    public function test_php_runtime_is_available(): void
     {
-        $this->assertTrue(true);
+        $version = phpversion();
+
+        $this->assertIsString($version);
+        $this->assertNotSame('', $version);
     }
 }
