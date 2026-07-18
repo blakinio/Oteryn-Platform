@@ -41,10 +41,10 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-18T23:17:10+02:00
-head: 874215a0f962e8e8efd8873a2b3e58802ea141ce
+updated_at: 2026-07-18T23:18:23+02:00
+head: d3dc100744f730d908179600edd0e7d3ba11b4ae
 branch: task/OTERYN-20260718-online-status-discovery
-pr: none
+pr: 5
 status: investigating
 context_routes:
   - agent-governance
@@ -64,6 +64,7 @@ proven:
   - The existing Canary data contract marks the global public online list UNKNOWN and does not approve players_online or cluster_sessions as a sole public source.
   - No other active task ownership is declared on main, so the owned_paths above do not overlap another recorded active task.
   - blakinio/canary is read-only for this task.
+  - Draft PR #5 targets main from task/OTERYN-20260718-online-status-discovery.
 derived:
   - The handover state on main requires bounded online-status discovery rather than online-list implementation.
 unknown:
@@ -79,6 +80,7 @@ rejected_hypotheses:
   - Treat players_online as authoritative without proving its writer lifecycle: rejected by the existing contract.
   - Treat cluster_sessions as a public online list without proving lease/freshness/failure semantics: rejected by the existing contract.
 changed_paths:
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260718-online-status-discovery.md
 validation:
   - command: startup state verification
