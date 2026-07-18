@@ -4,19 +4,21 @@ Oteryn Platform is the first-party web/application platform for the Oteryn Open 
 
 ## Current implementation
 
-The repository now contains the Phase 1 Laravel application foundation:
+The repository contains the Laravel application foundation plus initial evidence-backed read-only PublicGameData surfaces:
 
 - Laravel 13 on PHP 8.5;
 - server-rendered Blade UI;
 - safe local `.env.example` defaults with no committed secrets;
 - SQLite as the default local/test database connection;
+- dedicated Canary read connection for public game-data queries;
 - `GET /health` using Laravel's health route;
-- baseline unit and feature tests;
+- public level highscores, character profiles, guild details and configured channel metadata;
+- baseline unit/feature/integration tests;
 - Laravel Pint formatting checks;
 - lockfile-backed Composer installs;
 - GitHub Actions CI.
 
-The bootstrap intentionally does not implement Canary authentication, credential migration, MFA, account/character mutations, payments, or other shared-data write paths.
+Authentication, credential migration, MFA, account/character mutations, payments and all direct Canary/shared-data writes remain out of scope until their contracts and implementation tasks are explicitly approved.
 
 ## Local setup
 
@@ -34,6 +36,21 @@ The application is then available at `http://localhost:8000`.
 
 The health endpoint is available at `GET /health`. It reports only application availability and does not expose environment variables, configuration, version details, or secrets.
 
+## Read-only Canary game data
+
+The public read routes use the dedicated `canary` database connection:
+
+- `GET /highscores`
+- `GET /characters/{name}`
+- `GET /guilds/{name}`
+- `GET /servers`
+
+Configure `CANARY_DB_*` values in the local `.env`. The database user must be provisioned outside this repository with least-privilege `SELECT` access only to the required Canary tables. Do not reuse Canary's server credential or a database root/admin account.
+
+The current public read model intentionally does **not** implement a cluster-wide online character list or claim live per-channel availability. The authoritative source/freshness contract for that data remains unresolved.
+
+No application caching is used for these initial game-data reads because acceptable staleness semantics have not yet been defined.
+
 ## Validation
 
 ```sh
@@ -50,11 +67,13 @@ composer format
 
 GitHub Actions installs dependencies from `composer.lock`, validates Composer metadata/lock consistency, checks formatting, and runs the Laravel/PHPUnit test suite on PHP 8.5.
 
-A separate static-analysis dependency is intentionally deferred until substantive application/domain code exists. The bootstrap baseline uses Composer validation, Laravel Pint, PHP parsing/runtime through the test suite, and PHPUnit unit/feature tests.
+The PublicGameData integration tests seed an isolated SQLite Canary connection and enable SQLite `query_only` mode before requests, so accidental writes from the read endpoints fail validation.
 
 ## Data and integration boundaries
 
-Canary and login-server behavior are external contracts. Do not add shared account/player/authentication write paths until the matching evidence-backed contract task proves the required schema and session semantics.
+Canary and login-server behavior are external contracts. Shared account/player/authentication mutations remain blocked unless a future operation-level contract explicitly approves them.
+
+Public game-data queries use explicit selected columns and exclude deleted characters where required by `docs/contracts/CANARY_DATA_CONTRACT.md`.
 
 ## Authoritative project documentation
 
