@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-No active task is currently claimed.
+- `OTERYN-20260718-online-status-discovery` — branch `task/OTERYN-20260718-online-status-discovery`, draft PR #5; read-only Canary source discovery to prove cluster-wide online-character identity plus freshness/failure semantics before any online-list implementation.
 
 ## Recommended next task
 
-Create `OTERYN-20260718-online-status-discovery` to prove one authoritative cluster-wide online-character identity source plus freshness and failure semantics before implementing an online-list route. Inspect `players_online`, `cluster_sessions`, process-local status and multichannel runtime state read-only; do not guess.
+None while `OTERYN-20260718-online-status-discovery` is active. Continue from that task's single checkpoint `next_action`.
 
 ## Recently completed
 
