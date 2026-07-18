@@ -4,11 +4,9 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-No active task is currently claimed after completion of the Laravel bootstrap.
-
-## Next recommended task
-
-Create `OTERYN-20260718-canary-schema-discovery` to prove the current Oteryn Canary account/player/guild/session-related schema and permitted read/write contract before implementing shared-data mutations.
+| Task | Status | Scope | Record |
+|---|---|---|---|
+| OTERYN-20260718-canary-schema-discovery | investigating | Read-only evidence-backed discovery of current `blakinio/canary` account/player/guild/world/online/ban/session schema and permitted Platform data contract | `docs/agents/tasks/active/OTERYN-20260718-canary-schema-discovery.md` |
 
 ## Recently completed
 
