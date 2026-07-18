@@ -1,0 +1,244 @@
+# Oteryn Platform Agent Instructions
+
+## Instruction order
+
+1. This root `AGENTS.md`.
+2. The nearest nested `AGENTS.md`, when present.
+3. `docs/agents/REPOSITORY_MAP.md` and `docs/agents/CONTEXT_ROUTING.md`.
+4. The active task checkpoint and live PR for the current task, when present.
+5. Only the task-routed documentation and source evidence required for the task.
+
+When rules conflict, follow the more restrictive safety rule.
+
+## Repository allowlist — highest priority
+
+- The only repository where autonomous write operations are allowed by this file is `blakinio/Oteryn-Platform`.
+- Treat `blakinio/canary`, `opentibiabr/canary`, MyAAC repositories and all other repositories as read-only unless the user explicitly authorizes a write task for that repository.
+- Before every GitHub write operation, verify that `repository_full_name` is exactly `blakinio/Oteryn-Platform`, unless the user explicitly authorized another repository in the current task.
+- Do not push Oteryn Platform code into the Canary repository.
+- Cross-repository compatibility work must be documented as a contract; do not silently change both sides.
+
+## Mandatory lean startup protocol
+
+Before substantial implementation:
+
+1. Read this file.
+2. Read `docs/agents/REPOSITORY_MAP.md` and `docs/agents/CONTEXT_ROUTING.md`.
+3. If continuing existing work, read its active task `## Context checkpoint` and current live PR/head before broad discovery.
+4. Classify the task using routes from `CONTEXT_ROUTING.md` and load only matching context.
+5. Search active tasks and open PRs narrowly for overlapping paths, modules, identifiers or contracts.
+6. Search the repository for reusable code before designing a new reusable abstraction.
+7. When a local checkout exists, verify Git branch, working tree, remotes and worktrees before editing.
+8. Record uncertainty instead of inventing repository, deployment, database or cross-repository state.
+
+Do not recursively load unrelated documentation.
+
+## Durable context and continuation — mandatory
+
+- Chat history is disposable and never authoritative project state.
+- Git state, active task records, live PRs and deterministic evidence are authoritative.
+- Follow `docs/agents/CONTEXT_HANDOFF.md` when context grows materially, work is interrupted or another agent must continue.
+- Maintain a compact `## Context checkpoint` in every substantial active task.
+- Update the checkpoint after material discoveries, patches, validation changes, review changes, head changes, blockers and before session exhaustion.
+- Use evidence states consistently: `PROVEN`, `DERIVED`, `UNKNOWN`, `CONFLICT`.
+- Never convert `UNKNOWN` into an assumption.
+- Leave exactly one concrete `next_action` in a handoff.
+
+## Work visibility and task records — mandatory
+
+For substantial work:
+
+- create `docs/agents/tasks/active/OTERYN-YYYYMMDD-short-slug.md` from `docs/agents/tasks/TASK_TEMPLATE.md`;
+- declare `owned_paths`, modules, dependencies, blockers and cross-repository dependencies;
+- use one task branch per substantial task;
+- open a draft PR early when GitHub PR workflow is available;
+- treat the task record and live PR as the source of truth;
+- move completed task records to `docs/agents/tasks/archive/` after merge/completion;
+- create an ADR under `docs/architecture/adr/` for architectural decisions expected to outlive one task;
+- document public integration contracts under `docs/contracts/`.
+
+Before creating a service, repository abstraction, API client, auth provider, policy layer, payment abstraction, queue job family or reusable UI component, search for an existing implementation first. Prefer reuse or extension. If reuse is rejected, record the concrete reason.
+
+## Multi-agent concurrency
+
+- One agent uses one task branch/worktree.
+- Never share a branch or worktree between active agents.
+- `owned_paths` are advisory locks; resolve overlaps before editing.
+- Do not perform unrelated cleanup or broad refactors.
+- Do not edit another active task record except to resolve an explicitly coordinated ownership conflict.
+- Shared indexes and architecture documents must be edited narrowly.
+
+## Delivery workflow
+
+Default workflow:
+
+1. inspect current repository/task/PR state;
+2. claim the task and affected paths;
+3. create or update the task record;
+4. create a dedicated task branch;
+5. implement the smallest complete change;
+6. run relevant validation;
+7. create or update the PR;
+8. inspect CI results and logs;
+9. fix root causes and repeat until required checks pass;
+10. update checkpoint/docs/contracts as required;
+11. merge only when the merge gate is satisfied.
+
+Never push feature/fix work directly to `main` after the repository bootstrap phase.
+
+## Merge gate
+
+Merge only when all are true:
+
+- base/head repositories are the approved user-owned repository;
+- base is `main` and head is a dedicated task branch;
+- changed files contain no unrelated or forbidden changes;
+- acceptance criteria are satisfied;
+- relevant local validation ran, or unavailable environment is documented exactly;
+- required GitHub checks pass on the current head;
+- no unresolved blocker, requested change, ownership conflict or migration hold remains;
+- security-critical changes have appropriate regression tests;
+- task record and relevant contracts/architecture docs are current.
+
+Use squash merge unless repository policy requires another method. Never bypass branch protection, weaken tests, remove safety checks or mark failures successful.
+
+## CI repair loop
+
+When CI fails:
+
+1. identify workflow, job, step, current commit SHA and exact error;
+2. inspect logs/artifacts before rerunning;
+3. classify the cause as task code, stale base, CI configuration or external infrastructure;
+4. fix the root cause in the same PR when it belongs to the task;
+5. use a separate narrow task when an unrelated CI repair would obscure the change;
+6. rerun failed jobs only when appropriate;
+7. record failure and fix in the task checkpoint.
+
+A repeated identical failure must be investigated. Do not silence or loosen a check merely to obtain green CI.
+
+## Mandatory stop conditions
+
+Stop automatic merge and document the blocker for:
+
+- secrets, credentials, private keys, database dumps, backups or personal data;
+- destructive production migration without a tested rollback path;
+- production deployment or irreversible external action outside the repository PR;
+- unresolved overlapping path ownership;
+- an atomic cross-repository contract where both sides are not ready;
+- changes that would silently break Canary/login-server compatibility;
+- payment processing changes without explicit task scope and security review;
+- authentication/session changes whose compatibility or revocation behavior remains `UNKNOWN`.
+
+## Architecture boundaries
+
+Oteryn Platform is the web/application platform. Canary is the game server.
+
+Default responsibility split:
+
+- Oteryn Platform: web UI, CMS, accounts, authentication, authorization, admin, API and future payment/business modules.
+- Canary: game runtime and game-server behavior.
+- Shared database or protocol behavior is an explicit integration contract, not an implicit assumption.
+
+Rules:
+
+- Do not change Canary schema assumptions silently.
+- Do not duplicate authentication policy across multiple components without documenting the source of truth.
+- Prefer explicit service/domain boundaries for security-critical logic.
+- Keep future payment functionality modular; core account/auth code must not depend on a payment provider.
+- Read-only game data such as highscores, characters and guilds may use optimized read paths, but privileged state changes require explicit authorization and transactional integrity.
+
+## Security policy — mandatory
+
+Security-sensitive surfaces include authentication, sessions, MFA, password recovery, email verification, admin/RBAC, account/player mutations, API tokens, file uploads, webhooks and future payments.
+
+For these surfaces:
+
+- use framework-provided security mechanisms before custom cryptography or custom session logic;
+- use modern password hashing supported by the selected Laravel/PHP stack; never introduce plaintext or reversible password storage;
+- preserve CSRF protection for browser state-changing requests;
+- validate and authorize every state-changing operation server-side;
+- escape untrusted output by default;
+- use parameterized queries/ORM/query builder; never concatenate untrusted SQL;
+- apply rate limiting to authentication, recovery and abuse-prone endpoints;
+- require explicit authorization policies for privileged operations;
+- deny by default when authorization state is ambiguous;
+- rotate/revoke sessions when security-sensitive account state requires it;
+- require transactions and appropriate locking for balance/currency or other concurrency-sensitive mutations;
+- use idempotency for future payment/webhook operations;
+- add regression tests for every fixed security vulnerability when practical.
+
+Do not claim an endpoint is secure merely because Cloudflare, a WAF or a reverse proxy is present. Application-layer security remains mandatory.
+
+## Secrets and sensitive data
+
+- Never commit `.env`, tokens, passwords, private keys, production connection strings, cookies, personal data, database dumps or backups.
+- Commit only safe templates such as `.env.example` with placeholders.
+- If sensitive data is discovered, stop and report it without reproducing the secret.
+- Do not put secrets in task records, PR bodies, comments, logs, screenshots or test fixtures.
+- Production secrets belong in an approved secret-management/deployment system outside Git.
+
+## Database and migration safety
+
+- Treat migrations as durable production contracts.
+- Prefer backward-compatible, reversible migrations.
+- Never assume a production database is empty.
+- Destructive operations require explicit task scope, data-impact analysis and rollback/backup strategy.
+- Account, session and currency mutations must preserve transactional integrity.
+- Concurrency-sensitive operations require deterministic tests where practical.
+- Canary-owned or shared tables must be treated as cross-repository contracts and documented before incompatible schema changes.
+
+## Laravel / PHP implementation policy
+
+- Follow the Laravel version and conventions actually present in the repository; do not assume a version before `composer.json` exists.
+- Prefer framework validation, middleware, policies/gates, service container, queues/events and database transactions over ad-hoc equivalents.
+- Keep controllers thin; place durable business logic in appropriately scoped services/actions/domain classes.
+- Avoid static global state for request/user/security context.
+- Do not add a dependency when the framework or an existing package already provides the needed capability.
+- Pin and update dependencies deliberately; inspect security and maintenance implications of new packages.
+- Do not edit `vendor/**` or generated dependency directories.
+
+## Validation policy
+
+Before readiness, inspect the full changed-file list and diff.
+
+Run the smallest relevant validation supported by the repository. Depending on installed tooling this may include:
+
+- PHP syntax/static analysis;
+- Laravel/PHPUnit/Pest unit and feature tests;
+- focused auth/security regression tests;
+- migration tests against an isolated test database;
+- formatter/linter checks;
+- API contract tests;
+- CI workflows.
+
+Discover actual project commands from `composer.json`, repository docs and workflows before running them. Do not invent successful test results and do not claim CI passed unless verified on the current head.
+
+## Cross-repository Canary/login-server work
+
+When a task depends on Canary or login-server behavior:
+
+- treat external repositories as read-only unless separately authorized;
+- verify current source/schema rather than relying on memory;
+- record the contract under `docs/contracts/` when durable;
+- identify whether rollout order matters;
+- label facts as `PROVEN`, `DERIVED`, `UNKNOWN` or `CONFLICT`;
+- stop merge when an atomic compatibility requirement is unresolved.
+
+## Git safety
+
+- Never assume a local checkout is synchronized with GitHub.
+- Before editing from a local checkout, inspect branch, working tree, remotes and worktrees.
+- Do not automatically discard, clean, reset or overwrite uncommitted work.
+- Use one dedicated branch per task.
+- Never push task commits directly to `main`.
+- Prefer explicit push targets.
+- Use `--force-with-lease` only when history rewrite is justified; never plain `--force`.
+- Use Conventional Commit style: `<type>(optional-scope): <summary>`.
+
+Preferred types: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `revert`.
+
+## Current bootstrap note
+
+The repository may initially contain only governance/documentation scaffolding. Agents must inspect actual repository state before assuming Laravel, Composer, Node or database tooling has already been initialized.
+
+The first application bootstrap task must establish and document the chosen Laravel/PHP versions, local development workflow, test database strategy and baseline CI before feature work expands broadly.
