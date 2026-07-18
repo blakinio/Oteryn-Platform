@@ -2,15 +2,13 @@
 
 namespace Tests\Unit;
 
+use PDO;
 use PHPUnit\Framework\TestCase;
 
 class BootstrapTest extends TestCase
 {
-    public function test_php_runtime_is_available(): void
+    public function test_sqlite_driver_is_available_for_tests(): void
     {
-        $version = phpversion();
-
-        $this->assertIsString($version);
-        $this->assertNotSame('', $version);
+        $this->assertContains('sqlite', PDO::getAvailableDrivers());
     }
 }
