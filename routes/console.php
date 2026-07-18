@@ -11,7 +11,7 @@ Artisan::command('inspire', function () {
 Artisan::command('canary:verify-db-privileges', function () {
     try {
         $violations = app(CanaryDatabasePrivilegeVerifier::class)->inspect();
-    } catch (\Throwable) {
+    } catch (Throwable) {
         $this->error('Unable to inspect the Canary database privilege boundary.');
 
         return 1;
