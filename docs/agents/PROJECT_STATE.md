@@ -18,7 +18,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Initial read-only PublicGameData implementation: COMPLETE**
 
-**Next work — bounded cluster-wide online-status discovery.**
+**Cluster-wide online-status discovery: COMPLETE**
+
+**Next work — bounded PublicGameData cluster-wide online-list implementation.**
 
 ## What exists on main after the current delivery PR is merged
 
@@ -44,7 +46,10 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - read-only active character profiles at `GET /characters/{name}`;
 - read-only public guild details and membership at `GET /guilds/{name}`;
 - read-only configured channel metadata at `GET /servers`;
-- integration tests that exercise PublicGameData routes after placing an isolated Canary SQLite connection in `query_only` mode.
+- integration tests that exercise PublicGameData routes after placing an isolated Canary SQLite connection in `query_only` mode;
+- an approved cluster-wide online-character read contract using sanitized `cluster_sessions` identity joined to public player fields, with mandatory `ONLINE` status, unexpired lease and active-character filters;
+- explicit online-read stale/failure semantics: expired lease rows are excluded, Canary DB failure is not converted to an empty list, and raw session/security fields remain non-public;
+- proven rejection of shared `players_online` as a multichannel authority because every process periodically rewrites/prunes it from only its local player set.
 
 ## PublicGameData implementation summary
 
@@ -60,16 +65,24 @@ Proven implementation properties:
 - guild details exclude `guilds.balance` and membership data is joined in one paginated read path without per-member N+1 queries;
 - Blade output escapes guild content by default and XSS regression coverage exists for MOTD rendering;
 - server/channel page exposes configured enabled channel metadata and maintenance state only;
-- no `players_online`, `cluster_sessions` or cluster-wide online-character list is exposed by PublicGameData;
-- no application caching is used yet because accepted staleness semantics are not defined.
+- no cluster-wide online-character route is implemented yet;
+- no application caching is used yet.
+
+The approved next PublicGameData online-list implementation contract is:
+
+- backend identity source: `cluster_sessions` joined to `players`;
+- mandatory positive filters: `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms`, `players.deletion = 0`;
+- output: explicit public player allowlist plus durable `channels.id`, never raw account/session/lease identifiers;
+- dependency failure: Canary DB read failure must remain an explicit unavailable/error result, never a synthetic empty list;
+- `players_online`, process-local `ProtocolStatus`, and unbounded stale cache are forbidden fallbacks;
+- SQL `channel_runtime_status` is not a required hard identity gate because it is a best-effort diagnostic mirror; fresh channel availability remains a separate integration concern.
 
 Known PublicGameData unknowns:
 
-- authoritative cluster-wide online-character identity source;
-- freshness and failure semantics for online identity/availability;
-- transport from Canary multichannel runtime state to Oteryn Platform;
+- transport from Canary multichannel runtime state to Oteryn Platform for independent fresh per-channel availability/count;
 - privileged/group-hidden character filtering policy for public rankings;
-- production cache/staleness expectations.
+- production cache/staleness expectations outside the newly bounded online-lease freshness contract;
+- maximum production wall-clock skew relevant to the exact online freshness SLA.
 
 ## Canary data-contract summary
 
@@ -84,13 +97,18 @@ Key proven points:
 - guild ownership/membership/rank tables and constraints are documented;
 - account/IP bans, namelocks and session structures are documented;
 - `account_sessions` and `cluster_sessions` are separate concepts;
+- current `players_online` lifecycle is incompatible with cluster-wide completeness and is rejected as a multichannel authority;
+- `cluster_sessions` acquire/heartbeat/expiry behavior supports a bounded sanitized online-character read contract when status and expiry are both filtered;
+- Redis `ChannelRuntimeRegistry` is the fail-closed per-channel liveness fast path, while SQL `channel_runtime_status` is a best-effort diagnostic mirror;
+- process-local `ProtocolStatus` is not a cluster-wide character-identity source;
 - there are no approved direct Oteryn Platform writes to shared Canary data.
 
 Known data-contract blockers/unknowns:
 
 - `schema.sql` defines `accounts.tournament_coins`, while Canary repository code expects `accounts.coins_tournament` for tournament coin access;
 - actual deployed database shape for that field is not proven;
-- cluster-wide public online-character identity source/freshness policy is not yet contracted;
+- whether another cleanup path eventually physically deletes every expired orphaned `cluster_sessions` row is not proven, but online-read correctness no longer depends on physical deletion because expiry filtering is mandatory;
+- maximum production wall-clock skew relevant to the lease-expiry SLA is not proven;
 - product initialization rules for Platform-driven character creation are not proven.
 
 ## Authentication contract summary
@@ -117,7 +135,7 @@ Unless source is added after this state update, the following are **not implemen
 - MFA;
 - account management;
 - character creation/delete/rename;
-- cluster-wide online character list;
+- cluster-wide online character list route/UI despite its read contract now being approved;
 - live multichannel availability integration;
 - admin/RBAC/audit UI;
 - Canary/shared-data write paths;
@@ -129,27 +147,26 @@ Agents must verify repository source before relying on this list because later t
 
 ## Next planned task
 
-`OTERYN-20260718-online-status-discovery`
+`OTERYN-20260719-online-list-read-model`
 
 Objective:
 
-- inspect current Canary source read-only;
-- prove the lifecycle and semantics of `players_online`;
-- prove whether and how `cluster_sessions` can represent online character identity without exposing stale/unsafe runtime state;
-- inspect `channel_runtime_status`, Redis `ChannelRuntimeRegistry` and process-local `ProtocolStatus` behavior;
-- define freshness, stale-data and dependency-failure semantics;
-- select one evidence-backed cluster-wide online-character source/aggregation contract, or retain the feature as `UNKNOWN` if no safe source exists;
-- update `docs/contracts/CANARY_DATA_CONTRACT.md` when new durable facts are proven;
-- do not implement an online-list route until the contract is proven.
+- implement the cluster-wide online-character read model through the existing dedicated Canary query boundary;
+- select only the approved public player fields plus durable `channel_id`/approved channel metadata;
+- enforce `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms` and `players.deletion = 0`;
+- preserve Canary DB dependency failure explicitly rather than converting it to an empty list;
+- add integration tests for fresh, expired, deleted-character and dependency-failure cases under the read-only/query-only Canary test boundary;
+- do not use `players_online`, process-local `ProtocolStatus` or SQL `channel_runtime_status` as replacement identity authorities;
+- do not add shared Canary writes.
 
 ## High-priority unknowns and blockers
 
-- cluster-wide online-character identity source/freshness/failure policy;
 - exact deployed production authentication topology and login-server image digest;
 - password hash compatibility/migration rollout;
 - password reset/change and global revocation behavior;
 - MFA/email-verification enforcement across every login path;
 - tournament-coin schema/code conflict;
+- maximum production wall-clock skew for exact lease freshness SLA;
 - final production hosting/network topology;
 - production mail/cache/queue providers.
 
