@@ -1,91 +1,70 @@
 # Oteryn Platform
 
-Oteryn Platform is the planned web and application platform for the Oteryn Open Tibia Server ecosystem. It is intended to replace MyAAC as the long-term first-party web platform while keeping Canary as a separate game-server project.
+Oteryn Platform is the first-party web/application platform for the Oteryn Open Tibia Server ecosystem. It is intended to replace MyAAC as the long-term web platform while Canary remains a separate game-server project.
 
-## Current status
+## Current implementation
 
-**Architecture bootstrap. No Laravel application code has been committed yet.**
+The repository now contains the Phase 1 Laravel application foundation:
 
-The repository currently defines agent governance, architecture boundaries, security requirements, cross-repository contracts and the phased implementation roadmap. Agents must not infer that a feature exists until source code and tests prove it.
+- Laravel 13 on PHP 8.5;
+- server-rendered Blade UI;
+- safe local `.env.example` defaults with no committed secrets;
+- SQLite as the default local/test database connection;
+- `GET /health` using Laravel's health route;
+- baseline unit and feature tests;
+- Laravel Pint formatting checks;
+- lockfile-backed Composer installs;
+- GitHub Actions CI.
 
-See `docs/agents/PROJECT_STATE.md` for the current authoritative state.
+The bootstrap intentionally does not implement Canary authentication, credential migration, MFA, account/character mutations, payments, or other shared-data write paths.
 
-## Target direction
+## Local setup
 
-Initial implementation is planned as a **Laravel modular monolith** with server-rendered Blade views unless a later ADR changes that decision.
+Requirements: PHP 8.5 with Laravel's required extensions, Composer 2, and PDO SQLite for the default local database.
 
-Primary responsibilities:
-
-- public website and CMS/news;
-- player accounts and identity;
-- authentication, sessions, recovery, verification and MFA;
-- character/account management allowed by the Canary contract;
-- highscores, character profiles, guilds and server status;
-- administration and RBAC;
-- first-party API boundaries;
-- audit/security logging;
-- future payments/shop as an isolated later module.
-
-Canary remains responsible for game runtime and gameplay behavior.
-
-## Logical architecture
-
-```text
-Internet
-   |
-   v
-Cloudflare / edge protection
-   |
-   v
-Oteryn Platform (Laravel)
-   |-- Public Web / CMS
-   |-- Identity & Accounts
-   |-- Characters / Guilds / Highscores
-   |-- Admin / RBAC / Audit
-   |-- Internal application services
-   |-- Future Payments module
-   |
-   +---- explicit contracts ----> login-server / game authentication path
-   |
-   +---- explicit DB/read contracts ----> Canary-owned game data
-
-Canary (separate repository)
-   |-- game runtime
-   |-- world state
-   |-- game protocol
-   `-- gameplay systems
+```sh
+cp .env.example .env
+composer install
+php artisan key:generate
+php -r "file_exists('database/database.sqlite') || touch('database/database.sqlite');"
+php artisan serve
 ```
 
-## Core principles
+The application is then available at `http://localhost:8000`.
 
-1. **Repository state beats chat history.** Agents use task records, architecture docs, contracts, Git and tests as source of truth.
-2. **Security is application-owned.** Cloudflare/WAF is defense in depth, never a substitute for correct auth, authorization, validation and transactions.
-3. **One source of truth per responsibility.** Authentication, authorization and shared data ownership must not be duplicated implicitly across Oteryn Platform, login-server and Canary.
-4. **Modular monolith first.** Do not introduce microservices without a demonstrated boundary, scaling need or independent lifecycle requirement.
-5. **Canary integration is a contract.** Never silently assume table layouts, password formats, session semantics or write permissions.
-6. **Payments later.** Core identity/account architecture must not depend on a payment provider.
-7. **Secure defaults.** Deny ambiguous authorization, use framework security primitives, transactions for sensitive mutations and regression tests for security fixes.
+The health endpoint is available at `GET /health`. It reports only application availability and does not expose environment variables, configuration, version details, or secrets.
 
-## Authoritative documentation
+## Validation
+
+```sh
+composer validate --strict
+composer format:check
+composer test
+```
+
+To apply formatting:
+
+```sh
+composer format
+```
+
+GitHub Actions installs dependencies from `composer.lock`, validates Composer metadata/lock consistency, checks formatting, and runs the Laravel/PHPUnit test suite on PHP 8.5.
+
+A separate static-analysis dependency is intentionally deferred until substantive application/domain code exists. The bootstrap baseline uses Composer validation, Laravel Pint, PHP parsing/runtime through the test suite, and PHPUnit unit/feature tests.
+
+## Data and integration boundaries
+
+Canary and login-server behavior are external contracts. Do not add shared account/player/authentication write paths until the matching evidence-backed contract task proves the required schema and session semantics.
+
+## Authoritative project documentation
 
 - `AGENTS.md` — mandatory operating rules for agents.
-- `docs/agents/PROJECT_STATE.md` — what exists now and what happens next.
-- `docs/architecture/SYSTEM_ARCHITECTURE.md` — system structure and boundaries.
-- `docs/architecture/MODULE_CATALOG.md` — planned modules and ownership.
-- `docs/architecture/SECURITY_ARCHITECTURE.md` — security model and invariants.
-- `docs/architecture/DATA_OWNERSHIP.md` — database/data ownership rules.
-- `docs/architecture/ROADMAP.md` — phased delivery plan.
+- `docs/agents/PROJECT_STATE.md` — current project phase and next work.
+- `docs/agents/REPOSITORY_MAP.md` — repository navigation and ownership map.
+- `docs/architecture/SYSTEM_ARCHITECTURE.md` — system boundaries and target topology.
+- `docs/architecture/SECURITY_ARCHITECTURE.md` — mandatory security invariants.
+- `docs/architecture/DATA_OWNERSHIP.md` — persistent-data ownership rules.
 - `docs/contracts/` — Canary/login-server integration contracts.
-- `docs/architecture/adr/` — durable architectural decisions.
-- `docs/agents/tasks/active/` — active implementation work.
+- `docs/agents/tasks/active/` — active implementation task records.
 
-## For a new agent
-
-1. Read `AGENTS.md`.
-2. Read `docs/agents/REPOSITORY_MAP.md`.
-3. Read `docs/agents/PROJECT_STATE.md`.
-4. Find the relevant active task and its `## Context checkpoint`.
-5. Use `docs/agents/CONTEXT_ROUTING.md` to load only task-relevant architecture/contracts.
-6. Verify live Git/PR/test state before changing code.
-
-Do not reconstruct project state from old conversations.
+Repository state, task records, Git and live PR/CI state are authoritative over chat history.

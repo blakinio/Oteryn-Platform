@@ -10,78 +10,75 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Phase 0 — Architecture and agent bootstrap: COMPLETE**
 
-**Next phase — Phase 1: Laravel application bootstrap**
+**Phase 1 — Laravel application bootstrap: COMPLETE**
+
+**Next work — bounded Canary data-contract discovery, followed by authentication/session discovery.**
 
 ## What exists on main
+
+After completion of the Laravel bootstrap delivery PR, the repository contains:
 
 - root agent governance in `AGENTS.md`;
 - repository map and context routing;
 - durable task/checkpoint/handoff model;
-- target system architecture;
-- module catalog;
-- security architecture;
-- data ownership rules;
-- test strategy;
-- delivery roadmap;
-- Canary data integration discovery contract;
-- web-to-game authentication discovery contract;
+- target system architecture and module boundaries;
+- security architecture and data ownership rules;
+- test strategy and delivery roadmap;
+- Canary data and web-to-game authentication discovery contracts;
 - ADRs for Laravel modular monolith, separate Canary repository and deferred payments;
-- project changelog and durable current-state documentation.
+- Laravel 13 application foundation targeting PHP 8.5;
+- Blade as the initial server-rendered UI layer;
+- safe `.env.example` local defaults/placeholders with no committed application secret;
+- committed Composer lockfile;
+- SQLite as the default local/test database connection;
+- `GET /health` application availability route;
+- baseline unit and feature tests;
+- Laravel Pint formatting checks;
+- GitHub Actions CI using PHP 8.5 and lockfile-backed `composer install`;
+- documented local setup and validation commands.
 
 ## What does not exist yet
 
 Unless source is added after this state update, the following are **not implemented**:
 
-- Laravel application skeleton;
-- production website;
-- database migrations/models;
-- authentication/login;
+- production website/CMS beyond the bootstrap Blade page;
+- real account authentication/login;
+- password/hash migration;
 - MFA;
 - account management;
 - character management;
 - highscores/guilds/character pages;
-- CMS/admin UI;
-- Canary integration code;
+- admin/RBAC/audit UI;
+- Canary integration code or shared-data write paths;
 - login-server integration code;
-- CI application pipeline;
-- Cloudflare/deployment configuration;
+- production Cloudflare/deployment configuration;
 - payments/shop.
 
 Agents must verify repository source before relying on this list because later tasks may supersede it.
 
 ## Next planned task
 
-`OTERYN-20260718-laravel-bootstrap`
+`OTERYN-20260718-canary-schema-discovery`
 
 Objective:
 
-- bootstrap the maintained Laravel/PHP application stack;
-- establish Blade, tests, CI and safe environment configuration;
-- do not implement speculative Canary shared auth/data writes.
+- inspect the actual current `blakinio/canary` schema/source as read-only evidence;
+- prove account, player, guild, world/server, online, ban and session-related structures;
+- classify every contract statement as `PROVEN`, `DERIVED`, `UNKNOWN` or `CONFLICT`;
+- update `docs/contracts/CANARY_DATA_CONTRACT.md`;
+- do not implement shared-data write paths until the contract is proven.
 
-See `docs/agents/ACTIVE_WORK.md`, then verify the individual task record and live PR/Git state.
-
-## Work after Laravel bootstrap
-
-Create bounded discovery tasks for:
-
-1. actual Oteryn Canary account/player/guild schema;
-2. actual login-server component and authentication/session flow;
-3. password/hash compatibility and migration constraints;
-4. game session/token creation/revocation behavior;
-5. single-world versus multi-world requirement.
-
-Do not implement speculative shared credential/schema mutations before required contracts are proven.
+After that, create the separate authentication/identity discovery task to prove the actual login-server, credential verification and game-session flow.
 
 ## High-priority unknowns
 
 - exact Oteryn Canary account/player/guild schema;
 - actual login-server component and current authentication flow;
 - password hash compatibility/migration requirements;
-- game session/token creation and revocation semantics;
+- game session/token creation, TTL, replay and revocation semantics;
 - single-world versus multi-world requirements;
 - final production hosting/network topology;
-- mail/cache/queue providers.
+- production mail/cache/queue providers.
 
 ## Architecture summary
 
@@ -89,7 +86,7 @@ Do not implement speculative shared credential/schema mutations before required 
 Cloudflare / Edge
        |
        v
-Oteryn Platform (Laravel modular monolith)
+Oteryn Platform (Laravel 13 / PHP 8.5 modular monolith)
        |
        +--> platform-owned DB data
        |

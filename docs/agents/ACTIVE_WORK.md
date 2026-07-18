@@ -2,12 +2,17 @@
 
 Convenience index only. The individual active task record, live PR and Git state are authoritative.
 
-| Task | Status | Scope | Record |
-|---|---|---|---|
-| OTERYN-20260718-laravel-bootstrap | ready | Bootstrap maintained Laravel/PHP application, Blade, test baseline and CI; no speculative Canary auth/data integration | `docs/agents/tasks/active/OTERYN-20260718-laravel-bootstrap.md` |
+## Active tasks
+
+No active task is currently claimed after completion of the Laravel bootstrap.
+
+## Next recommended task
+
+Create `OTERYN-20260718-canary-schema-discovery` to prove the current Oteryn Canary account/player/guild/session-related schema and permitted read/write contract before implementing shared-data mutations.
 
 ## Recently completed
 
+- `OTERYN-20260718-laravel-bootstrap` — Laravel 13 / PHP 8.5 application foundation, Blade, health route, lockfile, tests and CI; archive record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-platform-architecture-bootstrap` — architecture/governance baseline completed; archive record under `docs/agents/tasks/archive/`.
 
 ## Coordination rule
