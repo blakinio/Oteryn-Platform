@@ -5,9 +5,13 @@ namespace App\PublicGameData;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 final class CanaryGameDataRepository
 {
+    /**
+     * @return LengthAwarePaginator<int, stdClass>
+     */
     public function levelHighscores(int $perPage = 50): LengthAwarePaginator
     {
         return DB::connection('canary')
@@ -30,7 +34,7 @@ final class CanaryGameDataRepository
     }
 
     /**
-     * @return array{guild: object, members: LengthAwarePaginator}|null
+     * @return array{guild: stdClass, members: LengthAwarePaginator<int, stdClass>}|null
      */
     public function findGuild(string $name, int $perPage = 50): ?array
     {
@@ -67,6 +71,9 @@ final class CanaryGameDataRepository
         return ['guild' => $guild, 'members' => $members];
     }
 
+    /**
+     * @return Collection<int, stdClass>
+     */
     public function configuredChannels(): Collection
     {
         return DB::connection('canary')
