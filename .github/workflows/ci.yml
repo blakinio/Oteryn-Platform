@@ -82,6 +82,9 @@ jobs:
       - name: Pint directory tests
         continue-on-error: true
         run: vendor/bin/pint --test tests
+      - name: Pint global direct
+        continue-on-error: true
+        run: vendor/bin/pint --test
 
       - name: Check formatting
         run: composer format:check
