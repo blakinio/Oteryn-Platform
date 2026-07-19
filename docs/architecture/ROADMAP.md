@@ -113,7 +113,7 @@ Deliverables:
 - efficient read/query services;
 - caching only after correctness/freshness policy is defined.
 
-Current implementation includes a shared public Blade shell/navigation, homepage exact-name character search routing, read-only highscores, character profiles, guild pages, configured server/channel metadata and the cluster-wide online-character list. News display remains not implemented, live multichannel runtime availability remains a separate integration concern, and caching remains deferred until correctness/freshness policy is defined.
+Current implementation includes a shared public Blade shell/navigation, homepage exact-name character search routing, read-only highscores, character profiles, guild pages, configured server/channel metadata, the cluster-wide online-character list, and a Platform-owned published-only public news list/detail read model. News authoring/management remains a future privileged CMS concern, live multichannel runtime availability remains a separate integration concern, and caching remains deferred until correctness/freshness policy is defined.
 
 Exit gate:
 
