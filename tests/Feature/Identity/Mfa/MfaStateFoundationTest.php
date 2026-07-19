@@ -6,6 +6,7 @@ use App\Audit\SecurityEventRecorder;
 use App\Identity\Actions\RevokeIdentityWebSessions;
 use App\Identity\Mfa\ResetIdentityMfa;
 use App\Identity\Models\Identity;
+use App\Identity\Sessions\WebSessionState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -77,13 +78,11 @@ final class MfaStateFoundationTest extends TestCase
             'two_factor_secret' => 'TEST-MFA-SECRET-NOT-REAL',
             'two_factor_recovery_codes' => ['recovery-alpha', 'recovery-bravo'],
             'two_factor_confirmed_at' => now(),
+            'two_factor_last_used_timestep' => 123456,
         ])->save();
 
-        $this->post('/login', [
-            'email' => $identity->email,
-            'password' => 'Correct-Horse-9!Battery',
-        ])->assertRedirect(route('home'));
-        $this->assertAuthenticatedAs($identity, 'web');
+        $this->actingAs($identity, 'web')
+            ->withSession([WebSessionState::GENERATION_KEY => 0]);
 
         $securityEvents = new SecurityEventRecorder;
         $resetMfa = new ResetIdentityMfa(
@@ -97,6 +96,7 @@ final class MfaStateFoundationTest extends TestCase
         self::assertNull($fresh->two_factor_secret);
         self::assertNull($fresh->two_factor_recovery_codes);
         self::assertNull($fresh->two_factor_confirmed_at);
+        self::assertNull($fresh->two_factor_last_used_timestep);
         self::assertFalse($fresh->hasConfirmedMfa());
         self::assertSame(1, $fresh->web_session_generation);
 
