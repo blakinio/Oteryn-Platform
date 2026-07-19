@@ -41,16 +41,5 @@ jobs:
       - name: Run static analysis
         run: composer analyse
 
-      - name: Capture static-analysis diagnostics
-        if: failure()
-        run: composer analyse > phpstan-diagnostic.txt 2>&1 || true
-
-      - name: Upload static-analysis diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: phpstan-diagnostic
-          path: phpstan-diagnostic.txt
-
       - name: Run tests
         run: composer test
