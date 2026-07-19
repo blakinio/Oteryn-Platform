@@ -15,7 +15,7 @@ Resolve the remaining Phase 4 transport/contract uncertainty for fresh per-chann
 - [x] Update `CANARY_DATA_CONTRACT.md` with evidence pinned to the verified current Canary revision and an explicit approved next integration boundary, or an exact blocker if no safe bounded transport can be approved.
 - [x] Update `PROJECT_STATE.md` / `ACTIVE_WORK.md` and roadmap state only as required by the discovery result; do not claim live runtime availability is implemented.
 - [x] Do not modify Canary/login-server repositories and do not add Platform runtime integration code in this discovery task.
-- [ ] Run exact-head CI and Agent Governance and merge only after the full merge gate is clean.
+- [x] Run repository CI and Agent Governance on the delivery-validation head; require a fresh exact-head pass after this ready checkpoint before merge.
 
 ## Ownership
 
@@ -47,11 +47,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T18:45:00+02:00
-head: 8c866e0e36a72a0215fcad2849028e79ad269bd7
+updated_at: 2026-07-19T18:55:00+02:00
+head: 242b6c54f1a528406ef0e4a7c6bd94c73add5c39
 branch: task/OTERYN-20260719-channel-runtime-availability-discovery
 pr: 21
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -80,12 +80,15 @@ proven:
   - Current ProtocolStatus reads process-local g_game player state and does not consult ChannelRuntimeRegistry, so it is not a suitable cluster-authoritative runtime transport.
   - No suitable purpose-built external aggregate runtime-status endpoint was found in the inspected current Canary source; the existing status protocol is explicitly process-local for the relevant data.
   - Current Oteryn Platform has no dedicated Canary-runtime Redis dependency/config boundary: composer has no explicit Redis client package, config/database.php defines SQL connections only, config/cache.php exposes array/file/null stores, and .env.example has no Canary runtime Redis settings.
-  - CANARY_DATA_CONTRACT now approves the next bounded integration as a dedicated read-only Redis adapter over deterministic configured-channel runtime keys, using enabled channels from the existing DB read as the expected key set.
+  - CANARY_DATA_CONTRACT approves the next bounded integration as a dedicated read-only Redis adapter over deterministic configured-channel runtime keys, using enabled channels from the existing DB read as the expected key set.
   - The approved Redis adapter must use a dedicated read-only credential/connection, must not scan the keyspace or access session lease keys, and must expose only channel_id, runtime status and non-negative players_online while keeping instance/node/build/map/data metadata private.
   - Redis key existence plus positive TTL and valid runtime fields/state form the external freshness boundary; missing/expired keys while Redis is healthy mean unknown/unavailable, not synthetic OFFLINE or zero players.
   - Any Redis transport/protocol failure while reading one logical configured-channel snapshot invalidates all runtime fields for that snapshot; static channel metadata may still render independently.
   - SQL channel_runtime_status and process-local ProtocolStatus are forbidden authoritative fallbacks; no application cache is approved initially.
   - The online-character cluster_sessions identity contract remains independent and must not be gated on runtime availability.
+  - Final PR #21 diff contains exactly six task-owned paths, with the merged public-news task represented as an exact-content rename with zero additions and zero deletions.
+  - Delivery-validation head 242b6c54f1a528406ef0e4a7c6bd94c73add5c39 passed CI run 29695019939 (#326), including Composer validation/install, Pint, PHPStan/Larastan level 10 and the full test suite.
+  - Delivery-validation head 242b6c54f1a528406ef0e4a7c6bd94c73add5c39 passed Agent Governance run 29695019933 (#247).
 derived:
   - Direct read-only Redis is the smallest transport that preserves Canary's actual fail-closed runtime availability semantics without inventing a new Canary service endpoint.
   - SQL channel_runtime_status cannot safely substitute for Redis-authoritative runtime availability because its asynchronous write can succeed after the Redis publish/refresh path has failed.
@@ -96,8 +99,8 @@ unknown:
   - exact supported Redis client/dependency selection for Laravel 13/PHP 8.5 must be resolved from current primary documentation during the implementation task
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
+  marker: CONTRACT_FULL_FILE_TAIL_TRUNCATION
+  evidence: PR #21 contract patch inspection detected that the first full-file replacement accidentally removed the existing Remaining UNKNOWN, Safety rules and Next contract dependency tail; the missing tail was restored before delivery validation and the final patch now contains only intended contract changes.
 rejected_hypotheses:
   - Implement SQL channel_runtime_status immediately: rejected because the SQL mirror is written best-effort even after Redis runtime publication failure and can therefore overstate authoritative availability.
   - Reuse process-local ProtocolStatus as cluster availability: rejected because current source reads only process-local g_game state and does not consult ChannelRuntimeRegistry.
@@ -121,15 +124,21 @@ validation:
   - command: Oteryn Platform dependency/config boundary inspection
     result: PASS
     evidence: composer.json, config/database.php, config/cache.php, .env.example, existing PublicGameData and DB privilege verifier were inspected
+  - command: PR #21 final task-owned diff inspection
+    result: PASS
+    evidence: exactly six task-owned paths; previous task archive is an exact-content rename 0/0; contract tail truncation was detected and corrected before validation
   - command: local Composer/Pint/PHPStan/tests
     result: NOT_RUN
     evidence: current execution environment cannot resolve github.com and has no usable local Oteryn-Platform checkout; exact-head GitHub Actions is the executable validation source
-  - command: stable delivery-head CI and Agent Governance
-    result: NOT_RUN
-    evidence: discovery documentation synchronization has completed; exact-head workflows must be inspected next
+  - command: GitHub Actions CI run 29695019939 (#326)
+    result: PASS
+    evidence: exact delivery-validation head 242b6c54f1a528406ef0e4a7c6bd94c73add5c39 passed Composer validation/install, Pint, PHPStan/Larastan level 10 and the full test suite
+  - command: Agent Governance run 29695019933 (#247)
+    result: PASS
+    evidence: exact delivery-validation head 242b6c54f1a528406ef0e4a7c6bd94c73add5c39 passed active checkpoint validation
 blockers:
   - none
-next_action: Inspect PR #21 exact delivery-head diff, CI and Agent Governance, fix any task-owned failure, then write one final ready checkpoint and revalidate the exact ready head before merge.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, then perform the full PR #21 merge gate and squash-merge only if main divergence, final diff and review state remain clean.
 ```
 
 ## Notes

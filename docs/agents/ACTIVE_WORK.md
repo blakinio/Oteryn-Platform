@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-channel-runtime-availability-discovery` — bounded Phase 4 discovery for fresh per-channel runtime availability/player-count transport from Canary to Oteryn Platform; branch `task/OTERYN-20260719-channel-runtime-availability-discovery`; draft PR #21; checkpoint status `validating`. The discovery approves a dedicated read-only Redis adapter over deterministic `cluster:channel:{id}:runtime` keys with Redis-TTL freshness and fail-closed complete-snapshot semantics. SQL `channel_runtime_status` and process-local `ProtocolStatus` are forbidden authoritative fallbacks. No runtime integration code or cross-repository writes are included in this task.
+- `OTERYN-20260719-channel-runtime-availability-discovery` — bounded Phase 4 discovery for fresh per-channel runtime availability/player-count transport from Canary to Oteryn Platform; branch `task/OTERYN-20260719-channel-runtime-availability-discovery`; draft PR #21; checkpoint status `ready`. The discovery approves a dedicated read-only Redis adapter over deterministic `cluster:channel:{id}:runtime` keys with Redis-TTL freshness and fail-closed complete-snapshot semantics. SQL `channel_runtime_status` and process-local `ProtocolStatus` are forbidden authoritative fallbacks. Delivery head `242b6c54f1a528406ef0e4a7c6bd94c73add5c39` passed CI #326 and Agent Governance #247; a fresh exact-head pass is required after the final ready checkpoint before merge.
 
 ## Recommended next task
 
