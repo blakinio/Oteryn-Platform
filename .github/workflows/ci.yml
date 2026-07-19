@@ -16,6 +16,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  format-diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies quietly
+        run: composer install --no-interaction --prefer-dist --no-progress --quiet
+
+      - name: Show exact Pint diff for MariaDB integration test
+        run: |
+          vendor/bin/pint tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php >/dev/null
+          git diff -- tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
+
   test:
     runs-on: ubuntu-latest
     services:
@@ -52,22 +73,6 @@ jobs:
 
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
-
-      # Temporary hard-fail diagnostics for PR #33. Remove before merge.
-      - name: Pint config/database.php
-        run: vendor/bin/pint --test config/database.php
-      - name: Pint identity Canary migration
-        run: vendor/bin/pint --test database/migrations/2026_07_20_011000_create_identity_canary_accounts_table.php
-      - name: Pint routes/console.php
-        run: vendor/bin/pint --test routes/console.php
-      - name: Pint MariaDB integration test
-        run: vendor/bin/pint --test tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
-      - name: Pint provisioning saga test
-        run: vendor/bin/pint --test tests/Feature/Accounts/ProvisionCanaryAccountTest.php
-      - name: Pint registration test
-        run: vendor/bin/pint --test tests/Feature/Identity/RegistrationTest.php
-      - name: Pint provisioning privilege verifier test
-        run: vendor/bin/pint --test tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php
 
       - name: Check formatting
         run: vendor/bin/pint --test
