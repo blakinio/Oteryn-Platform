@@ -192,7 +192,7 @@ final class ServerRuntimeAvailabilityTest extends TestCase
             ->assertDontSee('Players online:</strong> 25', false);
     }
 
-    private function commandExpectation(Connection&MockInterface $connection): Expectation
+    private function commandExpectation(MockInterface $connection): Expectation
     {
         /** @var Expectation */
         $expectation = $connection->shouldReceive('command');
