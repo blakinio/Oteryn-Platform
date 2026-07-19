@@ -27,7 +27,7 @@ final class WebSessionTest extends TestCase
     {
         $identity = $this->createIdentity();
 
-        $this->withSession(['pre_auth_marker' => 'present']);
+        $this->get('/login')->assertOk();
         $previousSessionId = session()->getId();
 
         $response = $this->post('/login', [
