@@ -36,4 +36,10 @@ jobs:
         run: python tools/agents/test_checkpoint.py
 
       - name: Validate active task checkpoints
-        run: python tools/agents/checkpoint.py --tasks docs/agents/tasks/active --require-checkpoint
+        shell: bash
+        run: |
+          if find docs/agents/tasks/active -maxdepth 1 -type f -name '*.md' -print -quit | grep -q .; then
+            python tools/agents/checkpoint.py --tasks docs/agents/tasks/active --require-checkpoint
+          else
+            echo "Validated 0 active task checkpoints."
+          fi
