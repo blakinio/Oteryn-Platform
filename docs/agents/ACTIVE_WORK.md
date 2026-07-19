@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-mfa-state-foundation` — Phase 3 T3.4a Platform-only encrypted MFA state and internal MFA reset/session-revocation foundation; branch `task/OTERYN-20260719-mfa-state-foundation`; draft PR pending. Scope deliberately excludes TOTP generation/verification, public MFA routes, login challenge/enforcement, Admin/RBAC and all Canary/login-server changes.
+- `OTERYN-20260719-mfa-state-foundation` — Phase 3 T3.4a Platform-only encrypted MFA state and internal MFA reset/session-revocation foundation; branch `task/OTERYN-20260719-mfa-state-foundation`; PR #14; task checkpoint status `ready`; final code and documentation validation heads have passed CI and Agent Governance. Scope deliberately excludes TOTP generation/verification, public MFA routes, login challenge/enforcement, Admin/RBAC and all Canary/login-server changes.
 
 ## Recommended next task
 
@@ -16,7 +16,7 @@ After T3.4a is merged, create a separate MFA enrollment/challenge/enforcement ta
 
 ## Recently completed
 
-- `OTERYN-20260719-password-recovery-credentials` — Phase 3 T3.3 secure Platform password recovery/change merged through PR #13 as `e1ec8fddd4aedbd847558f223be35212ea11c85f`; task record is being archived on the T3.4a branch.
+- `OTERYN-20260719-password-recovery-credentials` — Phase 3 T3.3 secure Platform password recovery/change merged through PR #13 as `e1ec8fddd4aedbd847558f223be35212ea11c85f`; task record archived under `docs/agents/tasks/archive/`.
 - `OTERYN-20260719-web-login-sessions` — Phase 3 T3.2 secure Platform web login/logout and revocable web sessions merged through PR #12 as `74a72d4acc2f0228a147e3ce71a1542f43e97906`; archived task record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260719-identity-core-registration` — Phase 3 T3.1 Platform-owned Identity core and registration merged through PR #11 as `6f48cf97288963c25b0ca97563865f5b3514de3b`; archived task record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-online-status-discovery` — current Canary online/status sources inspected read-only; `players_online` rejected as a multichannel authority; sanitized `cluster_sessions` status/expiry/deletion read contract approved with explicit stale/failure semantics; archive record under `docs/agents/tasks/archive/`.
