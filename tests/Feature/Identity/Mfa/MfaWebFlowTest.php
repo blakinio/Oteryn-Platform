@@ -40,7 +40,9 @@ final class MfaWebFlowTest extends TestCase
 
         $google2fa = new Google2FA;
         $timestamp = $google2fa->getTimestamp();
+        self::assertIsInt($timestamp);
         $code = $google2fa->oathTotp($identity->two_factor_secret, $timestamp);
+        self::assertIsString($code);
 
         $response = $this->post('/mfa/confirm', [
             'current_password' => self::PASSWORD,
@@ -66,7 +68,7 @@ final class MfaWebFlowTest extends TestCase
         self::assertCount(8, $storedRecoveryCodes);
         $normalizer = new MfaRecoveryCodes;
 
-        foreach ($plainRecoveryCodes as $index => $plainRecoveryCode) {
+        foreach (array_values($plainRecoveryCodes) as $index => $plainRecoveryCode) {
             self::assertIsString($plainRecoveryCode);
             $storedHash = $storedRecoveryCodes[$index] ?? null;
             self::assertIsString($storedHash);
@@ -94,6 +96,7 @@ final class MfaWebFlowTest extends TestCase
         self::assertIsString($identity->two_factor_secret);
         $google2fa = new Google2FA;
         $code = $google2fa->getCurrentOtp($identity->two_factor_secret);
+        self::assertIsString($code);
 
         $this->post('/mfa/confirm', [
             'current_password' => 'Wrong-Horse-9!Battery',
@@ -108,8 +111,10 @@ final class MfaWebFlowTest extends TestCase
     public function test_unconfirmed_mfa_secret_does_not_create_a_half_enforced_login_challenge(): void
     {
         $identity = $this->createIdentity();
+        $secret = (new Google2FA)->generateSecretKey();
+        self::assertIsString($secret);
         $identity->forceFill([
-            'two_factor_secret' => (new Google2FA)->generateSecretKey(),
+            'two_factor_secret' => $secret,
             'two_factor_confirmed_at' => null,
         ])->save();
 
@@ -133,7 +138,9 @@ final class MfaWebFlowTest extends TestCase
 
         $google2fa = new Google2FA;
         $timestamp = $google2fa->getTimestamp();
+        self::assertIsInt($timestamp);
         $code = $google2fa->oathTotp($secret, $timestamp);
+        self::assertIsString($code);
 
         $this->post('/mfa/challenge', ['code' => $code])
             ->assertRedirect(route('home'));
@@ -155,7 +162,9 @@ final class MfaWebFlowTest extends TestCase
         $secret = $this->enableMfa($identity);
         $google2fa = new Google2FA;
         $timestamp = $google2fa->getTimestamp();
+        self::assertIsInt($timestamp);
         $code = $google2fa->oathTotp($secret, $timestamp);
+        self::assertIsString($code);
 
         $this->passwordLogin($identity)->assertRedirect(route('identity.mfa.challenge.create'));
         $this->post('/mfa/challenge', ['code' => $code])->assertRedirect(route('home'));
@@ -218,6 +227,7 @@ final class MfaWebFlowTest extends TestCase
 
         (new RevokeIdentityWebSessions(new SecurityEventRecorder))->execute($identity);
         $code = (new Google2FA)->getCurrentOtp($secret);
+        self::assertIsString($code);
 
         $this->post('/mfa/challenge', ['code' => $code])
             ->assertRedirect(route('identity.login.create'));
@@ -252,7 +262,9 @@ final class MfaWebFlowTest extends TestCase
 
         $google2fa = new Google2FA;
         $timestamp = $google2fa->getTimestamp();
+        self::assertIsInt($timestamp);
         $code = $google2fa->oathTotp($secret, $timestamp);
+        self::assertIsString($code);
 
         $this->delete('/mfa', [
             'current_password' => self::PASSWORD,
@@ -287,7 +299,9 @@ final class MfaWebFlowTest extends TestCase
 
         $google2fa = new Google2FA;
         $timestamp = $google2fa->getTimestamp();
+        self::assertIsInt($timestamp);
         $code = $google2fa->oathTotp($secret, $timestamp);
+        self::assertIsString($code);
 
         $this->delete('/mfa', [
             'current_password' => 'Wrong-Horse-9!Battery',
@@ -315,6 +329,7 @@ final class MfaWebFlowTest extends TestCase
     {
         $google2fa = new Google2FA;
         $secret = $google2fa->generateSecretKey();
+        self::assertIsString($secret);
         $normalizer = new MfaRecoveryCodes;
         $hashes = [];
 
