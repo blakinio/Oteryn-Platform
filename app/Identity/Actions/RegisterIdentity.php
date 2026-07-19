@@ -24,7 +24,7 @@ final class RegisterIdentity
                 'password' => Hash::make($password),
             ]);
 
-            $this->securityEvents->recordIdentityRegistered((int) $identity->getKey());
+            $this->securityEvents->recordIdentityRegistered($identity->id);
 
             return $identity;
         });
