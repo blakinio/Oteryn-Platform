@@ -24,7 +24,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Cluster-wide online-character read model: COMPLETE**
 
-**Public site shell and exact-name character search: IMPLEMENTED IN CURRENT DELIVERY / VALIDATING**
+**Public site shell and exact-name character search: COMPLETE**
+
+**Public news read model: IMPLEMENTED IN CURRENT DELIVERY / VALIDATING**
 
 ## What exists on main after the current delivery PR is merged
 
@@ -54,8 +56,12 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - evidence-backed current web/login-server/Canary authentication contract and staged target direction for one authoritative Identity policy plus short-lived atomic game-login authorization;
 - dedicated Canary read connection configured independently from the Platform-owned database;
 - database-enforced least-privilege Canary credential verification with direct table-level `SELECT` allowlisting for the implemented read surface, including `cluster_sessions` for the online-character read model;
-- shared Blade public/game-data shell used by the homepage and implemented public read surfaces, with navigation for Home, Online, Highscores and Servers;
+- shared Blade public shell used by the homepage, news and implemented public game-data surfaces, with navigation for Home, News, Online, Highscores and Servers;
 - homepage exact-name character search at `GET /characters?name=...`, validating the submitted name and redirecting to the existing character profile route rather than introducing a second query path;
+- Platform-owned `news_posts` persistence with unique slug, title, plain-text body and nullable publication timestamp;
+- published-only public news list at `GET /news` and detail at `GET /news/{slug}`, excluding drafts and future-scheduled posts;
+- deterministic public news ordering by `published_at DESC, id DESC` with bounded pagination of 10 posts;
+- escaped plain-text public news rendering with no rich-HTML or media-upload boundary introduced;
 - read-only public level highscores at `GET /highscores`;
 - read-only active character profiles at `GET /characters/{name}`;
 - read-only public guild details and membership at `GET /guilds/{name}`;
@@ -109,7 +115,7 @@ Proven implementation properties:
 
 - shared Canary tables are accessed through a dedicated query service using Laravel query builder rather than mutation-capable shared Eloquent models;
 - deployment documentation requires a separate least-privilege SELECT-only Canary database credential, and the verifier/provisioning allowlist includes `cluster_sessions` because the online-list adapter reads it;
-- the shared Blade public/game-data shell exposes Home, Online, Highscores and Servers navigation and the homepage uses that same layout rather than a separate document;
+- the shared Blade public shell exposes Home, News, Online, Highscores and Servers navigation and the homepage uses that same layout rather than a separate document;
 - exact-name homepage character search validates the `name` query value and redirects to the existing `game.characters.show` route, so no duplicate character query implementation or extra Canary privilege is introduced;
 - character/highscore/guild member reads filter `players.deletion = 0`;
 - highscores select only public fields, use deterministic `level DESC, name ASC` ordering and paginate 50 rows;
@@ -136,6 +142,31 @@ Known PublicGameData unknowns:
 - privileged/group-hidden character filtering policy for public rankings;
 - production cache/staleness expectations outside the bounded online-lease freshness contract;
 - maximum production wall-clock skew relevant to the exact online freshness SLA.
+
+## CMS implementation summary
+
+The current CMS implementation is intentionally public-read-only and Platform-owned.
+
+Implemented properties:
+
+- `news_posts` belongs to the Platform database and is managed by an authoritative Laravel migration; it does not introduce a Canary/shared-data contract;
+- public list/detail queries use the dedicated `PublicNewsQuery` boundary and expose only rows where `published_at` is non-null and not later than the read time;
+- drafts and future-scheduled posts remain non-public, including direct detail lookup by slug;
+- the list orders by `published_at DESC` and then `id DESC`, and paginates 10 posts per page;
+- slugs are unique at the database level;
+- title and body are rendered through escaped Blade output, with body treated as plain text and whitespace preserved;
+- focused tests cover required schema, unique slug, publication-state visibility, deterministic ordering/pagination, detail 404 behavior and XSS escaping.
+
+Not included in the current CMS boundary:
+
+- authoring or editing routes/UI;
+- page management;
+- Admin/RBAC or privileged CMS permissions;
+- privileged CMS audit actions;
+- arbitrary rich HTML or a sanitizer integration;
+- media/file uploads.
+
+Those mutation and privileged-management capabilities remain Phase 6 work and must not be inferred from the public read model.
 
 ## Canary data-contract summary
 
@@ -184,7 +215,7 @@ These blockers do not block the completed Platform-owned Phase 3 web Identity bo
 
 Unless source is added after this state update, the following are **not implemented**:
 
-- full production public website/CMS and managed news display;
+- CMS news/page authoring and management, privileged CMS administration, rich-HTML publishing or media uploads;
 - shared password/hash migration to an authoritative cross-component credential model;
 - global game-login enforcement of Platform MFA/email verification;
 - account management beyond Identity-owned credential/security operations;
@@ -200,15 +231,15 @@ Agents must verify repository source before relying on this list because later t
 
 ## Current active task
 
-`OTERYN-20260719-public-site-shell-and-search`
+`OTERYN-20260719-public-news-read-model`
 
 Objective:
 
-- reuse the existing Blade game-data layout as the shared public homepage/read-surface shell;
-- expose Home, Online, Highscores and Servers navigation;
-- add exact-name character search through a validated `GET /characters?name=...` redirect to the existing character profile route;
-- do not add a duplicate character read model, new Canary table access, caching, live runtime availability claims or shared writes;
-- add focused feature tests and synchronize Phase 4 state documentation.
+- add Platform-owned `news_posts` persistence through a Laravel migration;
+- expose published-only `GET /news` and `GET /news/{slug}` public reads through a dedicated CMS query boundary;
+- exclude drafts and future-scheduled posts using `published_at` visibility semantics;
+- provide deterministic bounded pagination and escaped plain-text rendering;
+- do not add authoring, Admin/RBAC, rich HTML, media uploads, Canary access, caching or production deployment work.
 
 No successor bounded task is approved by this change. Re-evaluate remaining Phase 4 work against live repository/task state after this task is merged.
 
