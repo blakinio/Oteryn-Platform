@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-web-login-sessions` — Phase 3 T3.2 Platform-only web login/logout and revocable web sessions; branch `task/OTERYN-20260719-web-login-sessions`; draft PR pending. Scope excludes remember-me, password recovery, MFA, Canary/shared writes and game-login authorization.
+- `OTERYN-20260719-web-login-sessions` — Phase 3 T3.2 Platform-only web login/logout and revocable web sessions; branch `task/OTERYN-20260719-web-login-sessions`; PR #12; task checkpoint status `ready`. Code-validation head passed Composer validation, lockfile install, Pint, PHPStan/Larastan level 10, full tests and Agent Governance. Scope excludes remember-me, password recovery, MFA, Canary/shared writes and game-login authorization.
 
 ## Recommended next task
 
-After T3.2 is merged, create `OTERYN-20260719-password-recovery-credentials` as a separate Phase 3 T3.3 task after re-verifying session-revocation primitives and current auth-contract blockers.
+After T3.2 is merged, create `OTERYN-20260719-password-recovery-credentials` as a separate Phase 3 T3.3 task after re-verifying session-revocation primitives and current auth-contract blockers. Platform-only password recovery must not be described as revoking Canary/login-server credentials or active game sessions while those cross-repository paths remain unresolved.
 
 ## Other queued work
 
