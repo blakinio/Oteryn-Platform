@@ -16,6 +16,7 @@
         .muted { color: #9ca3af; }
         .notice { padding: .9rem 1rem; border-left: .25rem solid #60a5fa; background: #1e3a5f; }
         .search-row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+        .prose-text { white-space: pre-wrap; }
         input, button { font: inherit; padding: .7rem .8rem; border: 1px solid #4b5563; border-radius: .5rem; }
         input { min-width: min(24rem, 100%); background: #111827; color: #f9fafb; }
         button { cursor: pointer; }
@@ -28,8 +29,9 @@
 <body>
 <header>
     <a href="{{ route('home') }}"><strong>Oteryn Platform</strong></a>
-    <nav aria-label="Public game data">
+    <nav aria-label="Public navigation">
         <a href="{{ route('home') }}">Home</a>
+        <a href="{{ route('news.index') }}">News</a>
         <a href="{{ route('game.online.index') }}">Online</a>
         <a href="{{ route('game.highscores.index') }}">Highscores</a>
         <a href="{{ route('game.servers.index') }}">Servers</a>

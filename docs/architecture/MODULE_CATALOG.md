@@ -17,7 +17,7 @@ At architecture bootstrap, all product modules are `PLANNED` or `DISCOVERY`.
 | Accounts | DISCOVERY | Account profile/settings and account-level business operations | Password verification logic, game runtime |
 | Characters | DISCOVERY | Authorized web-triggered character lifecycle operations allowed by contract | Direct undocumented writes to Canary tables |
 | PublicGameData | AVAILABLE | Read models/queries for characters, guilds, highscores, online/status | Privileged mutations |
-| CMS | PLANNED | News, pages, public managed content | Identity policy, game state |
+| CMS | AVAILABLE | News, pages, public managed content | Identity policy, game state |
 | Admin | PLANNED | Admin UI, privileged use cases, RBAC integration | Bypassing domain/application invariants |
 | Audit | PLANNED | Security/admin audit events and query surface | Secrets, raw credentials, business logic decisions |
 | Integration | DISCOVERY | Canary/login-server adapters, schema translation, contract enforcement | Product policy that belongs in domain modules |
@@ -100,7 +100,7 @@ Potential operations include create, rename, delete/soft-delete and other web ac
 
 Prefer dedicated query/read-model services. Cache may be introduced after correctness is established. Staleness expectations must be explicit for each view.
 
-The module is available on main for the implemented read-only surfaces, including the cluster-wide online-character list. The public-web shell reuses the existing Blade layout across the homepage and game-data views, and exact-name character search routes to the existing character profile endpoint rather than introducing a second query path. Remaining Phase 4 work includes news display; fresh multichannel runtime availability remains a separate integration concern and caching remains deferred pending explicit freshness policy.
+The module is available on main for the implemented read-only surfaces, including the cluster-wide online-character list. The public-web shell reuses the existing Blade layout across the homepage and game-data views, and exact-name character search routes to the existing character profile endpoint rather than introducing a second query path. Fresh multichannel runtime availability remains a separate integration concern and caching remains deferred pending explicit freshness policy.
 
 ## CMS
 
@@ -110,6 +110,10 @@ The module is available on main for the implemented read-only surfaces, includin
 - managed pages;
 - publication state;
 - media references when upload security is implemented.
+
+### Current available boundary
+
+The available Phase 4 CMS boundary is public read-only news display backed by Platform-owned `news_posts` persistence. Public list/detail queries expose only rows with a non-null `published_at` at or before the read time, use deterministic bounded pagination, and render title/body as escaped plain text. News authoring, page management, rich HTML, media uploads and all privileged CMS mutations remain outside this boundary and require the future Phase 6 Admin/RBAC and audit controls.
 
 ### Security
 
