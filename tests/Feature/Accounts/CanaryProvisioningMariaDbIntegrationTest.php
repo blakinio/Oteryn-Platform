@@ -78,10 +78,10 @@ final class CanaryProvisioningMariaDbIntegrationTest extends TestCase
         $recoveredId = $provisioner->provision($name, $creationEpoch);
 
         self::assertSame($firstId, $recoveredId);
-        self::assertSame(1, $this->rootCount("SELECT COUNT(*) FROM `".self::DATABASE."`.`accounts` WHERE `name` = '{$name}'"));
-        self::assertSame(3, $this->rootCount("SELECT COUNT(*) FROM `".self::DATABASE."`.`account_vipgroups` WHERE `account_id` = {$firstId}"));
+        self::assertSame(1, $this->rootCount('SELECT COUNT(*) FROM `'.self::DATABASE."`.`accounts` WHERE `name` = '{$name}'"));
+        self::assertSame(3, $this->rootCount('SELECT COUNT(*) FROM `'.self::DATABASE."`.`account_vipgroups` WHERE `account_id` = {$firstId}"));
 
-        $storedPassword = $this->rootValue("SELECT `password` FROM `".self::DATABASE."`.`accounts` WHERE `id` = {$firstId}");
+        $storedPassword = $this->rootValue('SELECT `password` FROM `'.self::DATABASE."`.`accounts` WHERE `id` = {$firstId}");
         self::assertIsString($storedPassword);
         self::assertMatchesRegularExpression('/^[0-9a-f]{40}$/', $storedPassword);
 
@@ -123,8 +123,8 @@ final class CanaryProvisioningMariaDbIntegrationTest extends TestCase
 
         self::assertTrue($binding->isReady());
         self::assertSame($committedAccountId, $binding->canary_account_id);
-        self::assertSame(1, $this->rootCount("SELECT COUNT(*) FROM `".self::DATABASE."`.`accounts` WHERE `name` = '{$name}'"));
-        self::assertSame(3, $this->rootCount("SELECT COUNT(*) FROM `".self::DATABASE."`.`account_vipgroups` WHERE `account_id` = {$committedAccountId}"));
+        self::assertSame(1, $this->rootCount('SELECT COUNT(*) FROM `'.self::DATABASE."`.`accounts` WHERE `name` = '{$name}'"));
+        self::assertSame(3, $this->rootCount('SELECT COUNT(*) FROM `'.self::DATABASE."`.`account_vipgroups` WHERE `account_id` = {$committedAccountId}"));
     }
 
     private function resetDatabase(): void
