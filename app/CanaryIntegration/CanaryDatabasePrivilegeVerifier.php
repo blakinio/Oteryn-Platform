@@ -34,7 +34,7 @@ final class CanaryDatabasePrivilegeVerifier
         $connection = DB::connection('canary');
         $database = $connection->getDatabaseName();
 
-        if (! is_string($database) || $database === '') {
+        if ($database === '') {
             throw new RuntimeException('The Canary database name is unavailable.');
         }
 
