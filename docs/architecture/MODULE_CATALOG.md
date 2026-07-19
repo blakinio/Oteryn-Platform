@@ -100,7 +100,7 @@ Potential operations include create, rename, delete/soft-delete and other web ac
 
 Prefer dedicated query/read-model services. Cache may be introduced after correctness is established. Staleness expectations must be explicit for each view.
 
-The module is available on main for the implemented read-only surfaces. The cluster-wide online-character route remains the next bounded Phase 4 extension under its approved read contract.
+The module is available on main for the implemented read-only surfaces, including the cluster-wide online-character list. The public-web shell reuses the existing Blade layout across the homepage and game-data views, and exact-name character search routes to the existing character profile endpoint rather than introducing a second query path. Remaining Phase 4 work includes news display; fresh multichannel runtime availability remains a separate integration concern and caching remains deferred pending explicit freshness policy.
 
 ## CMS
 
