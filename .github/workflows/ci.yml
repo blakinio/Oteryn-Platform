@@ -53,6 +53,63 @@ jobs:
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Temporary per-file diagnostics for PR #33. Remove before merge once the
+      # exact Pint failures are corrected; the repository-wide gate remains below.
+      - name: Pint app/Accounts/Actions/ProvisionCanaryAccount.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Accounts/Actions/ProvisionCanaryAccount.php
+      - name: Pint app/Accounts/Contracts/CanaryAccountProvisioningGateway.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Accounts/Contracts/CanaryAccountProvisioningGateway.php
+      - name: Pint app/Accounts/Exceptions/CanaryAccountProvisioningConflict.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningConflict.php
+      - name: Pint app/Accounts/Exceptions/CanaryAccountProvisioningException.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningException.php
+      - name: Pint app/Accounts/Exceptions/CanaryAccountProvisioningUnavailable.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningUnavailable.php
+      - name: Pint app/Accounts/Models/IdentityCanaryAccount.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Accounts/Models/IdentityCanaryAccount.php
+      - name: Pint app/Audit/SecurityEventRecorder.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Audit/SecurityEventRecorder.php
+      - name: Pint app/CanaryIntegration/CanaryAccountProvisioner.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/CanaryIntegration/CanaryAccountProvisioner.php
+      - name: Pint app/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifier.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifier.php
+      - name: Pint app/Identity/Actions/RegisterIdentity.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Identity/Actions/RegisterIdentity.php
+      - name: Pint app/Providers/AppServiceProvider.php
+        continue-on-error: true
+        run: vendor/bin/pint --test app/Providers/AppServiceProvider.php
+      - name: Pint config/database.php
+        continue-on-error: true
+        run: vendor/bin/pint --test config/database.php
+      - name: Pint database migration
+        continue-on-error: true
+        run: vendor/bin/pint --test database/migrations/2026_07_20_011000_create_identity_canary_accounts_table.php
+      - name: Pint routes/console.php
+        continue-on-error: true
+        run: vendor/bin/pint --test routes/console.php
+      - name: Pint tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
+        continue-on-error: true
+        run: vendor/bin/pint --test tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
+      - name: Pint tests/Feature/Accounts/ProvisionCanaryAccountTest.php
+        continue-on-error: true
+        run: vendor/bin/pint --test tests/Feature/Accounts/ProvisionCanaryAccountTest.php
+      - name: Pint tests/Feature/Identity/RegistrationTest.php
+        continue-on-error: true
+        run: vendor/bin/pint --test tests/Feature/Identity/RegistrationTest.php
+      - name: Pint tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php
+        continue-on-error: true
+        run: vendor/bin/pint --test tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php
+
       - name: Check formatting
         run: composer format:check
 
