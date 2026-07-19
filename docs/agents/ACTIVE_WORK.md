@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-mfa-totp-provider-resolution` — Phase 3 T3.4b dependency-resolution-only follow-up for Platform MFA; branch `task/OTERYN-20260719-mfa-totp-provider-resolution`; draft PR #15; task checkpoint status `blocked`. Preferred candidate is `pragmarx/google2fa:^9.0`, but `composer.json` / `composer.lock` must not change until real Composer resolution can run; the current execution environment still cannot resolve `github.com`. No public MFA routes, challenge/enforcement logic, Admin/RBAC semantics or Canary/login-server changes are in scope.
+- `OTERYN-20260719-mfa-totp-provider-resolution` — Phase 3 T3.4b dependency-resolution-only follow-up for Platform MFA; branch `task/OTERYN-20260719-mfa-totp-provider-resolution`; draft PR #15; task checkpoint status `validating`. Real Composer resolution added `pragmarx/google2fa:^9.0`, locking `pragmarx/google2fa` v9.0.0 and `paragonie/constant_time_encoding` v3.1.3. The ephemeral resolver workflow has been removed. Generated dependency metadata passed normal CI run #228; final documentation-head CI and Agent Governance remain required before merge. No public MFA routes, challenge/enforcement logic, Admin/RBAC semantics or Canary/login-server changes are in scope.
 
 ## Recommended next task
 
-After T3.4b produces a Composer-generated lockfile and exact-head CI proves the dependency graph installs cleanly, create a separate Platform web MFA integration task for maintained-provider-backed enrollment confirmation and login challenge/enforcement within the existing custom auth stack. Recovery-code consumption, replay resistance, rate limiting and session semantics must be designed explicitly. Platform web MFA must not be described as a global game-login gate while alternate Canary/login-server paths remain unresolved.
+After T3.4b is merged, create a separate Platform web MFA integration task for maintained-provider-backed enrollment confirmation and login challenge/enforcement within the existing custom auth stack. Recovery-code consumption, replay resistance, rate limiting, audit and session semantics must be designed explicitly. Platform web MFA must not be described as a global game-login gate while alternate Canary/login-server paths remain unresolved.
 
 ## Other queued work
 
@@ -16,7 +16,7 @@ After T3.4b produces a Composer-generated lockfile and exact-head CI proves the 
 
 ## Recently completed
 
-- `OTERYN-20260719-mfa-state-foundation` — Phase 3 T3.4a Platform-only encrypted MFA state and internal reset/session-revocation foundation merged through PR #14 as `6109e48d28c305f24a8db56389a433b4a4876750`; task record is being archived on the T3.4b branch.
+- `OTERYN-20260719-mfa-state-foundation` — Phase 3 T3.4a Platform-only encrypted MFA state and internal reset/session-revocation foundation merged through PR #14 as `6109e48d28c305f24a8db56389a433b4a4876750`; task record archived under `docs/agents/tasks/archive/` on the T3.4b branch.
 - `OTERYN-20260719-password-recovery-credentials` — Phase 3 T3.3 secure Platform password recovery/change merged through PR #13 as `e1ec8fddd4aedbd847558f223be35212ea11c85f`; task record archived under `docs/agents/tasks/archive/`.
 - `OTERYN-20260719-web-login-sessions` — Phase 3 T3.2 secure Platform web login/logout and revocable web sessions merged through PR #12 as `74a72d4acc2f0228a147e3ce71a1542f43e97906`; archived task record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260719-identity-core-registration` — Phase 3 T3.1 Platform-owned Identity core and registration merged through PR #11 as `6f48cf97288963c25b0ca97563865f5b3514de3b`; archived task record under `docs/agents/tasks/archive/`.
