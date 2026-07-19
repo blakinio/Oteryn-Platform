@@ -16,7 +16,7 @@ Resolve the authorization blocker discovered by the first Phase 5 character-crea
 - [x] Add `docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md` with the exact blocker and safe target claim boundary.
 - [x] Update `ACTIVE_WORK.md` with the current task; do not claim character/account mutation authorization.
 - [x] Do not modify Canary/login-server repositories and do not implement shared Canary account/player writes.
-- [ ] Run final exact-head CI and Agent Governance before readiness/merge.
+- [ ] Run final fresh exact-head CI and Agent Governance on this ready checkpoint before merge.
 
 ## Ownership
 
@@ -52,11 +52,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T23:42:00+02:00
-head: 6fd486dc6465904a8afc3cbbb49d03f4abaaa3a0
+updated_at: 2026-07-19T23:49:00+02:00
+head: ba8e5cb19349a7bd4cede6061d86df18953443ac
 branch: task/OTERYN-20260719-phase5-identity-canary-account-binding
 pr: 27
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -77,7 +77,7 @@ owned_paths:
 proven:
   - PR #26 was squash-merged to main as ab78d6ac3bc674deb0868195563b61a753d95f98 after exact-head CI and Agent Governance passed and the final merge gate remained clean.
   - Live open-PR search after PR #26 merge returned no open pull requests before this successor task was claimed.
-  - The predecessor active task blob c66f27a5a04e272c35e20b58509acccce7cec933 was copied unchanged to archive and the active copy removed.
+  - The predecessor active task blob c66f27a5a04e272c35e20b58509acccce7cec933 was copied unchanged to archive and the active copy removed; current branch comparison reports the move as a rename with zero additions and zero deletions.
   - Current Platform Identity persistence and registration contain no Canary account key/binding, and Platform credentials remain separate from game credentials.
   - Current Canary schema at 2b6ae86539640dfc52323e9d5abbde31d6610c5f has unique accounts.name, non-unique indexed accounts.email and credential-sensitive accounts.password.
   - The current database-enforced Platform canary read credential can SELECT only players, guilds, guild_membership, guild_ranks, channels and cluster_sessions; it cannot read accounts or account_sessions.
@@ -85,6 +85,7 @@ proven:
   - External login-server normal login authenticates with (email OR unique name) plus SHA-1 password match, then loads players, creates a 24-hour account_sessions game session and returns game-login session material; it is not a side-effect-free ownership-claim endpoint.
   - No purpose-built current Canary/login-server external account-control claim API was proven that returns a short-lived single-use assertion bound to one accounts.id without creating a reusable game session.
   - IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT records that a durable Platform-owned mapping is conceptually valid only after trustworthy account-control proof, but approves no binding implementation yet.
+  - Delivery-validation head ba8e5cb19349a7bd4cede6061d86df18953443ac passed CI run 29703518458 (#400) and Agent Governance run 29703518465 (#321).
 derived:
   - Matching existing accounts by email cannot establish authorization because email is non-unique.
   - Direct Platform verification of accounts.password would create another credential authority and require access to sensitive credential hashes, violating the current least-privilege boundary.
@@ -119,7 +120,7 @@ validation:
     evidence: main at ab78d6ac3bc674deb0868195563b61a753d95f98 and no open PR before branch creation
   - command: predecessor archive exact-content check
     result: PASS
-    evidence: archive was created from merged predecessor blob c66f27a5a04e272c35e20b58509acccce7cec933 before active copy deletion
+    evidence: branch comparison reports exact rename with zero content changes from active to archive
   - command: Platform Identity and DB privilege boundary inspection
     result: PASS
     evidence: Identity model/migrations/registration and canary-readonly provisioning prove no binding and no accounts/account_sessions access
@@ -129,12 +130,15 @@ validation:
   - command: current external login-server account/login inspection
     result: PASS
     evidence: account.go and grpc/login.go at 2612930de4d97123a397f8f2cd0d5f784094af40 inspected read-only; normal login creates account_sessions after SHA-1 credential verification
-  - command: exact-head GitHub Actions CI and Agent Governance
-    result: NOT_RUN
-    evidence: final discovery documentation head not yet validated
+  - command: delivery-validation GitHub Actions CI run 29703518458 (#400)
+    result: PASS
+    evidence: exact delivery-validation head ba8e5cb19349a7bd4cede6061d86df18953443ac completed successfully
+  - command: delivery-validation Agent Governance run 29703518465 (#321)
+    result: PASS
+    evidence: exact delivery-validation head ba8e5cb19349a7bd4cede6061d86df18953443ac completed successfully
 blockers:
   - none for discovery merge; binding implementation and all user-scoped Canary mutations remain blocked pending a safe account-control claim capability or approved atomic account-creation path plus explicit ownership lifecycle policy
-next_action: Update ACTIVE_WORK with the exact binding blocker and cross-repository/authentication dependency, then validate final diff and exact-head CI plus Agent Governance before readiness/merge.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, then perform the full PR #27 merge gate and squash-merge only if main divergence, final diff and review state remain clean.
 ```
 
 ## Notes
