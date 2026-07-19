@@ -51,9 +51,10 @@ final class CanaryAccountProvisioner implements CanaryAccountProvisioningGateway
                     throw new CanaryAccountProvisioningUnavailable('Canary account provisioning did not produce a recoverable account row.');
                 }
 
-                $accountId = $account->id ?? null;
-                $accountName = $account->name ?? null;
-                $accountCreation = $account->creation ?? null;
+                $values = (array) $account;
+                $accountId = $values['id'] ?? null;
+                $accountName = $values['name'] ?? null;
+                $accountCreation = $values['creation'] ?? null;
 
                 if ((! is_int($accountId) && ! is_string($accountId)) || (int) $accountId <= 0) {
                     throw new CanaryAccountProvisioningUnavailable('Canary account provisioning returned an invalid account identifier.');
