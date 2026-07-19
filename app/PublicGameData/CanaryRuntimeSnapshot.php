@@ -5,7 +5,7 @@ namespace App\PublicGameData;
 final readonly class CanaryRuntimeSnapshot
 {
     /**
-     * @param array<int, CanaryRuntimeStatus|null> $statuses
+     * @param  array<int, CanaryRuntimeStatus|null>  $statuses
      */
     private function __construct(
         public bool $available,
@@ -13,7 +13,7 @@ final readonly class CanaryRuntimeSnapshot
     ) {}
 
     /**
-     * @param array<int, CanaryRuntimeStatus|null> $statuses
+     * @param  array<int, CanaryRuntimeStatus|null>  $statuses
      */
     public static function available(array $statuses): self
     {
