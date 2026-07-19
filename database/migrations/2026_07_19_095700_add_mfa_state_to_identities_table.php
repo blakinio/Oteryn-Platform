@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('identities', function (Blueprint $table): void {
-            $table->text('mfa_secret')->nullable();
-            $table->text('mfa_recovery_codes')->nullable();
-            $table->timestamp('mfa_confirmed_at')->nullable();
+            $table->text('two_factor_secret')->nullable();
+            $table->text('two_factor_recovery_codes')->nullable();
+            $table->timestamp('two_factor_confirmed_at')->nullable();
         });
     }
 
@@ -19,9 +19,9 @@ return new class extends Migration
     {
         Schema::table('identities', function (Blueprint $table): void {
             $table->dropColumn([
-                'mfa_secret',
-                'mfa_recovery_codes',
-                'mfa_confirmed_at',
+                'two_factor_secret',
+                'two_factor_recovery_codes',
+                'two_factor_confirmed_at',
             ]);
         });
     }
