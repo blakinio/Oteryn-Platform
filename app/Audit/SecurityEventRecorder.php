@@ -28,6 +28,14 @@ final class SecurityEventRecorder
 
     public const IDENTITY_MFA_DISABLED = 'identity.mfa_disabled';
 
+    public const CANARY_ACCOUNT_PROVISIONING_REQUESTED = 'identity.canary_account_provisioning_requested';
+
+    public const CANARY_ACCOUNT_PROVISIONING_COMPLETED = 'identity.canary_account_provisioning_completed';
+
+    public const CANARY_ACCOUNT_PROVISIONING_FAILED = 'identity.canary_account_provisioning_failed';
+
+    public const CANARY_ACCOUNT_PROVISIONING_CONFLICT = 'identity.canary_account_provisioning_conflict';
+
     public function recordIdentityRegistered(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_REGISTERED);
@@ -81,6 +89,26 @@ final class SecurityEventRecorder
     public function recordIdentityMfaDisabled(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_MFA_DISABLED);
+    }
+
+    public function recordCanaryAccountProvisioningRequested(int $identityId): void
+    {
+        $this->record($identityId, self::CANARY_ACCOUNT_PROVISIONING_REQUESTED);
+    }
+
+    public function recordCanaryAccountProvisioningCompleted(int $identityId): void
+    {
+        $this->record($identityId, self::CANARY_ACCOUNT_PROVISIONING_COMPLETED);
+    }
+
+    public function recordCanaryAccountProvisioningFailed(int $identityId): void
+    {
+        $this->record($identityId, self::CANARY_ACCOUNT_PROVISIONING_FAILED);
+    }
+
+    public function recordCanaryAccountProvisioningConflict(int $identityId): void
+    {
+        $this->record($identityId, self::CANARY_ACCOUNT_PROVISIONING_CONFLICT);
     }
 
     private function record(int $identityId, string $eventType): void
