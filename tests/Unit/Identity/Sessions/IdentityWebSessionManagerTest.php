@@ -18,11 +18,11 @@ final class IdentityWebSessionManagerTest extends TestCase
         $session->start();
         $request = Request::create('/login', 'POST');
         $request->setLaravelSession($session);
-        $identity = new Identity();
+        $identity = new Identity;
         $identity->web_session_generation = 7;
         $previousSessionId = $session->getId();
 
-        (new IdentityWebSessionManager())->establish($request, $identity);
+        (new IdentityWebSessionManager)->establish($request, $identity);
 
         self::assertNotSame($previousSessionId, $session->getId());
         self::assertSame(7, $session->get(WebSessionState::GENERATION_KEY));
