@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers\Identity;
 
-use App\Http\Controllers\Controller;
 use App\Http\Requests\Identity\RegisterIdentityRequest;
 use App\Identity\Actions\RegisterIdentity;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 
-final class RegistrationController extends Controller
+final class RegistrationController
 {
     public function create(): View
     {
