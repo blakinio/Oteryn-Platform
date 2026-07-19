@@ -22,10 +22,10 @@ final class PublicGameDataController
 
     public function characterSearch(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $request->validate([
             'name' => ['required', 'string', 'max:255'],
         ]);
-        $name = $validated['name'];
+        $name = $request->input('name');
 
         if (! is_string($name)) {
             abort(422);
