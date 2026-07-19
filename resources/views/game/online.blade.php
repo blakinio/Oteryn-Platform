@@ -16,4 +16,20 @@
     @empty
         <div class="card">No characters are currently online.</div>
     @endforelse
+
+    @if ($characters->hasPages())
+        <nav class="pagination" aria-label="Online character pages">
+            @if ($characters->onFirstPage())
+                <span class="muted">Previous</span>
+            @else
+                <a href="{{ $characters->previousPageUrl() }}">Previous</a>
+            @endif
+            <span>Page {{ $characters->currentPage() }} of {{ $characters->lastPage() }}</span>
+            @if ($characters->hasMorePages())
+                <a href="{{ $characters->nextPageUrl() }}">Next</a>
+            @else
+                <span class="muted">Next</span>
+            @endif
+        </nav>
+    @endif
 @endsection
