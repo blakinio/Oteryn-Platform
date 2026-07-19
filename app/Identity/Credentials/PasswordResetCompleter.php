@@ -20,7 +20,7 @@ final class PasswordResetCompleter
     public function complete(array $input): string
     {
         return DB::transaction(function () use ($input): string {
-            return Password::broker('identities')->reset(
+            $status = Password::broker('identities')->reset(
                 $input,
                 function (CanResetPasswordContract $resettable, mixed $newPassword): void {
                     if (! $resettable instanceof Identity || ! is_string($newPassword)) {
@@ -30,6 +30,12 @@ final class PasswordResetCompleter
                     $this->credentials->reset($resettable, $newPassword);
                 },
             );
+
+            if (! is_string($status)) {
+                throw new RuntimeException('The password broker returned an invalid reset status.');
+            }
+
+            return $status;
         });
     }
 }
