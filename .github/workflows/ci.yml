@@ -38,17 +38,6 @@ jobs:
       - name: Check formatting
         run: composer format:check
 
-      - name: Capture formatting diagnostics
-        if: failure()
-        run: vendor/bin/pint --test -v > pint-diagnostic.txt 2>&1 || true
-
-      - name: Upload formatting diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pint-diagnostic
-          path: pint-diagnostic.txt
-
       - name: Run static analysis
         run: composer analyse
 
