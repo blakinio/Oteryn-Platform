@@ -58,8 +58,8 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->twice()->with('canary_runtime')->andReturn($connection);
-        $this->commandExpectation($connection)
-            ->andReturnUsing(function (string $command, array $arguments): mixed {
+        $this->commandExpectation($connection)->__call('andReturnUsing', [
+            function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
                 if ($command === 'hmget' && $key === 'cluster:channel:1:runtime') {
@@ -87,7 +87,8 @@ final class ServerRuntimeAvailabilityTest extends TestCase
                 }
 
                 throw new RuntimeException('Unexpected Redis command in test.');
-            });
+            },
+        ]);
 
         $this->get(route('game.servers.index'))
             ->assertOk()
@@ -110,17 +111,11 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $this->commandExpectation($connection)
-            ->once()
-            ->with('hmget', [
-                'cluster:channel:1:runtime',
-                ['channel_id', 'status', 'players_online'],
-            ])
-            ->andReturn([]);
-        $this->commandExpectation($connection)
-            ->once()
-            ->with('pttl', ['cluster:channel:1:runtime'])
-            ->andReturn(-2);
+        $this->expectCommandReturns($connection, 'hmget', [
+            'cluster:channel:1:runtime',
+            ['channel_id', 'status', 'players_online'],
+        ], []);
+        $this->expectCommandReturns($connection, 'pttl', ['cluster:channel:1:runtime'], -2);
 
         $this->get(route('game.servers.index'))
             ->assertOk()
@@ -136,13 +131,13 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $this->commandExpectation($connection)
-            ->once()
-            ->with('hmget', [
-                'cluster:channel:1:runtime',
-                ['channel_id', 'status', 'players_online'],
-            ])
-            ->andThrow(new RuntimeException('Redis transport unavailable.'));
+        $expectation = $this->commandExpectation($connection);
+        $expectation->__call('once', []);
+        $expectation->__call('with', ['hmget', [
+            'cluster:channel:1:runtime',
+            ['channel_id', 'status', 'players_online'],
+        ]]);
+        $expectation->__call('andThrow', [new RuntimeException('Redis transport unavailable.')]);
 
         $this->get(route('game.servers.index'))
             ->assertOk()
@@ -161,8 +156,8 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->twice()->with('canary_runtime')->andReturn($connection);
-        $this->commandExpectation($connection)
-            ->andReturnUsing(function (string $command, array $arguments): mixed {
+        $this->commandExpectation($connection)->__call('andReturnUsing', [
+            function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
                 if ($command === 'hmget' && $key === 'cluster:channel:1:runtime') {
@@ -182,7 +177,8 @@ final class ServerRuntimeAvailabilityTest extends TestCase
                 }
 
                 throw new RuntimeException('Unexpected Redis command in test.');
-            });
+            },
+        ]);
 
         $this->get(route('game.servers.index'))
             ->assertOk()
@@ -190,6 +186,17 @@ final class ServerRuntimeAvailabilityTest extends TestCase
             ->assertSee('Beta')
             ->assertSee('Runtime:</strong> Unavailable', false)
             ->assertDontSee('Players online:</strong> 25', false);
+    }
+
+    /**
+     * @param  list<mixed>  $arguments
+     */
+    private function expectCommandReturns(MockInterface $connection, string $command, array $arguments, mixed $returnValue): void
+    {
+        $expectation = $this->commandExpectation($connection);
+        $expectation->__call('once', []);
+        $expectation->__call('with', [$command, $arguments]);
+        $expectation->andReturn($returnValue);
     }
 
     private function commandExpectation(MockInterface $connection): CompositeExpectation
