@@ -22,16 +22,43 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('identity-login', function (Request $request): Limit {
-            $email = $request->input('email');
-            $canonicalEmail = is_string($email) ? CanonicalEmail::normalize($email) : '';
-            $identityKey = hash('sha256', $canonicalEmail);
-            $sourceIp = $request->ip() ?? 'unknown';
-
-            return Limit::perMinute(5)->by($identityKey.'|'.$sourceIp);
+            return Limit::perMinute(5)->by($this->emailSourceKey($request));
         });
 
         RateLimiter::for('identity-login-source', function (Request $request): Limit {
             return Limit::perMinute(20)->by($request->ip() ?? 'unknown');
         });
+
+        RateLimiter::for('identity-password-recovery', function (Request $request): Limit {
+            return Limit::perMinute(3)->by($this->emailSourceKey($request));
+        });
+
+        RateLimiter::for('identity-password-recovery-source', function (Request $request): Limit {
+            return Limit::perMinute(10)->by($request->ip() ?? 'unknown');
+        });
+
+        RateLimiter::for('identity-password-reset', function (Request $request): Limit {
+            return Limit::perMinute(5)->by($this->emailSourceKey($request));
+        });
+
+        RateLimiter::for('identity-password-change', function (Request $request): Limit {
+            $identifier = $request->user()?->getAuthIdentifier();
+            $identityKey = is_int($identifier) || is_string($identifier)
+                ? hash('sha256', (string) $identifier)
+                : 'unknown';
+            $sourceIp = $request->ip() ?? 'unknown';
+
+            return Limit::perMinute(5)->by($identityKey.'|'.$sourceIp);
+        });
+    }
+
+    private function emailSourceKey(Request $request): string
+    {
+        $email = $request->input('email');
+        $canonicalEmail = is_string($email) ? CanonicalEmail::normalize($email) : '';
+        $identityKey = hash('sha256', $canonicalEmail);
+        $sourceIp = $request->ip() ?? 'unknown';
+
+        return $identityKey.'|'.$sourceIp;
     }
 }
