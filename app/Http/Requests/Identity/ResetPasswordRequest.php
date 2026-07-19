@@ -52,7 +52,7 @@ final class ResetPasswordRequest extends FormRequest
     }
 
     /**
-     * @return array{email: string, token: string, password: string, password_confirmation: string}
+     * @return array{email: string, token: string, password: string}
      */
     public function credentials(): array
     {
@@ -60,13 +60,11 @@ final class ResetPasswordRequest extends FormRequest
         $email = $validated['email'] ?? null;
         $token = $validated['token'] ?? null;
         $password = $validated['password'] ?? null;
-        $passwordConfirmation = $validated['password_confirmation'] ?? null;
 
         abort_unless(
             is_string($email)
                 && is_string($token)
-                && is_string($password)
-                && is_string($passwordConfirmation),
+                && is_string($password),
             422,
         );
 
@@ -74,7 +72,6 @@ final class ResetPasswordRequest extends FormRequest
             'email' => $email,
             'token' => $token,
             'password' => $password,
-            'password_confirmation' => $passwordConfirmation,
         ];
     }
 }
