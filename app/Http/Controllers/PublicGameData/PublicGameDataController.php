@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\PublicGameData;
 
+use App\PublicGameData\CanaryChannelRuntimeService;
 use App\PublicGameData\CanaryGameDataRepository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
@@ -11,7 +12,10 @@ use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 final class PublicGameDataController
 {
-    public function __construct(private readonly CanaryGameDataRepository $gameData) {}
+    public function __construct(
+        private readonly CanaryGameDataRepository $gameData,
+        private readonly CanaryChannelRuntimeService $runtime,
+    ) {}
 
     public function highscores(): View
     {
@@ -56,8 +60,18 @@ final class PublicGameDataController
 
     public function servers(): View
     {
+        $channels = $this->gameData->configuredChannels();
+
+        /** @var list<int> $channelIds */
+        $channelIds = $channels
+            ->pluck('id')
+            ->map(static fn (mixed $channelId): int => (int) $channelId)
+            ->values()
+            ->all();
+
         return view('game.servers', [
-            'channels' => $this->gameData->configuredChannels(),
+            'channels' => $channels,
+            'runtimeSnapshot' => $this->runtime->snapshot($channelIds),
         ]);
     }
 
