@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
-use Mockery\Expectation;
+use Mockery\CompositeExpectation;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
@@ -192,9 +192,9 @@ final class ServerRuntimeAvailabilityTest extends TestCase
             ->assertDontSee('Players online:</strong> 25', false);
     }
 
-    private function commandExpectation(MockInterface $connection): Expectation
+    private function commandExpectation(MockInterface $connection): CompositeExpectation
     {
-        /** @var Expectation */
+        /** @var CompositeExpectation */
         $expectation = $connection->shouldReceive('command');
 
         return $expectation;
