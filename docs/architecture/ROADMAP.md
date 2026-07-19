@@ -99,27 +99,30 @@ Phase 3 completion does **not** claim that Platform MFA, email verification, pas
 
 ## Phase 4 — Public website and read-only game data
 
-**Status: IN PROGRESS**
+**Status: COMPLETE**
 
-Deliverables:
+Delivered:
 
-- public layout/navigation;
-- homepage/server status;
-- news display;
-- character search/profile;
-- highscores;
-- guild pages;
-- online list where supported;
-- efficient read/query services;
-- caching only after correctness/freshness policy is defined.
+- shared public Blade layout/navigation for Home, News, Online, Highscores and Servers;
+- homepage exact-name character search routed to the existing bounded character profile read path;
+- configured server/channel metadata plus fresh per-channel runtime availability/count projection through the dedicated read-only `canary_runtime` Redis boundary;
+- Platform-owned published-only public news list/detail with deterministic ordering, pagination and escaped plain-text rendering;
+- read-only active character profiles;
+- read-only level highscores with deterministic ordering and pagination;
+- read-only guild detail plus joined paginated membership reads without per-member N+1 queries;
+- cluster-wide online-character list from fresh `cluster_sessions` identity joined to public player/channel fields, with explicit dependency-failure semantics and pagination capped at 100 rows per page;
+- dedicated read/query boundaries using explicit public field allowlists and database-enforced SELECT-only Canary privileges for the implemented SQL read surface;
+- caching intentionally absent where it could extend `cluster_sessions` lease expiry or Canary runtime Redis TTL freshness.
 
-Current implementation includes a shared public Blade shell/navigation, homepage exact-name character search routing, read-only highscores, character profiles, guild pages, the cluster-wide online-character list, a Platform-owned published-only public news list/detail read model, and a per-channel server runtime availability/count projection. The runtime surface uses a dedicated read-only `canary_runtime` Redis connection over deterministic configured-channel keys, requires positive Redis TTL, preserves explicit Canary runtime states, treats missing/expired keys as unknown, and discards the whole runtime snapshot on dependency or malformed-data failure while keeping configured channel metadata available. SQL `channel_runtime_status` and process-local `ProtocolStatus` remain forbidden authoritative fallbacks. Runtime and online-character caching remain deferred because no cache may extend data past the proven Redis-TTL or lease-expiry freshness boundaries. News authoring/management remains a future privileged CMS concern.
+Closure revalidation found one concrete exit-gate gap: `onlineCharacters()` still terminated in an unbounded `get()`. PR #23 replaces that mass-query path with a `LengthAwarePaginator` defaulting to 100 rows and adds route-level regression coverage proving 101 fresh online characters split across two pages.
 
-Exit gate:
+Known privileged/group-hidden ranking policy, production runtime Redis ACL/endpoint provisioning, exact production wall-clock skew and broader cache policy remain explicit later product/deployment unknowns. They are not silently resolved by Phase 4 completion and do not authorize shared writes or deployment claims.
 
-- no write access required for public game-data features;
-- query performance avoids obvious N+1/mass-query patterns;
-- public output is escaped/sanitized correctly.
+Exit gate — satisfied by closure revalidation:
+
+- no write access is required for public game-data features;
+- query performance avoids obvious N+1/mass-query patterns through bounded lookups, joins and pagination;
+- public output is escaped/sanitized correctly for the implemented surfaces.
 
 ## Phase 5 — Account and character management
 
@@ -139,6 +142,8 @@ Exit gate:
 - every shared write is documented in contract;
 - authorization and concurrency invariants tested;
 - no undocumented raw writes to Canary-owned data.
+
+The first Phase 5 task must be a bounded operation-contract/discovery task derived from live repository and Canary evidence. It must select one concrete operation and prove ownership, authorization, validation, transaction, concurrency, side-effect and rollback semantics before implementing any shared write.
 
 ## Phase 6 — CMS, Admin, RBAC and Audit
 
