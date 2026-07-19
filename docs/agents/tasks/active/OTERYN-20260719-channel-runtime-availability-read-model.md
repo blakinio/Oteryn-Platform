@@ -108,6 +108,8 @@ proven:
   - The merged CANARY_DATA_CONTRACT already specifies the exact deterministic Redis-key, TTL, public-projection, snapshot-failure and forbidden-fallback semantics implemented here; no semantic contract amendment was required.
   - PROJECT_STATE, MODULE_CATALOG, ROADMAP and ACTIVE_WORK were synchronized with the implemented runtime read boundary.
   - Temporary CI diagnostics used to expose Pint, PHPStan and PHPUnit failure details were removed; the delivery-validation diff uses the repository's original CI workflow.
+  - After Pint passed, Larastan level 10 exposed mixed channel-id narrowing and Mockery expectation typing issues; production channel IDs were narrowed explicitly and test expectation configuration was repaired without reducing analysis level.
+  - After static analysis passed, PHPUnit exposed that Mockery shouldReceive returned CompositeExpectation rather than Expectation for these generated mocks; tests were changed to configure the real CompositeExpectation through its declared delegation boundary.
   - Delivery-validation head 15c35487a15aa73e4935416580e3834266d2e75d passed CI #370, including Composer validation/install, Pint, PHPStan/Larastan level 10 and the full test suite.
   - Delivery-validation head 15c35487a15aa73e4935416580e3834266d2e75d passed Agent Governance #290.
 derived:
@@ -119,11 +121,6 @@ conflicts: []
 first_failure:
   marker: PINT_FORMAT_CHECK
   evidence: CI #341 and #343 stopped at Check formatting before static analysis or tests; exact Pint diagnostics identified only PHPDoc spacing issues and those were corrected without weakening formatting rules
-subsequent_failures:
-  - marker: PHPSTAN_RUNTIME_TEST_TYPING
-    evidence: after Pint passed, Larastan level 10 exposed mixed channel-id narrowing and Mockery expectation typing issues; production channel IDs were narrowed explicitly and test expectation configuration was typed without reducing analysis level
-  - marker: MOCKERY_COMPOSITE_EXPECTATION_RUNTIME_TYPE
-    evidence: after static analysis passed, PHPUnit exposed that Mockery shouldReceive returned CompositeExpectation rather than Expectation in these generated mocks; tests were changed to configure the real CompositeExpectation through its declared delegation boundary
 rejected_hypotheses:
   - The early CI failure was a failing test suite: rejected because CI #341/#343 failed at formatting and skipped both static analysis and tests.
   - Add Predis solely for this adapter: rejected because Laravel 13 supports PhpRedis directly and the bounded implementation does not need a new Composer dependency.
