@@ -6,6 +6,8 @@ use App\CanaryIntegration\CanaryRuntimeRedisReader;
 use Illuminate\Redis\Connections\Connection;
 use Illuminate\Support\Facades\Redis;
 use Mockery;
+use Mockery\Expectation;
+use Mockery\MockInterface;
 use Tests\TestCase;
 use UnexpectedValueException;
 
@@ -15,26 +17,16 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
     {
         $connection = Mockery::mock(Connection::class);
 
-        Redis::shouldReceive('connection')
-            ->once()
-            ->with('canary_runtime')
-            ->andReturn($connection);
-
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('hmget', [
-                'cluster:channel:7:runtime',
-                ['channel_id', 'status', 'players_online'],
-            ])
-            ->andReturn([
-                'channel_id' => '7',
-                'status' => 'ONLINE',
-                'players_online' => '42',
-            ]);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('pttl', ['cluster:channel:7:runtime'])
-            ->andReturn(25000);
+        Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
+        $this->commandExpectation($connection)->once()->with('hmget', [
+            'cluster:channel:7:runtime',
+            ['channel_id', 'status', 'players_online'],
+        ])->andReturn([
+            'channel_id' => '7',
+            'status' => 'ONLINE',
+            'players_online' => '42',
+        ]);
+        $this->commandExpectation($connection)->once()->with('pttl', ['cluster:channel:7:runtime'])->andReturn(25000);
 
         $status = (new CanaryRuntimeRedisReader)->read(7);
 
@@ -49,17 +41,11 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
         $connection = Mockery::mock(Connection::class);
 
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('hmget', [
-                'cluster:channel:7:runtime',
-                ['channel_id', 'status', 'players_online'],
-            ])
-            ->andReturn([]);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('pttl', ['cluster:channel:7:runtime'])
-            ->andReturn(-2);
+        $this->commandExpectation($connection)->once()->with('hmget', [
+            'cluster:channel:7:runtime',
+            ['channel_id', 'status', 'players_online'],
+        ])->andReturn([]);
+        $this->commandExpectation($connection)->once()->with('pttl', ['cluster:channel:7:runtime'])->andReturn(-2);
 
         self::assertNull((new CanaryRuntimeRedisReader)->read(7));
     }
@@ -69,21 +55,15 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
         $connection = Mockery::mock(Connection::class);
 
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('hmget', [
-                'cluster:channel:7:runtime',
-                ['channel_id', 'status', 'players_online'],
-            ])
-            ->andReturn([
-                'channel_id' => '7',
-                'status' => 'ONLINE',
-                'players_online' => '-1',
-            ]);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('pttl', ['cluster:channel:7:runtime'])
-            ->andReturn(25000);
+        $this->commandExpectation($connection)->once()->with('hmget', [
+            'cluster:channel:7:runtime',
+            ['channel_id', 'status', 'players_online'],
+        ])->andReturn([
+            'channel_id' => '7',
+            'status' => 'ONLINE',
+            'players_online' => '-1',
+        ]);
+        $this->commandExpectation($connection)->once()->with('pttl', ['cluster:channel:7:runtime'])->andReturn(25000);
 
         $this->expectException(UnexpectedValueException::class);
 
@@ -95,21 +75,15 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
         $connection = Mockery::mock(Connection::class);
 
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('hmget', [
-                'cluster:channel:7:runtime',
-                ['channel_id', 'status', 'players_online'],
-            ])
-            ->andReturn([
-                'channel_id' => '8',
-                'status' => 'ONLINE',
-                'players_online' => '10',
-            ]);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('pttl', ['cluster:channel:7:runtime'])
-            ->andReturn(25000);
+        $this->commandExpectation($connection)->once()->with('hmget', [
+            'cluster:channel:7:runtime',
+            ['channel_id', 'status', 'players_online'],
+        ])->andReturn([
+            'channel_id' => '8',
+            'status' => 'ONLINE',
+            'players_online' => '10',
+        ]);
+        $this->commandExpectation($connection)->once()->with('pttl', ['cluster:channel:7:runtime'])->andReturn(25000);
 
         $this->expectException(UnexpectedValueException::class);
 
@@ -121,24 +95,26 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
         $connection = Mockery::mock(Connection::class);
 
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('hmget', [
-                'cluster:channel:7:runtime',
-                ['channel_id', 'status', 'players_online'],
-            ])
-            ->andReturn([
-                'channel_id' => '7',
-                'status' => 'DEGRADED',
-                'players_online' => '10',
-            ]);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('pttl', ['cluster:channel:7:runtime'])
-            ->andReturn(25000);
+        $this->commandExpectation($connection)->once()->with('hmget', [
+            'cluster:channel:7:runtime',
+            ['channel_id', 'status', 'players_online'],
+        ])->andReturn([
+            'channel_id' => '7',
+            'status' => 'DEGRADED',
+            'players_online' => '10',
+        ]);
+        $this->commandExpectation($connection)->once()->with('pttl', ['cluster:channel:7:runtime'])->andReturn(25000);
 
         $this->expectException(UnexpectedValueException::class);
 
         (new CanaryRuntimeRedisReader)->read(7);
+    }
+
+    private function commandExpectation(Connection&MockInterface $connection): Expectation
+    {
+        /** @var Expectation */
+        $expectation = $connection->shouldReceive('command');
+
+        return $expectation;
     }
 }
