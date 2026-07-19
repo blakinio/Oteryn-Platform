@@ -18,22 +18,17 @@ concurrency:
 jobs:
   format-diagnostic:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          coverage: none
-          tools: composer:v2
-
-      - name: Install dependencies quietly
-        run: composer install --no-interaction --prefer-dist --no-progress --quiet
-
       - name: Show exact Pint diff for MariaDB integration test
         run: |
+          git init -q repo
+          cd repo
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth=1 origin "refs/pull/${{ github.event.pull_request.number }}/merge"
+          git checkout -q FETCH_HEAD
+          composer install --no-interaction --prefer-dist --no-progress --quiet
           vendor/bin/pint tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php >/dev/null
           git diff -- tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
 
