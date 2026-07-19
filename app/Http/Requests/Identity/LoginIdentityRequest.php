@@ -6,10 +6,17 @@ use App\Identity\Models\Identity;
 use App\Identity\Support\CanonicalEmail;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 final class LoginIdentityRequest extends FormRequest
 {
+    /**
+     * Non-secret Argon2id hash used only to equalize password-verification work
+     * when no Identity row exists. It is not a credential for any account.
+     */
+    private const DUMMY_PASSWORD_HASH = '$argon2id$v=19$m=19456,t=2,p=1$M0Iyek83amFsS1J0cWNnLg$5wDTmQ1PJJorXDWlZfJnbjZkEATuPz4DMxaPpZ9azV0';
+
     public function authorize(): bool
     {
         return true;
@@ -55,22 +62,17 @@ final class LoginIdentityRequest extends FormRequest
             $this->failAuthentication();
         }
 
-        $authenticated = Auth::guard('web')->attempt([
-            'email' => $email,
-            'password' => $password,
-            'disabled_at' => null,
-        ], false);
+        $identity = Identity::query()
+            ->where('email', $email)
+            ->first();
+        $passwordHash = $identity?->password ?? self::DUMMY_PASSWORD_HASH;
+        $passwordIsValid = Hash::check($password, $passwordHash);
 
-        if (! $authenticated) {
+        if ($identity === null || ! $passwordIsValid || $identity->disabled_at !== null) {
             $this->failAuthentication();
         }
 
-        $identity = Auth::guard('web')->user();
-
-        if (! $identity instanceof Identity) {
-            Auth::guard('web')->logout();
-            $this->failAuthentication();
-        }
+        Auth::guard('web')->login($identity, false);
 
         return $identity;
     }
