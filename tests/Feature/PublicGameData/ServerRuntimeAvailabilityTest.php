@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
+use Mockery\Expectation;
+use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -56,7 +58,7 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->twice()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->andReturnUsing(function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
@@ -108,14 +110,14 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->once()
             ->with('hmget', [
                 'cluster:channel:1:runtime',
                 ['channel_id', 'status', 'players_online'],
             ])
             ->andReturn([]);
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->once()
             ->with('pttl', ['cluster:channel:1:runtime'])
             ->andReturn(-2);
@@ -134,7 +136,7 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->once()
             ->with('hmget', [
                 'cluster:channel:1:runtime',
@@ -146,7 +148,7 @@ final class ServerRuntimeAvailabilityTest extends TestCase
             ->assertOk()
             ->assertSee('Alpha')
             ->assertSee('Configured max players:</strong> 100', false)
-            ->assertSee('Live runtime status is temporarily unavailable.')
+            ->assertSee('live player availability is intentionally not shown')
             ->assertSee('Runtime:</strong> Unavailable', false)
             ->assertDontSee('Players online:</strong>', false)
             ->assertDontSee('Runtime:</strong> OFFLINE', false);
@@ -159,7 +161,7 @@ final class ServerRuntimeAvailabilityTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->twice()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->andReturnUsing(function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
@@ -188,6 +190,14 @@ final class ServerRuntimeAvailabilityTest extends TestCase
             ->assertSee('Beta')
             ->assertSee('Runtime:</strong> Unavailable', false)
             ->assertDontSee('Players online:</strong> 25', false);
+    }
+
+    private function commandExpectation(Connection&MockInterface $connection): Expectation
+    {
+        /** @var Expectation */
+        $expectation = $connection->shouldReceive('command');
+
+        return $expectation;
     }
 
     private function insertChannel(int $id, string $name, int $maxPlayers, int $sortOrder): void
