@@ -16,7 +16,7 @@ Revalidate the remaining character-creation blockers after greenfield Identity-t
 - [x] Define the narrowest possible dedicated character-create DB privilege surface only if the exact atomic write set is proven; otherwise retain it as blocked.
 - [x] Record any required future Canary changes precisely in durable history; do not modify Canary without separate authorization.
 - [x] Keep character creation fail-closed because critical product policy remains unproven.
-- [ ] Run exact-head CI and Agent Governance before merge.
+- [x] Run exact-head CI and Agent Governance before merge.
 
 ## Ownership
 
@@ -49,11 +49,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T02:18:00+02:00
-head: 5f1c4e2321577707ef5789b885c3899b5b3a0dfe
+updated_at: 2026-07-20T02:24:00+02:00
+head: f54e25043b8fdae18593a9929484c14d7a4ba396
 branch: task/OTERYN-20260720-phase5-character-creation-policy-revalidation
 pr: 35
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -78,6 +78,7 @@ proven:
   - Current schema enforces exact stored-name uniqueness but does not define Oteryn normalization, allowed characters, reserved names or visually-confusable policy.
   - Current schema does not enforce a maximum number of characters per account.
   - CHARACTER_CREATION_CONTRACT now records ownership authorization as resolved and character implementation as blocked only by product naming/starter/character-limit decisions plus the dependent write/grant surface derived from them.
+  - Delivery-validation head f54e25043b8fdae18593a9929484c14d7a4ba396 passed CI run 29708150122 (#484) and Agent Governance run 29708150119 (#405).
   - No blakinio/canary repository modification was made.
 derived:
   - The exact character-create INSERT/dependent write set cannot be approved before the product starter-state policy is selected.
@@ -115,9 +116,15 @@ validation:
   - command: starter/name policy evidence review
     result: PASS
     evidence: current schema, player load paths and global login hooks distinguish engine compatibility from still-missing product policy without assuming defaults as intent
+  - command: delivery-validation CI run 29708150122 (#484)
+    result: PASS
+    evidence: exact delivery-validation head f54e25043b8fdae18593a9929484c14d7a4ba396 passed formatting, PHPStan and full tests
+  - command: delivery-validation Agent Governance run 29708150119 (#405)
+    result: PASS
+    evidence: exact delivery-validation head f54e25043b8fdae18593a9929484c14d7a4ba396 completed successfully
 blockers:
   - character-create implementation remains blocked by explicit Oteryn product decisions for naming, starter state and account character limit
-next_action: Run exact-head CI and Agent Governance for PR #35, inspect final diff/review/base divergence, then squash-merge the bounded revalidation if the merge gate remains clean.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, inspect PR #35 final diff/review/base divergence, then squash-merge the bounded revalidation if the merge gate remains clean.
 ```
 
 ## Notes
