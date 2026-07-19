@@ -77,4 +77,5 @@ Route::put('/password/change', [PasswordChangeController::class, 'update'])
 Route::get('/highscores', [PublicGameDataController::class, 'highscores'])->name('game.highscores.index');
 Route::get('/characters/{name}', [PublicGameDataController::class, 'character'])->name('game.characters.show');
 Route::get('/guilds/{name}', [PublicGameDataController::class, 'guild'])->name('game.guilds.show');
+Route::get('/online', [PublicGameDataController::class, 'online'])->name('game.online.index');
 Route::get('/servers', [PublicGameDataController::class, 'servers'])->name('game.servers.index');
