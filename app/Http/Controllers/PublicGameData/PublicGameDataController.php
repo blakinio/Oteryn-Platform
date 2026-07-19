@@ -9,6 +9,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
+use UnexpectedValueException;
 
 final class PublicGameDataController
 {
@@ -65,7 +66,21 @@ final class PublicGameDataController
         /** @var list<int> */
         $channelIds = $channels
             ->pluck('id')
-            ->map(static fn (mixed $channelId): int => (int) $channelId)
+            ->map(static function (mixed $channelId): int {
+                if (is_int($channelId)) {
+                    return $channelId;
+                }
+
+                if (is_string($channelId) && ctype_digit($channelId)) {
+                    $parsedChannelId = (int) $channelId;
+
+                    if ($parsedChannelId > 0) {
+                        return $parsedChannelId;
+                    }
+                }
+
+                throw new UnexpectedValueException('Configured Canary channel ID is invalid.');
+            })
             ->values()
             ->all();
 
