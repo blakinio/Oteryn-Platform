@@ -22,7 +22,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Cluster-wide online-status discovery: COMPLETE**
 
-**Cluster-wide online-character read model: IMPLEMENTED IN CURRENT DELIVERY / VALIDATING**
+**Cluster-wide online-character read model: COMPLETE**
+
+**Public site shell and exact-name character search: IMPLEMENTED IN CURRENT DELIVERY / VALIDATING**
 
 ## What exists on main after the current delivery PR is merged
 
@@ -52,6 +54,8 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - evidence-backed current web/login-server/Canary authentication contract and staged target direction for one authoritative Identity policy plus short-lived atomic game-login authorization;
 - dedicated Canary read connection configured independently from the Platform-owned database;
 - database-enforced least-privilege Canary credential verification with direct table-level `SELECT` allowlisting for the implemented read surface, including `cluster_sessions` for the online-character read model;
+- shared Blade public/game-data shell used by the homepage and implemented public read surfaces, with navigation for Home, Online, Highscores and Servers;
+- homepage exact-name character search at `GET /characters?name=...`, validating the submitted name and redirecting to the existing character profile route rather than introducing a second query path;
 - read-only public level highscores at `GET /highscores`;
 - read-only active character profiles at `GET /characters/{name}`;
 - read-only public guild details and membership at `GET /guilds/{name}`;
@@ -104,7 +108,9 @@ The current PublicGameData implementation is intentionally narrow and read-only.
 Proven implementation properties:
 
 - shared Canary tables are accessed through a dedicated query service using Laravel query builder rather than mutation-capable shared Eloquent models;
-- deployment documentation requires a separate least-privilege SELECT-only Canary database credential, and the verifier/provisioning allowlist now includes `cluster_sessions` because the online-list adapter reads it;
+- deployment documentation requires a separate least-privilege SELECT-only Canary database credential, and the verifier/provisioning allowlist includes `cluster_sessions` because the online-list adapter reads it;
+- the shared Blade public/game-data shell exposes Home, Online, Highscores and Servers navigation and the homepage uses that same layout rather than a separate document;
+- exact-name homepage character search validates the `name` query value and redirects to the existing `game.characters.show` route, so no duplicate character query implementation or extra Canary privilege is introduced;
 - character/highscore/guild member reads filter `players.deletion = 0`;
 - highscores select only public fields, use deterministic `level DESC, name ASC` ordering and paginate 50 rows;
 - public character profiles expose only `id`, `name`, `level` and `vocation` to the query layer, while the view renders only name/level/vocation;
@@ -128,7 +134,7 @@ Known PublicGameData unknowns:
 
 - transport from Canary multichannel runtime state to Oteryn Platform for independent fresh per-channel availability/count;
 - privileged/group-hidden character filtering policy for public rankings;
-- production cache/staleness expectations outside the newly bounded online-lease freshness contract;
+- production cache/staleness expectations outside the bounded online-lease freshness contract;
 - maximum production wall-clock skew relevant to the exact online freshness SLA.
 
 ## Canary data-contract summary
@@ -178,7 +184,7 @@ These blockers do not block the completed Platform-owned Phase 3 web Identity bo
 
 Unless source is added after this state update, the following are **not implemented**:
 
-- full production public website/CMS;
+- full production public website/CMS and managed news display;
 - shared password/hash migration to an authoritative cross-component credential model;
 - global game-login enforcement of Platform MFA/email verification;
 - account management beyond Identity-owned credential/security operations;
@@ -194,19 +200,17 @@ Agents must verify repository source before relying on this list because later t
 
 ## Current active task
 
-`OTERYN-20260719-online-list-read-model`
+`OTERYN-20260719-public-site-shell-and-search`
 
 Objective:
 
-- deliver the cluster-wide online-character read model through the existing dedicated Canary query boundary;
-- select only approved public player fields plus durable `channel_id`/approved channel metadata;
-- enforce `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms` and `players.deletion = 0`;
-- preserve Canary DB dependency failure explicitly rather than converting it to an empty list;
-- keep the enforced SELECT-only database privilege allowlist synchronized with the implemented `cluster_sessions` read;
-- do not use `players_online`, process-local `ProtocolStatus` or SQL `channel_runtime_status` as replacement identity authorities;
-- do not add shared Canary writes.
+- reuse the existing Blade game-data layout as the shared public homepage/read-surface shell;
+- expose Home, Online, Highscores and Servers navigation;
+- add exact-name character search through a validated `GET /characters?name=...` redirect to the existing character profile route;
+- do not add a duplicate character read model, new Canary table access, caching, live runtime availability claims or shared writes;
+- add focused feature tests and synchronize Phase 4 state documentation.
 
-No successor bounded task is approved by this change. Re-evaluate the remaining Phase 4 roadmap against live repository/task state after this task is merged.
+No successor bounded task is approved by this change. Re-evaluate remaining Phase 4 work against live repository/task state after this task is merged.
 
 ## High-priority unknowns and blockers
 
