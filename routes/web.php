@@ -7,9 +7,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'home')->name('home');
 
-Route::get('/register', [RegistrationController::class, 'create'])->name('identity.register.create');
+Route::get('/register', [RegistrationController::class, 'create'])
+    ->middleware('guest')
+    ->name('identity.register.create');
 Route::post('/register', [RegistrationController::class, 'store'])
-    ->middleware('throttle:identity-registration')
+    ->middleware(['guest', 'throttle:identity-registration'])
     ->name('identity.register.store');
 
 Route::get('/login', [SessionController::class, 'create'])
