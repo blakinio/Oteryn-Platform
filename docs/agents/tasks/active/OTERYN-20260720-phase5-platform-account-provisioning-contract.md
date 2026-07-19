@@ -18,7 +18,7 @@ Define the smallest evidence-backed operation-level contract for Platform-origin
 - [x] Add/update durable contracts and active-work handoff with the exact implementation gate.
 - [x] Record exact future login-server/possible Canary cross-repository changes without modifying those repositories.
 - [x] Do not modify Canary/login-server repositories and do not implement account/character shared writes.
-- [ ] Run exact-head CI and Agent Governance before readiness/merge.
+- [x] Run exact-head CI and Agent Governance before readiness/merge.
 
 ## Ownership
 
@@ -53,11 +53,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T00:48:00+02:00
-head: 2003686a07b02afdbe23ab2deca0f8bf3a3be8ad
+updated_at: 2026-07-20T00:56:00+02:00
+head: 08e709418cb55320de089973139b0ab17f1eef59
 branch: task/OTERYN-20260720-phase5-platform-account-provisioning-contract
 pr: 31
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -85,6 +85,7 @@ proven:
   - PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT approves a non-user random sink credential whose plaintext is never persisted/exposed, a server-generated 120-bit random immutable provisioning name, a pending-before-write Platform saga record and a separate least-privilege provisioning connection.
   - The approved saga uses forward recovery by persisted provisioning name plus creation epoch after Canary commit/Platform-finalization failure and never auto-deletes the committed Canary account as compensation.
   - The contract records the required future login-server Platform-assertion exchange and explicitly identifies possible separately authorized Canary work if stronger session/revocation/direct assertion/fencing semantics are required.
+  - Delivery-validation head 08e709418cb55320de089973139b0ab17f1eef59 passed Agent Governance run 29706085234 (#338) and CI run 29706085260 (#417).
 derived:
   - Existing password login paths are not a usable user authentication path for Platform-originated accounts when the random sink plaintext is never persisted or disclosed.
   - No Canary repository change is required for the account-create write itself; the schema and trigger support the bounded insert contract.
@@ -123,9 +124,15 @@ validation:
   - command: operation-contract threat/failure review
     result: PASS
     evidence: contract defines least privilege, pending-before-write saga intent, exact 1:1 constraints, deterministic partial-failure recovery, duplicate/race handling and secret-safe audit rules
+  - command: delivery-validation Agent Governance run 29706085234 (#338)
+    result: PASS
+    evidence: exact delivery-validation head 08e709418cb55320de089973139b0ab17f1eef59 completed successfully
+  - command: delivery-validation CI run 29706085260 (#417)
+    result: PASS
+    evidence: exact delivery-validation head 08e709418cb55320de089973139b0ab17f1eef59 completed successfully, including formatting, static analysis and tests
 blockers:
   - none for merging the contract; account provisioning plus binding implementation remains the next task
-next_action: Run exact-head CI and Agent Governance for PR #31, inspect final diff/review/base divergence, then squash-merge only if the merge gate remains clean.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, inspect final diff/review/base divergence, then squash-merge PR #31 only if the merge gate remains clean.
 ```
 
 ## Notes
