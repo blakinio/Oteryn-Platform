@@ -104,6 +104,21 @@ final class WebSessionTest extends TestCase
         ])->assertStatus(429);
     }
 
+    public function test_login_source_is_rate_limited_across_distinct_identity_keys(): void
+    {
+        for ($attempt = 1; $attempt <= 20; $attempt++) {
+            $this->post('/login', [
+                'email' => "unknown{$attempt}@example.com",
+                'password' => 'Wrong-Horse-9!Battery',
+            ])->assertSessionHasErrors('email');
+        }
+
+        $this->post('/login', [
+            'email' => 'unknown21@example.com',
+            'password' => 'Wrong-Horse-9!Battery',
+        ])->assertStatus(429);
+    }
+
     public function test_logout_invalidates_current_session_and_records_audit_event(): void
     {
         $identity = $this->createIdentity();
