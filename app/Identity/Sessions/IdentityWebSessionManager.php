@@ -16,7 +16,7 @@ final class IdentityWebSessionManager
 
     public function invalidate(Request $request): void
     {
-        Auth::guard('web')->logout();
+        Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
     }
