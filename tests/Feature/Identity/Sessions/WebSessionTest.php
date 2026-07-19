@@ -137,7 +137,7 @@ final class WebSessionTest extends TestCase
         $identity = $this->createIdentity();
         $this->login($identity);
 
-        $generation = (new RevokeIdentityWebSessions(new SecurityEventRecorder()))->execute($identity);
+        $generation = (new RevokeIdentityWebSessions(new SecurityEventRecorder))->execute($identity);
 
         self::assertSame(1, $generation);
 
