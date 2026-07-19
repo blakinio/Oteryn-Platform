@@ -23,8 +23,8 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
             ->with('canary_runtime')
             ->andReturn($connection);
 
-        $this->commandExpectation($connection)
-            ->andReturnUsing(function (string $command, array $arguments): mixed {
+        $this->commandExpectation($connection)->__call('andReturnUsing', [
+            function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
                 if ($command === 'hmget' && $key === 'cluster:channel:1:runtime') {
@@ -48,7 +48,8 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
                 }
 
                 throw new RuntimeException('Unexpected Redis command in test.');
-            });
+            },
+        ]);
 
         $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader))->snapshot([1, 2]);
         $channelOneStatus = $snapshot->forChannel(1);
@@ -68,8 +69,8 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
             ->with('canary_runtime')
             ->andReturn($connection);
 
-        $this->commandExpectation($connection)
-            ->andReturnUsing(function (string $command, array $arguments): mixed {
+        $this->commandExpectation($connection)->__call('andReturnUsing', [
+            function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
                 if ($command === 'hmget' && $key === 'cluster:channel:1:runtime') {
@@ -89,7 +90,8 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
                 }
 
                 throw new RuntimeException('Unexpected Redis command in test.');
-            });
+            },
+        ]);
 
         $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader))->snapshot([1, 2]);
 
@@ -107,8 +109,8 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
             ->with('canary_runtime')
             ->andReturn($connection);
 
-        $this->commandExpectation($connection)
-            ->andReturnUsing(function (string $command, array $arguments): mixed {
+        $this->commandExpectation($connection)->__call('andReturnUsing', [
+            function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
                 if ($command === 'hmget' && $key === 'cluster:channel:1:runtime') {
@@ -136,7 +138,8 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
                 }
 
                 throw new RuntimeException('Unexpected Redis command in test.');
-            });
+            },
+        ]);
 
         $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader))->snapshot([1, 2]);
 
