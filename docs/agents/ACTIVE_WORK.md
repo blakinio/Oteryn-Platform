@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-password-recovery-credentials` — Phase 3 T3.3 Platform-only forgot/reset password and authenticated password change; branch `task/OTERYN-20260719-password-recovery-credentials`; draft PR pending. Scope uses Laravel framework reset primitives, revokes Platform web sessions and explicitly excludes Canary/login-server credentials, sessions and active-game revocation.
+- `OTERYN-20260719-password-recovery-credentials` — Phase 3 T3.3 Platform-only forgot/reset password and authenticated password change; branch `task/OTERYN-20260719-password-recovery-credentials`; PR #13; task checkpoint status `ready`. Code-validation head passed Composer validation, lockfile install, Pint, PHPStan/Larastan level 10 and full tests. Scope revokes Platform web sessions and explicitly excludes Canary/login-server credentials, sessions and active-game revocation.
 
 ## Recommended next task
 
