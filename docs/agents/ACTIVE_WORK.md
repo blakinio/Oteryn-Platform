@@ -4,17 +4,17 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-phase5-identity-canary-account-binding` — bounded Phase 5 discovery for a durable, unambiguous Platform Identity → Canary `accounts.id` ownership binding; branch `task/OTERYN-20260719-phase5-identity-canary-account-binding`; checkpoint status `investigating`. The task must prove a trustworthy account-control claim/link ceremony and lifecycle without relying on client-supplied account IDs, non-unique email equality or unproven credential compatibility. No shared Canary write is authorized.
+- `OTERYN-20260719-phase5-identity-canary-account-binding` — bounded Phase 5 discovery for durable Platform Identity → Canary `accounts.id` ownership; branch `task/OTERYN-20260719-phase5-identity-canary-account-binding`; draft PR #27; checkpoint status `validating`. Current evidence does **not** approve a binding implementation: email is non-unique, direct shared-password verification would create another credential authority, normal external login creates a reusable 24-hour game session and is SHA-1-only, and no purpose-built side-effect-free account-control claim API is proven. `docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md` records the exact blocker and target claim properties.
 
 ## Recommended next task
 
-Derive the successor only from this binding discovery result. If a safe binding ceremony is approved, implement only the Platform-owned durable mapping/claim boundary required by that contract before resuming character-create authorization. If no current account-control proof is safe, resolve the exact authentication-authority dependency first rather than inventing a weak ownership rule.
+After PR #27 is validated and merged, do not implement user-scoped Canary mutations yet. The next dependency must be selected explicitly between: (1) a separately coordinated authoritative account-control claim capability on the Canary/login-server authentication side that returns a short-lived single-use `accounts.id`-bound assertion without creating a game session, or (2) an approved future Canary account-creation flow where Platform originates the account and persists the binding atomically. Either path also requires explicit product ownership cardinality/unlink/rebind/recovery policy.
 
 ## Other queued work
 
 - Character-create implementation remains blocked until durable account ownership binding, product character-name normalization/reserved-name policy and exact starter-state rules are approved; a separate least-privilege Canary write credential/connection must then be defined rather than broadening the existing read-only connection.
-- Authoritative cross-component credential/game-login migration remains a separately coordinated programme under `AUTH_GAME_LOGIN_CONTRACT.md`; Phase 3 completion does not authorize shared Canary credential writes.
-- Admin/RBAC identity classification and permissions remain Phase 6. Future privileged routes must combine explicit authorization with the Phase 3 `mfa.confirmed` gate rather than an `is_admin` shortcut.
+- Authoritative cross-component credential/game-login migration remains a separately coordinated programme under `AUTH_GAME_LOGIN_CONTRACT.md`; any new account-control proof capability must use the selected authoritative verifier rather than duplicating password hashing in Platform.
+- Admin/RBAC identity classification and permissions remain Phase 6. Future privileged recovery/binding routes must combine explicit authorization with the Phase 3 `mfa.confirmed` gate rather than an `is_admin` shortcut.
 - Privileged/group-hidden public-ranking policy, production runtime Redis ACL/endpoint provisioning, exact production wall-clock skew and broader cache policy remain explicit later policy/deployment unknowns.
 
 ## Recently completed
