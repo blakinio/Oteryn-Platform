@@ -29,5 +29,9 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(5)->by($identityKey.'|'.$sourceIp);
         });
+
+        RateLimiter::for('identity-login-source', function (Request $request): Limit {
+            return Limit::perMinute(20)->by($request->ip() ?? 'unknown');
+        });
     }
 }
