@@ -7,7 +7,7 @@ use App\PublicGameData\CanaryChannelRuntimeService;
 use Illuminate\Redis\Connections\Connection;
 use Illuminate\Support\Facades\Redis;
 use Mockery;
-use Mockery\Expectation;
+use Mockery\CompositeExpectation;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
@@ -145,9 +145,9 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
         self::assertNull($snapshot->forChannel(2));
     }
 
-    private function commandExpectation(MockInterface $connection): Expectation
+    private function commandExpectation(MockInterface $connection): CompositeExpectation
     {
-        /** @var Expectation */
+        /** @var CompositeExpectation */
         $expectation = $connection->shouldReceive('command');
 
         return $expectation;
