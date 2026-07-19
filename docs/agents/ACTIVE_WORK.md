@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-channel-runtime-availability-read-model` — bounded Phase 4 implementation of the approved per-channel runtime availability/count surface; branch `task/OTERYN-20260719-channel-runtime-availability-read-model`; draft PR #22; checkpoint status `investigating`. Scope adds a dedicated read-only named `canary_runtime` Redis connection, deterministic runtime-key reads, Redis-TTL freshness, complete-snapshot fail-closed semantics, static channel metadata fallback and focused tests. SQL `channel_runtime_status`, process-local `ProtocolStatus`, Redis key scanning, runtime caching, Canary DB grant expansion and shared writes are forbidden.
+- `OTERYN-20260719-channel-runtime-availability-read-model` — bounded Phase 4 implementation of the approved per-channel runtime availability/count surface; branch `task/OTERYN-20260719-channel-runtime-availability-read-model`; draft PR #22; checkpoint status `validating`. The dedicated read-only named `canary_runtime` Redis boundary, deterministic runtime-key reads, positive-TTL freshness, complete-snapshot fail-closed semantics, static channel metadata fallback and focused tests are implemented. SQL `channel_runtime_status`, process-local `ProtocolStatus`, Redis key scanning, runtime caching, Canary DB grant expansion and shared writes remain forbidden. The first proven CI failure was Pint formatting; the repair loop is active and exact-head CI/Governance remains required before merge.
 
 ## Recommended next task
 
-Complete and merge the current channel runtime availability read model first. Re-evaluate remaining Phase 4 exit criteria from live repository/project state after the implemented runtime surface is validated.
+Complete and merge the current channel runtime availability read model first. Then start one bounded Phase 4 closure/revalidation task to prove every Phase 4 deliverable and exit-gate invariant against live `main`, mark the phase complete only if the gate is satisfied, and leave the next Phase 5 work as a handoff rather than starting shared writes speculatively.
 
 ## Other queued work
 
