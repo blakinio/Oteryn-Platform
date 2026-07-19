@@ -12,8 +12,7 @@ final class RegisterIdentity
 {
     public function __construct(
         private readonly SecurityEventRecorder $securityEvents,
-    ) {
-    }
+    ) {}
 
     public function execute(string $email, #[\SensitiveParameter] string $password): Identity
     {
