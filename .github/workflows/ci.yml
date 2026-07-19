@@ -16,24 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  format-diagnostic:
-    runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
-    steps:
-      - name: Show exact Pint diff for MariaDB integration test
-        run: |
-          git init -q repo
-          cd repo
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch -q --depth=1 origin "refs/pull/${{ github.event.pull_request.number }}/merge"
-          git checkout -q FETCH_HEAD
-          curl -sS https://getcomposer.org/download/latest-stable/composer.phar -o composer.phar
-          docker pull -q php:8.5-cli >/dev/null
-          docker run --rm -v "$PWD:/app" -w /app php:8.5-cli sh -lc 'apt-get update -qq && apt-get install -y -qq unzip >/dev/null && php composer.phar install --no-interaction --prefer-dist --no-progress --quiet --ignore-platform-reqs'
-          docker run --rm -v "$PWD:/app" -w /app php:8.5-cli php vendor/bin/pint tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php >/dev/null
-          git diff -- tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
-
   test:
     runs-on: ubuntu-latest
     services:
