@@ -53,6 +53,27 @@ jobs:
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      # Temporary hard-fail diagnostics for PR #33. The first failing directory
+      # identifies the unformatted scope. Remove before merge.
+      - name: Check formatting app
+        run: vendor/bin/pint --test app
+      - name: Check formatting bootstrap
+        run: vendor/bin/pint --test bootstrap
+      - name: Check formatting config
+        run: vendor/bin/pint --test config
+      - name: Check formatting database
+        run: vendor/bin/pint --test database
+      - name: Check formatting public
+        run: vendor/bin/pint --test public
+      - name: Check formatting resources
+        run: vendor/bin/pint --test resources
+      - name: Check formatting routes
+        run: vendor/bin/pint --test routes
+      - name: Check formatting storage
+        run: vendor/bin/pint --test storage
+      - name: Check formatting tests
+        run: vendor/bin/pint --test tests
+
       - name: Check formatting
         run: vendor/bin/pint --test
 
