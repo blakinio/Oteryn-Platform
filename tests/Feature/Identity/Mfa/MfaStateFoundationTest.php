@@ -85,7 +85,7 @@ final class MfaStateFoundationTest extends TestCase
         ])->assertRedirect(route('home'));
         $this->assertAuthenticatedAs($identity, 'web');
 
-        $securityEvents = new SecurityEventRecorder();
+        $securityEvents = new SecurityEventRecorder;
         $resetMfa = new ResetIdentityMfa(
             new RevokeIdentityWebSessions($securityEvents),
             $securityEvents,
