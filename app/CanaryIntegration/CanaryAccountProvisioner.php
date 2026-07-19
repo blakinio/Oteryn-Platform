@@ -95,8 +95,12 @@ final class CanaryAccountProvisioner implements CanaryAccountProvisioningGateway
         return (string) $exception->getCode() === '23000';
     }
 
-    private function erase(string &$value): void
+    private function erase(?string &$value): void
     {
+        if ($value === null) {
+            return;
+        }
+
         if (function_exists('sodium_memzero')) {
             sodium_memzero($value);
 
