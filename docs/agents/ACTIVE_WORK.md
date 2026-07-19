@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-public-news-read-model` — bounded Phase 4 Platform-owned CMS public-news read model; branch `task/OTERYN-20260719-public-news-read-model`; draft PR pending; checkpoint status `investigating`. Scope is limited to a Platform database `news_posts` schema, published-only public list/detail reads, deterministic pagination/order, escaped plain-text rendering and focused tests. No authoring, Admin/RBAC, uploads, rich HTML, Canary access or shared-data writes are authorized.
+- `OTERYN-20260719-public-news-read-model` — bounded Phase 4 Platform-owned CMS public-news read model; branch `task/OTERYN-20260719-public-news-read-model`; draft PR #20; checkpoint status `validating`. Scope is limited to Platform-owned `news_posts` persistence, published-only public list/detail reads, deterministic pagination/order, escaped plain-text rendering and focused tests. No authoring, Admin/RBAC, uploads, rich HTML, Canary access or shared-data writes are authorized. Stable exact-head CI and Agent Governance validation is required before readiness.
 
 ## Recommended next task
 
