@@ -12,7 +12,7 @@ Version the shared checkpoint/handoff governance contract explicitly, add determ
 - [x] `.github/workflows/agent-governance.yml` validates active task records for governance-affecting changes without secrets or write permissions.
 - [x] Governance docs explain local validation, live Git/PR/CI verification boundaries, and cross-repository contract upgrade handling.
 - [x] Canary remains read-only and no full resume/context/routing stack is ported.
-- [ ] All currently active task checkpoints are structurally compliant and the current PR head is ready for merge.
+- [x] All currently active task checkpoints inspected for T4 are structurally compliant and PR #8 is synchronized with current `main` before final-head validation.
 
 ## Ownership
 
@@ -31,7 +31,7 @@ modules:
 dependencies:
   - blakinio/canary checkpoint/handoff contract v1 (read-only reference)
 blockers:
-  - OTERYN-20260718-db-privilege-boundary active checkpoint on PR 7 uses unsupported validation result UNAVAILABLE; owner coordination is required before T4 can satisfy the all-active-checkpoints Definition of Done.
+  - none
 cross_repository_tasks:
   - none
 ```
@@ -40,11 +40,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-18T21:48:00Z
-head: b962f8fe0883bae6cdf748b80a628af2d0253635
+updated_at: 2026-07-19T07:15:00Z
+head: 90fbd8bc524900c3bbb9e836dceebb0c0f917841
 branch: task/OTERYN-20260718-governance-version-sync
 pr: 8
-status: blocked
+status: ready
 context_routes:
   - agent-governance
   - testing
@@ -59,21 +59,21 @@ owned_paths:
   - tools/agents/test_checkpoint.py
   - .github/workflows/agent-governance.yml
 proven:
-  - Oteryn Platform main was d94915064e64b7cd6c02dcd91268743224289f76 when PR 8 was opened; PR 8 is mergeable and its changed-file list contains only the eight T4 governance-specific paths.
+  - PR 8 contains only the eight T4 governance-specific paths and does not modify PROJECT_STATE.md or ACTIVE_WORK.md.
   - The shared checkpoint contract is version 1 and is pinned to read-only Canary reference commit c1c0d10ed1e758cb72728be5fe22458cd9d9e61a without claiming repository-wide governance identity.
   - tools/agents/checkpoint.py loads the machine-readable contract marker and validates required fields, checkpoint version, supported statuses, supported validation results, one top-level non-placeholder next_action, required first_failure and validation fields, and normalized evidence-state overlap.
   - tools/agents/test_checkpoint.py covers valid input plus missing checkpoint, missing next_action, duplicate next_action, unsupported status, unsupported validation result, placeholder next_action, evidence-state overlap, and wrong checkpoint version.
-  - Agent Governance workflow run 29662215721 passed checkpoint-validator tests and active-task validation on PR 8 head b962f8fe0883bae6cdf748b80a628af2d0253635.
-  - Existing CI workflow run 29662215710 passed Composer validation, lockfile install, Pint formatting and application tests on PR 8 head b962f8fe0883bae6cdf748b80a628af2d0253635.
-  - Active PR 6 checkpoint uses only supported checkpoint contract values in the inspected live task record.
-  - Active PR 7 checkpoint still uses validation result UNAVAILABLE, which is outside contract v1; coordination comment 5013042467 requested owner-side correction without modifying the other agent task record.
+  - Agent Governance and CI both passed on PR 8 implementation head b962f8fe0883bae6cdf748b80a628af2d0253635 before the final handover and synchronization commits.
+  - PR 7 was corrected by its owner and merged to main as cf14cb611b8b9168884dd01b1372e4a24b5323c0, so its former non-compliant active checkpoint is no longer an active-task blocker.
+  - Open PR 6 checkpoint_version is 1, status is ready, validation results use only PASS and BLOCKED, and it has exactly one concrete top-level next_action.
+  - Temporary synchronization PR 9 merged current main cf14cb611b8b9168884dd01b1372e4a24b5323c0 into the T4 task branch without rewriting published history, producing synchronized task head 90fbd8bc524900c3bbb9e836dceebb0c0f917841.
 derived:
-  - T4 implementation and its own CI are complete, but the task must remain blocked until the active PR 7 checkpoint is corrected by its owner and revalidated.
+  - The T4 coordination blocker is resolved and the implementation is ready for final-head CI validation and squash merge.
 unknown: []
 conflicts: []
 first_failure:
   marker: active-task-checkpoint-validation
-  evidence: PR 7 docs/agents/tasks/active/OTERYN-20260718-db-privilege-boundary.md validation item local checkout validation has result UNAVAILABLE
+  evidence: Historical T4 blocker was PR 7 validation result UNAVAILABLE; the owner corrected/completed that task and PR 7 is now merged.
 rejected_hypotheses:
   - Whole-governance synchronization is required: Oteryn and Canary have intentionally different repository allowlists, delivery rules, routing scope, and repository-specific policies.
   - Canary CONTEXT_ROUTES.json schema_version is the checkpoint contract version: routing schema versioning is separate from the shared checkpoint_version contract.
@@ -89,25 +89,28 @@ changed_paths:
 validation:
   - command: python tools/agents/test_checkpoint.py
     result: PASS
-    evidence: 9 tests passed in local reconstructed connector workspace
+    evidence: 9 tests passed in local reconstructed connector workspace and in Agent Governance GitHub Actions
   - command: python tools/agents/checkpoint.py --tasks docs/agents/tasks/active --require-checkpoint
     result: PASS
-    evidence: T4 active checkpoint validated locally against contract v1 before final handoff update
-  - command: GitHub Actions Agent Governance run 29662215721
+    evidence: T4 active checkpoint validated against contract v1 before this final handover update
+  - command: GitHub Actions Agent Governance run 29662266003
     result: PASS
-    evidence: checkpoint-validation job completed successfully on PR 8 head b962f8fe0883bae6cdf748b80a628af2d0253635
-  - command: GitHub Actions CI run 29662215710
+    evidence: checkpoint-validation completed successfully on PR 8 head 5b28d7b8b87b573c63be82de12e28133c3761080
+  - command: GitHub Actions CI run 29662265970
     result: PASS
-    evidence: test job completed successfully on PR 8 head b962f8fe0883bae6cdf748b80a628af2d0253635
+    evidence: CI completed successfully on PR 8 head 5b28d7b8b87b573c63be82de12e28133c3761080
   - command: active PR 6 checkpoint structure inspection
     result: PASS
-    evidence: live task record uses checkpoint_version 1 and supported BLOCKED validation result for unavailable local checkout
-  - command: active PR 7 checkpoint structure inspection
-    result: FAIL
-    evidence: live task record uses unsupported validation result UNAVAILABLE; owner coordination comment 5013042467 posted
+    evidence: live task record uses checkpoint_version 1, supported ready status, supported PASS and BLOCKED validation results, and one concrete next_action
+  - command: PR 7 coordination revalidation
+    result: PASS
+    evidence: PR 7 is merged and its former active checkpoint no longer blocks active-task validation
+  - command: synchronize PR 8 task branch with current main
+    result: PASS
+    evidence: temporary PR 9 merged main cf14cb611b8b9168884dd01b1372e4a24b5323c0 into the task branch as 90fbd8bc524900c3bbb9e836dceebb0c0f917841
 blockers:
-  - Active PR 7 checkpoint must replace UNAVAILABLE with an evidence-accurate supported validation result on its own task branch.
-next_action: Re-validate PR 7's active task checkpoint after its owner replaces UNAVAILABLE with a supported validation result.
+  - none
+next_action: After this checkpoint commit's Agent Governance and CI runs pass, mark PR 8 ready and squash-merge it.
 ```
 
 ## Notes
