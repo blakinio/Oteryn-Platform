@@ -43,14 +43,3 @@ jobs:
 
       - name: Run tests
         run: composer test
-
-      - name: Capture test diagnostics
-        if: failure()
-        run: composer test > test-diagnostic.txt 2>&1 || true
-
-      - name: Upload test diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-diagnostic
-          path: test-diagnostic.txt
