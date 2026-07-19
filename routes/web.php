@@ -18,7 +18,7 @@ Route::get('/login', [SessionController::class, 'create'])
     ->middleware('guest')
     ->name('identity.login.create');
 Route::post('/login', [SessionController::class, 'store'])
-    ->middleware(['guest', 'throttle:identity-login'])
+    ->middleware(['guest', 'throttle:identity-login', 'throttle:identity-login-source'])
     ->name('identity.login.store');
 Route::post('/logout', [SessionController::class, 'destroy'])
     ->middleware('auth')
