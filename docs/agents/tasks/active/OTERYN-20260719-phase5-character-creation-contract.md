@@ -17,7 +17,7 @@ Start Phase 5 with one bounded operation-contract/discovery task for Platform-dr
 - [x] Add `docs/contracts/CHARACTER_CREATION_CONTRACT.md`, pinned to the verified current Canary revision, with the exact decision that no shared character-create write is approved yet.
 - [x] Update active-work handoff for the Phase 5 discovery result; leave project-level Phase completion claims unchanged because no mutation capability is implemented.
 - [x] Do not modify Canary/login-server repositories and do not add a Platform shared-write implementation in this discovery task.
-- [ ] Run the repository merge gate, including exact-head CI and Agent Governance, before readiness/merge.
+- [ ] Run the final repository merge gate, including fresh exact-head CI and Agent Governance on this ready checkpoint, before merge.
 
 ## Ownership
 
@@ -50,11 +50,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T23:05:00+02:00
-head: 4a04baa13a53ff7cb0cacc47d4a4aa030231472f
+updated_at: 2026-07-19T23:12:00+02:00
+head: f93b52c3a50cce20c0c5e30ba2724a54db394c1a
 branch: task/OTERYN-20260719-phase5-character-creation-contract
 pr: 26
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -83,6 +83,8 @@ proven:
   - Canary accounts.email is indexed but is not unique in the current schema, so email equality alone cannot prove one-to-one Identity ownership of a Canary account.
   - The existing Platform canary SQL connection remains configured as the read-only oteryn_readonly boundary; no dedicated shared-write connection exists.
   - CHARACTER_CREATION_CONTRACT records the operation as BLOCKED and approves no shared write.
+  - Delivery-validation head f93b52c3a50cce20c0c5e30ba2724a54db394c1a passed CI run 29703239800 (#393) and Agent Governance run 29703239801 (#314).
+  - PR #26 delivery-validation diff is limited to ACTIVE_WORK, the active task record and CHARACTER_CREATION_CONTRACT; branch comparison against main is behind_by=0 and there are no PR comments, reviews or unresolved review threads.
 derived:
   - Character creation is a high-leverage first Phase 5 discovery because its authorization and initialization blockers must be solved before any user-scoped create operation can be safe.
   - The next dependency should be a bounded Identity-to-Canary-account ownership-binding contract/discovery task; matching by client-supplied account_id or email alone is not an acceptable authorization substitute.
@@ -106,6 +108,7 @@ rejected_hypotheses:
   - Bind Identity to Canary account by email equality at mutation time: rejected because Canary accounts.email is not unique and no durable binding lifecycle is defined.
   - Reuse or broaden the existing canary SQL connection for writes: rejected because it is the database-enforced read-only PublicGameData boundary.
 changed_paths:
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260719-phase5-character-creation-contract.md
   - docs/contracts/CHARACTER_CREATION_CONTRACT.md
 validation:
@@ -118,12 +121,15 @@ validation:
   - command: Platform authorization/write-boundary inspection
     result: PASS
     evidence: current Identity model, identities migration, registration action and database connection configuration prove no Canary-account binding and an existing read-only Canary SQL boundary
-  - command: exact-head GitHub Actions CI and Agent Governance
-    result: NOT_RUN
-    evidence: final discovery documentation head not yet validated
+  - command: delivery-validation GitHub Actions CI run 29703239800 (#393)
+    result: PASS
+    evidence: exact delivery-validation head f93b52c3a50cce20c0c5e30ba2724a54db394c1a completed successfully
+  - command: delivery-validation Agent Governance run 29703239801 (#314)
+    result: PASS
+    evidence: exact delivery-validation head f93b52c3a50cce20c0c5e30ba2724a54db394c1a completed successfully
 blockers:
   - none for discovery merge; future character-create implementation is blocked by missing Identity-to-Canary-account binding and unresolved product starter/name policy
-next_action: Update ACTIVE_WORK with PR #26 and the exact discovery blocker, then validate the final task-owned diff and exact-head CI plus Agent Governance before readiness or merge.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, then perform the full PR #26 merge gate and squash-merge only if main divergence, final diff and review state remain clean.
 ```
 
 ## Notes
