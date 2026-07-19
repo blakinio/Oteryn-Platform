@@ -8,7 +8,6 @@ use App\Identity\Sessions\IdentityWebSessionManager;
 use App\Identity\Sessions\WebSessionState;
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
 final class EnsureIdentitySessionIsCurrent
@@ -23,7 +22,7 @@ final class EnsureIdentitySessionIsCurrent
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $identity = Auth::user();
+        $identity = $this->sessions->user();
 
         if ($identity === null) {
             return $next($request);
