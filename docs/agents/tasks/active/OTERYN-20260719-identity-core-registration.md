@@ -129,8 +129,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T07:48:00Z
-head: f9b116d67a239b403df3e59ccddb8e4f7cba1f25
+updated_at: 2026-07-19T07:52:00Z
+head: 74c013ee8787c218db7969d0c4b31ca4ee8a6922
 branch: task/OTERYN-20260719-identity-core-registration
 pr: 11
 status: ready
@@ -171,8 +171,8 @@ proven:
   - Registration is wrapped in one Platform database transaction that creates the identity and its minimal identity.registered security event together.
   - Registration POST is protected by the web middleware stack/CSRF form token and a named application rate limiter of five attempts per minute per source IP.
   - Registration regression tests cover canonical duplicate identity, malformed email, weak password, confirmation mismatch, rate limiting, non-plaintext password storage, Argon2id verification and registration audit persistence.
-  - CI run 29678590603 on head f9b116d67a239b403df3e59ccddb8e4f7cba1f25 passed Composer validation, lockfile install, Pint, PHPStan/Larastan and full tests.
-  - Agent Governance run 29678590631 on head f9b116d67a239b403df3e59ccddb8e4f7cba1f25 passed.
+  - CI run 29678690033 on head 74c013ee8787c218db7969d0c4b31ca4ee8a6922 passed the complete mandatory Composer validation, lockfile install, Pint, PHPStan/Larastan and full-test workflow after implementation and durable checkpoint/index updates.
+  - Agent Governance run 29678690008 on head 74c013ee8787c218db7969d0c4b31ca4ee8a6922 passed.
   - Trust boundary affected: Internet/browser to Oteryn Platform only; Canary/login-server credential validation is not changed by this task.
   - Authentication invariant affected: new Platform credentials are non-reversible, uniquely keyed by canonical email, rate-limited at registration, and never written to Canary credential fields.
   - Canary/login-server schema or session compatibility changes: none in this task.
@@ -190,7 +190,7 @@ conflicts:
   - Native Canary and upstream external login-server still have incompatible credential verification capabilities: Canary custom Argon2 plus SHA-1 fallback versus upstream login-server SHA-1 only.
 first_failure:
   marker: composer format:check on PR head 535caa0c6fbcfd770c369de5d098784bcf8e202e
-  evidence: CI run 29678452998 job 88170104743 failed at Pint; fixed by formatting the promoted constructor. The next head then exposed PHPStan mixed-type findings, which were fixed by declaring Identity attribute types and using typed attributes; CI run 29678590603 is green.
+  evidence: CI run 29678452998 job 88170104743 failed at Pint; fixed by formatting the promoted constructor. The next head exposed PHPStan mixed-type findings, which were fixed by declaring Identity attribute types and using typed attributes; later full CI runs are green.
 rejected_hypotheses:
   - Registration may create a Canary accounts row directly: rejected because CANARY_DATA_CONTRACT.md has zero approved shared writes and account creation is NOT APPROVED.
   - Platform-only MFA or email verification can currently be claimed as a global game-login gate: rejected by the alternate-path inventory in AUTH_GAME_LOGIN_CONTRACT.md.
@@ -207,11 +207,12 @@ changed_paths:
   - config/hashing.php
   - database/migrations/2026_07_19_073600_create_identities_table.php
   - database/migrations/2026_07_19_073601_create_identity_security_events_table.php
+  - docs/agents/ACTIVE_WORK.md
+  - docs/agents/tasks/active/OTERYN-20260719-identity-core-registration.md
   - resources/views/identity/register.blade.php
   - routes/web.php
   - tests/Feature/Identity/RegistrationTest.php
   - tests/Unit/Identity/CanonicalEmailTest.php
-  - docs/agents/tasks/active/OTERYN-20260719-identity-core-registration.md
 validation:
   - command: repository/source/contract/live-PR prerequisite inspection
     result: PASS
@@ -221,10 +222,10 @@ validation:
     evidence: no pre-existing local checkout is exposed to this environment; a temporary clone attempt could not resolve github.com, so live GitHub branch/PR state was used instead and no claim is made about an unavailable local working tree
   - command: composer validate --strict; composer install --no-interaction --prefer-dist --no-progress; composer format:check; composer analyse; composer test
     result: PASS
-    evidence: GitHub Actions CI run 29678590603 on head f9b116d67a239b403df3e59ccddb8e4f7cba1f25; all required steps passed
+    evidence: GitHub Actions CI run 29678690033 on head 74c013ee8787c218db7969d0c4b31ca4ee8a6922; all required steps passed
   - command: Agent Governance
     result: PASS
-    evidence: GitHub Actions run 29678590631 on head f9b116d67a239b403df3e59ccddb8e4f7cba1f25
+    evidence: GitHub Actions run 29678690008 on head 74c013ee8787c218db7969d0c4b31ca4ee8a6922
 blockers:
   - none for this bounded Platform-owned registration task
   - T3.5 and any global game-login MFA, credential migration or cross-session revocation claim remain blocked by AUTH_GAME_LOGIN_CONTRACT.md rollout gates
