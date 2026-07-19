@@ -53,31 +53,6 @@ jobs:
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      # Temporary hard-fail diagnostics for PR #33. The first failing file
-      # identifies the exact formatting defect. Remove before merge.
-      - name: Pint ProvisionCanaryAccount action
-        run: vendor/bin/pint --test app/Accounts/Actions/ProvisionCanaryAccount.php
-      - name: Pint provisioning gateway contract
-        run: vendor/bin/pint --test app/Accounts/Contracts/CanaryAccountProvisioningGateway.php
-      - name: Pint provisioning conflict exception
-        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningConflict.php
-      - name: Pint provisioning base exception
-        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningException.php
-      - name: Pint provisioning unavailable exception
-        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningUnavailable.php
-      - name: Pint IdentityCanaryAccount model
-        run: vendor/bin/pint --test app/Accounts/Models/IdentityCanaryAccount.php
-      - name: Pint SecurityEventRecorder
-        run: vendor/bin/pint --test app/Audit/SecurityEventRecorder.php
-      - name: Pint CanaryAccountProvisioner
-        run: vendor/bin/pint --test app/CanaryIntegration/CanaryAccountProvisioner.php
-      - name: Pint Canary provisioning privilege verifier
-        run: vendor/bin/pint --test app/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifier.php
-      - name: Pint RegisterIdentity
-        run: vendor/bin/pint --test app/Identity/Actions/RegisterIdentity.php
-      - name: Pint AppServiceProvider
-        run: vendor/bin/pint --test app/Providers/AppServiceProvider.php
-
       - name: Check formatting
         run: vendor/bin/pint --test
 
