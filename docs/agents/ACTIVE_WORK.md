@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-public-site-shell-and-search` — bounded Phase 4 public-web shell/navigation and exact-name character search; branch `task/OTERYN-20260719-public-site-shell-and-search`; draft PR #19; checkpoint status `validating`. Scope reuses the existing Blade game-data layout as the shared public shell, exposes Home/Online/Highscores/Servers navigation, adds a validated GET character-search redirect to the existing profile route, and adds focused tests/documentation without new Canary reads, caching, live runtime-status claims or shared-data writes.
+- `OTERYN-20260719-public-site-shell-and-search` — bounded Phase 4 public-web shell/navigation and exact-name character search; branch `task/OTERYN-20260719-public-site-shell-and-search`; draft PR #19; checkpoint status `ready`. Scope reuses the existing Blade game-data layout as the shared public shell, exposes Home/Online/Highscores/Servers navigation, adds a validated GET character-search redirect to the existing profile route, and adds focused tests/documentation without new Canary reads, caching, live runtime-status claims or shared-data writes. Delivery head `e936dc94e176f23525d799df23d6714bca042d3a` passed CI #300 and Agent Governance #221; a fresh exact-head pass is required after the final ready checkpoint before merge.
 
 ## Recommended next task
 
