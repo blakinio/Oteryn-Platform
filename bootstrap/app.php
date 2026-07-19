@@ -13,6 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/health',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo('/login');
+        $middleware->redirectUsersTo('/');
         $middleware->appendToGroup('web', EnsureIdentitySessionIsCurrent::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
