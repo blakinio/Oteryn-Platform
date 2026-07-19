@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Identity\PasswordChangeController;
+use App\Http\Controllers\Identity\PasswordRecoveryController;
+use App\Http\Controllers\Identity\PasswordResetController;
 use App\Http\Controllers\Identity\RegistrationController;
 use App\Http\Controllers\Identity\SessionController;
 use App\Http\Controllers\PublicGameData\PublicGameDataController;
@@ -23,6 +26,26 @@ Route::post('/login', [SessionController::class, 'store'])
 Route::post('/logout', [SessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('identity.logout');
+
+Route::get('/forgot-password', [PasswordRecoveryController::class, 'create'])
+    ->middleware('guest')
+    ->name('password.request');
+Route::post('/forgot-password', [PasswordRecoveryController::class, 'store'])
+    ->middleware(['guest', 'throttle:identity-password-recovery', 'throttle:identity-password-recovery-source'])
+    ->name('password.email');
+Route::get('/reset-password/{token}', [PasswordResetController::class, 'create'])
+    ->middleware('guest')
+    ->name('password.reset');
+Route::post('/reset-password', [PasswordResetController::class, 'store'])
+    ->middleware(['guest', 'throttle:identity-password-reset'])
+    ->name('password.update');
+
+Route::get('/password/change', [PasswordChangeController::class, 'create'])
+    ->middleware('auth')
+    ->name('identity.password.change.create');
+Route::put('/password/change', [PasswordChangeController::class, 'update'])
+    ->middleware(['auth', 'throttle:identity-password-change'])
+    ->name('identity.password.change.update');
 
 Route::get('/highscores', [PublicGameDataController::class, 'highscores'])->name('game.highscores.index');
 Route::get('/characters/{name}', [PublicGameDataController::class, 'character'])->name('game.characters.show');
