@@ -100,7 +100,7 @@ Potential operations include create, rename, delete/soft-delete and other web ac
 
 Prefer dedicated query/read-model services. Cache may be introduced after correctness is established. Staleness expectations must be explicit for each view.
 
-The module is available on main for the implemented read-only surfaces, including the cluster-wide online-character list. The public-web shell reuses the existing Blade layout across the homepage and game-data views, and exact-name character search routes to the existing character profile endpoint rather than introducing a second query path. Fresh multichannel runtime availability remains a separate integration concern and caching remains deferred pending explicit freshness policy.
+The module is available on main for the implemented read-only surfaces, including the cluster-wide online-character list and fresh per-channel runtime availability/count projection on the server page. The public-web shell reuses the existing Blade layout across the homepage and game-data views, and exact-name character search routes to the existing character profile endpoint rather than introducing a second query path. Runtime availability uses the dedicated read-only `canary_runtime` Redis boundary with deterministic configured-channel keys, positive TTL freshness and whole-snapshot fail-closed semantics; missing/expired keys remain unknown and runtime dependency failure does not fabricate OFFLINE or zero-player data. Caching remains deferred so it cannot extend either lease or Redis-TTL freshness beyond the proven boundaries.
 
 ## CMS
 
