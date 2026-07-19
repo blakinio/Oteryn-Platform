@@ -67,10 +67,10 @@ This selection is provisional until real Composer resolution succeeds against th
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T13:06:30+02:00
-head: 6109e48d28c305f24a8db56389a433b4a4876750
+updated_at: 2026-07-19T13:08:00+02:00
+head: 77ba2bcf94f566fed3f9cf29cd169a9c5489f320
 branch: task/OTERYN-20260719-mfa-totp-provider-resolution
-pr: none
+pr: 15
 status: blocked
 context_routes:
   - agent-governance
@@ -90,6 +90,8 @@ proven:
   - Current composer.json/composer.lock do not contain a TOTP provider from the completed T3.4a scope.
   - Current package research identifies pragmarx/google2fa v9.0.0 as the stable direct-provider candidate and Laravel Fortify as a broader authentication package whose default route surface overlaps the existing Platform-owned auth stack.
   - A fresh local git clone retry after PR #14 merge failed with `Could not resolve host: github.com`.
+  - Draft PR #15 is open from task/OTERYN-20260719-mfa-totp-provider-resolution to main as the coordination surface for this blocked dependency-resolution task.
+  - T3.4a task record is archived on the task branch and ACTIVE_WORK now points to T3.4b with the DNS/Composer blocker explicit.
   - Trust boundary affected by this task: dependency metadata only; no authentication request path, secret state transition or session policy may change.
   - Canary/login-server schema or session compatibility changes: none.
   - Rollback requirement: dependency addition, if resolved, must be reversible by a real Composer remove/update operation that regenerates the lockfile.
@@ -111,6 +113,7 @@ rejected_hypotheses:
   - Implement TOTP/HOTP directly in Platform code: rejected because security architecture requires maintained mechanisms rather than custom cryptography.
   - Add public MFA enrollment before challenge enforcement is complete: rejected because it would create configured MFA state without a complete enforced authentication path.
 changed_paths:
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/archive/OTERYN-20260719-mfa-state-foundation.md
   - docs/agents/tasks/active/OTERYN-20260719-mfa-totp-provider-resolution.md
 validation:
@@ -125,7 +128,7 @@ validation:
     evidence: no local checkout is available and the lockfile will not be fabricated or hand-edited
 blockers:
   - deterministic Composer dependency resolution is blocked by the current execution environment DNS failure
-next_action: Open a draft PR for coordination, update ACTIVE_WORK, and retry real Composer dependency resolution only when a working checkout/network path is available. Do not add public MFA behavior in this task.
+next_action: Keep PR #15 draft and blocked. Retry real Composer dependency resolution only when a working checkout/network path is available; if it succeeds, commit only Composer-generated dependency metadata and validate the exact final head. Do not add public MFA behavior in this task.
 ```
 
 ## Notes
