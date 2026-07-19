@@ -6,17 +6,17 @@ Resolve the authorization blocker discovered by the first Phase 5 character-crea
 
 ## Acceptance criteria
 
-- [ ] Archive the merged `OTERYN-20260719-phase5-character-creation-contract` task under `docs/agents/tasks/archive/` with exact historical content and remove the active copy.
-- [ ] Verify current Oteryn Platform `main`, open PR state and current Canary `main` before claiming scope.
-- [ ] Inspect current Platform Identity persistence, registration/login/session/MFA/recovery boundaries and any existing account-link model.
-- [ ] Inspect current Canary account identity keys and current authentication/control-proof paths relevant to proving ownership of one `accounts.id`.
-- [ ] Compare viable binding ceremonies: durable Platform-owned mapping established by authoritative account-control proof, new-account creation with immediate binding, existing-account claim, and privileged/manual recovery.
-- [ ] Reject any binding rule that relies only on client-supplied account IDs, non-unique email equality, or an unproven password-verification compatibility path.
-- [ ] Define one-to-one/cardinality constraints, lifecycle/unlink/rebind rules, concurrency/idempotency semantics, audit requirements and rollback/migration implications for the binding itself.
-- [ ] Update or add an operation-specific contract with an approved bounded binding mechanism or the exact blocker and next dependency.
-- [ ] Update `ACTIVE_WORK.md` with the current task and next action; do not claim character/account mutation authorization until binding is actually implemented and proven.
-- [ ] Do not modify Canary/login-server repositories and do not implement shared Canary account/player writes.
-- [ ] Run exact-head CI and Agent Governance before readiness/merge.
+- [x] Archive the merged `OTERYN-20260719-phase5-character-creation-contract` task under `docs/agents/tasks/archive/` with exact historical content and remove the active copy.
+- [x] Verify current Oteryn Platform `main`, open PR state and current Canary `main` before claiming scope.
+- [x] Inspect current Platform Identity persistence, registration/login/session/MFA/recovery boundaries and confirm there is no existing account-link model.
+- [x] Inspect current Canary account identity keys and current Canary/external-login-server authentication paths relevant to proving ownership of one `accounts.id`.
+- [x] Compare viable binding ceremonies: durable Platform-owned mapping established by authoritative account-control proof, new-account creation with immediate binding, existing-account claim, and privileged/manual recovery.
+- [x] Reject binding rules that rely only on client-supplied account IDs, non-unique email equality, direct Platform password-hash verification, or reuse of normal login as a side-effect-free claim API.
+- [x] Define the binding lifecycle/cardinality/concurrency/audit requirements supported by current evidence and retain unresolved product cardinality/unlink/rebind policy as explicit blockers rather than guessing.
+- [x] Add `docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md` with the exact blocker and safe target claim boundary.
+- [x] Update `ACTIVE_WORK.md` with the current task; do not claim character/account mutation authorization.
+- [x] Do not modify Canary/login-server repositories and do not implement shared Canary account/player writes.
+- [ ] Run final exact-head CI and Agent Governance before readiness/merge.
 
 ## Ownership
 
@@ -42,21 +42,21 @@ dependencies:
   - docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md
   - docs/contracts/CANARY_DATA_CONTRACT.md
 blockers:
-  - none for discovery; a safe binding mechanism may remain blocked by current cross-component authentication authority
+  - none for completing this discovery task; binding implementation is blocked by missing safe authoritative account-control claim capability and unresolved product ownership lifecycle/cardinality
 cross_repository_tasks:
   - blakinio/canary is read-only evidence source; no writes are authorized
-  - opentibiabr/login-server may be inspected read-only only if required by the authentication-control proof
+  - opentibiabr/login-server was inspected read-only at current main; no writes are authorized
 ```
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T23:25:00+02:00
-head: 8e4d572c4136672866d043e2af989c2bcff9be44
+updated_at: 2026-07-19T23:42:00+02:00
+head: 6fd486dc6465904a8afc3cbbb49d03f4abaaa3a0
 branch: task/OTERYN-20260719-phase5-identity-canary-account-binding
-pr: none
-status: investigating
+pr: 27
+status: validating
 context_routes:
   - agent-governance
   - architecture
@@ -77,35 +77,66 @@ owned_paths:
 proven:
   - PR #26 was squash-merged to main as ab78d6ac3bc674deb0868195563b61a753d95f98 after exact-head CI and Agent Governance passed and the final merge gate remained clean.
   - Live open-PR search after PR #26 merge returned no open pull requests before this successor task was claimed.
-  - The merged character-creation contract identifies missing durable Platform Identity to Canary accounts.id ownership binding as the first authorization blocker.
-  - The archived predecessor task was copied from exact merged blob c66f27a5a04e272c35e20b58509acccce7cec933 before removal of its active copy.
+  - The predecessor active task blob c66f27a5a04e272c35e20b58509acccce7cec933 was copied unchanged to archive and the active copy removed.
+  - Current Platform Identity persistence and registration contain no Canary account key/binding, and Platform credentials remain separate from game credentials.
+  - Current Canary schema at 2b6ae86539640dfc52323e9d5abbde31d6610c5f has unique accounts.name, non-unique indexed accounts.email and credential-sensitive accounts.password.
+  - The current database-enforced Platform canary read credential can SELECT only players, guilds, guild_membership, guild_ranks, channels and cluster_sessions; it cannot read accounts or account_sessions.
+  - Current Canary native password verification accepts custom Argon2 and SHA-1 fallback, while current external login-server main 2612930de4d97123a397f8f2cd0d5f784094af40 verifies SHA-1 only.
+  - External login-server normal login authenticates with (email OR unique name) plus SHA-1 password match, then loads players, creates a 24-hour account_sessions game session and returns game-login session material; it is not a side-effect-free ownership-claim endpoint.
+  - No purpose-built current Canary/login-server external account-control claim API was proven that returns a short-lived single-use assertion bound to one accounts.id without creating a reusable game session.
+  - IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT records that a durable Platform-owned mapping is conceptually valid only after trustworthy account-control proof, but approves no binding implementation yet.
 derived:
-  - A Platform-owned durable mapping can represent ownership only after a separate trustworthy account-control proof establishes the initial association.
+  - Matching existing accounts by email cannot establish authorization because email is non-unique.
+  - Direct Platform verification of accounts.password would create another credential authority and require access to sensitive credential hashes, violating the current least-privilege boundary.
+  - Reusing normal external login as a claim flow is unsafe as the general binding contract because it has game-session side effects and SHA-1-only compatibility.
+  - A future safe existing-account claim should be owned by the authoritative game-authentication side and return a short-lived single-use accounts.id-bound claim assertion with no reusable game session side effect.
+  - An alternative future path is atomic binding when Platform itself is approved to create the Canary account, but account creation/credential authority is not approved today.
 unknown:
-  - whether any current cross-component path can safely prove control of an existing Canary account without introducing credential compatibility or bypass risks
-  - whether product policy allows one Identity to own exactly one Canary account or multiple accounts
-  - unlink/rebind/recovery policy and privileged break-glass ownership
-  - whether new Canary account creation is intended to be the only automatic binding path
-conflicts: []
+  - product cardinality: one Platform Identity to one Canary account versus multiple accounts
+  - unlink, transfer, rebind and recovery policy
+  - privileged break-glass ownership procedure after Phase 6 Admin/RBAC exists
+  - which authentication component will become authoritative for a future purpose-built account-control claim capability
+conflicts:
+  - native Canary and current external login-server support different password verification compatibility, so a claim path based only on the external SHA-1 login cannot prove control for every currently supported account credential state
 first_failure:
-  marker: none
-  evidence: none
+  marker: SAFE_EXISTING_ACCOUNT_CLAIM_CAPABILITY_MISSING
+  evidence: no inspected current path proves one exact accounts.id to Platform without either ambiguous email inference, direct credential-hash access, game-login/session side effects, or incomplete password-format compatibility.
 rejected_hypotheses:
-  - Bind by email equality alone: already rejected by the character-creation contract because Canary accounts.email is non-unique.
+  - Bind by email equality alone: rejected because Canary accounts.email is non-unique.
   - Trust browser-supplied accounts.id: rejected because client input cannot prove ownership.
+  - Read accounts.password and verify inside Platform: rejected because it exposes shared credential hashes and duplicates incompatible authentication logic.
+  - Reuse external login-server normal login as the binding API: rejected because success creates a reusable 24-hour account_sessions entry and supports SHA-1 verification only.
+  - Emulate native Canary ProtocolLogin from Platform: rejected because it is a game-client login protocol, not a purpose-built server-to-server claim contract.
 changed_paths:
-  - docs/agents/tasks/archive/OTERYN-20260719-phase5-character-creation-contract.md
-  - docs/agents/tasks/active/OTERYN-20260719-phase5-character-creation-contract.md
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260719-phase5-identity-canary-account-binding.md
+  - docs/agents/tasks/active/OTERYN-20260719-phase5-character-creation-contract.md
+  - docs/agents/tasks/archive/OTERYN-20260719-phase5-character-creation-contract.md
+  - docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md
 validation:
   - command: successor task claim preflight
     result: PASS
     evidence: main at ab78d6ac3bc674deb0868195563b61a753d95f98 and no open PR before branch creation
+  - command: predecessor archive exact-content check
+    result: PASS
+    evidence: archive was created from merged predecessor blob c66f27a5a04e272c35e20b58509acccce7cec933 before active copy deletion
+  - command: Platform Identity and DB privilege boundary inspection
+    result: PASS
+    evidence: Identity model/migrations/registration and canary-readonly provisioning prove no binding and no accounts/account_sessions access
+  - command: current Canary account/auth inspection
+    result: PASS
+    evidence: schema and native Account authentication at Canary 2b6ae86539640dfc52323e9d5abbde31d6610c5f inspected read-only
+  - command: current external login-server account/login inspection
+    result: PASS
+    evidence: account.go and grpc/login.go at 2612930de4d97123a397f8f2cd0d5f784094af40 inspected read-only; normal login creates account_sessions after SHA-1 credential verification
+  - command: exact-head GitHub Actions CI and Agent Governance
+    result: NOT_RUN
+    evidence: final discovery documentation head not yet validated
 blockers:
-  - none for discovery
-next_action: Open the draft PR, update ACTIVE_WORK to the successor task, then inspect the current account-control proof options and define or reject a safe binding ceremony.
+  - none for discovery merge; binding implementation and all user-scoped Canary mutations remain blocked pending a safe account-control claim capability or approved atomic account-creation path plus explicit ownership lifecycle policy
+next_action: Update ACTIVE_WORK with the exact binding blocker and cross-repository/authentication dependency, then validate final diff and exact-head CI plus Agent Governance before readiness/merge.
 ```
 
 ## Notes
 
-This task resolves authorization ownership only. It must not be used to bypass the separate credential/game-login authority blockers or to grant character/account mutation capability prematurely.
+This task resolves authorization ownership only. Current evidence does not permit a self-service existing-account binding implementation. It must not be used to bypass the separate credential/game-login authority blockers or to grant character/account mutation capability prematurely.
