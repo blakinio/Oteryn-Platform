@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-phase5-character-creation-contract` — first bounded Phase 5 operation-contract/discovery task; branch `task/OTERYN-20260719-phase5-character-creation-contract`; draft PR #26; checkpoint status `validating`. Current evidence does **not** approve a character-create write: Platform Identity has no durable binding to one Canary `accounts.id`, Canary `accounts.email` is not unique, product starter-state/name policy is not proven, and the existing `canary` SQL connection remains the database-enforced read-only boundary. `docs/contracts/CHARACTER_CREATION_CONTRACT.md` records the exact blockers and safe future transaction/write-boundary requirements.
+- `OTERYN-20260719-phase5-character-creation-contract` — first bounded Phase 5 operation-contract/discovery task; branch `task/OTERYN-20260719-phase5-character-creation-contract`; draft PR #26; checkpoint status `ready`. Current evidence does **not** approve a character-create write: Platform Identity has no durable binding to one Canary `accounts.id`, Canary `accounts.email` is not unique, product starter-state/name policy is not proven, and the existing `canary` SQL connection remains the database-enforced read-only boundary. `docs/contracts/CHARACTER_CREATION_CONTRACT.md` records the exact blockers and safe future transaction/write-boundary requirements.
 
 ## Recommended next task
 
