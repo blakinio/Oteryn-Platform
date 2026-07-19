@@ -22,6 +22,12 @@ final class SecurityEventRecorder
 
     public const IDENTITY_MFA_RESET = 'identity.mfa_reset';
 
+    public const IDENTITY_MFA_ENROLLED = 'identity.mfa_enrolled';
+
+    public const IDENTITY_MFA_RECOVERY_CODE_USED = 'identity.mfa_recovery_code_used';
+
+    public const IDENTITY_MFA_DISABLED = 'identity.mfa_disabled';
+
     public function recordIdentityRegistered(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_REGISTERED);
@@ -60,6 +66,21 @@ final class SecurityEventRecorder
     public function recordIdentityMfaReset(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_MFA_RESET);
+    }
+
+    public function recordIdentityMfaEnrolled(int $identityId): void
+    {
+        $this->record($identityId, self::IDENTITY_MFA_ENROLLED);
+    }
+
+    public function recordIdentityMfaRecoveryCodeUsed(int $identityId): void
+    {
+        $this->record($identityId, self::IDENTITY_MFA_RECOVERY_CODE_USED);
+    }
+
+    public function recordIdentityMfaDisabled(int $identityId): void
+    {
+        $this->record($identityId, self::IDENTITY_MFA_DISABLED);
     }
 
     private function record(int $identityId, string $eventType): void

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Identity\Mfa\MfaChallengeController;
+use App\Http\Controllers\Identity\Mfa\MfaEnrollmentController;
 use App\Http\Controllers\Identity\PasswordChangeController;
 use App\Http\Controllers\Identity\PasswordRecoveryController;
 use App\Http\Controllers\Identity\PasswordResetController;
@@ -26,6 +28,26 @@ Route::post('/login', [SessionController::class, 'store'])
 Route::post('/logout', [SessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('identity.logout');
+
+Route::get('/mfa/challenge', [MfaChallengeController::class, 'create'])
+    ->middleware('guest')
+    ->name('identity.mfa.challenge.create');
+Route::post('/mfa/challenge', [MfaChallengeController::class, 'store'])
+    ->middleware(['guest', 'throttle:identity-mfa-challenge', 'throttle:identity-mfa-challenge-source'])
+    ->name('identity.mfa.challenge.store');
+
+Route::get('/mfa', [MfaEnrollmentController::class, 'show'])
+    ->middleware('auth')
+    ->name('identity.mfa.settings');
+Route::post('/mfa/enroll', [MfaEnrollmentController::class, 'store'])
+    ->middleware(['auth', 'throttle:identity-mfa-enrollment'])
+    ->name('identity.mfa.enroll');
+Route::post('/mfa/confirm', [MfaEnrollmentController::class, 'confirm'])
+    ->middleware(['auth', 'throttle:identity-mfa-enrollment'])
+    ->name('identity.mfa.confirm');
+Route::delete('/mfa', [MfaEnrollmentController::class, 'destroy'])
+    ->middleware(['auth', 'throttle:identity-mfa-disable'])
+    ->name('identity.mfa.destroy');
 
 Route::get('/forgot-password', [PasswordRecoveryController::class, 'create'])
     ->middleware('guest')
