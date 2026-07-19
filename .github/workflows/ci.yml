@@ -53,19 +53,8 @@ jobs:
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      # Temporary command-resolution diagnostics for PR #33. Remove before merge.
-      - name: Pint vendor binary direct
-        continue-on-error: true
-        run: vendor/bin/pint --test
-      - name: Pint PATH direct
-        continue-on-error: true
-        run: pint --test
-      - name: Pint through composer exec
-        continue-on-error: true
-        run: composer exec -- pint --test
-
       - name: Check formatting
-        run: composer format:check
+        run: vendor/bin/pint --test
 
       - name: Run static analysis
         run: composer analyse
