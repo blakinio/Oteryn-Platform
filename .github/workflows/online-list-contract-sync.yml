@@ -1,9 +1,9 @@
 name: Online List Contract Sync
 
 on:
-  push:
-    branches:
-      - task/OTERYN-20260719-online-list-read-model
+  pull_request:
+    types:
+      - synchronize
     paths:
       - .github/online-list-contract-sync.trigger
 
@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   sync-contract:
+    if: github.head_ref == 'task/OTERYN-20260719-online-list-read-model'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
