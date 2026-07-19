@@ -22,7 +22,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Cluster-wide online-status discovery: COMPLETE**
 
-**Next work — bounded PublicGameData cluster-wide online-list implementation.**
+**Cluster-wide online-character read model: IMPLEMENTED IN CURRENT DELIVERY / VALIDATING**
 
 ## What exists on main after the current delivery PR is merged
 
@@ -51,13 +51,16 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - evidence-backed Canary data contract with approved read boundaries and zero approved direct shared-data writes;
 - evidence-backed current web/login-server/Canary authentication contract and staged target direction for one authoritative Identity policy plus short-lived atomic game-login authorization;
 - dedicated Canary read connection configured independently from the Platform-owned database;
+- database-enforced least-privilege Canary credential verification with direct table-level `SELECT` allowlisting for the implemented read surface, including `cluster_sessions` for the online-character read model;
 - read-only public level highscores at `GET /highscores`;
 - read-only active character profiles at `GET /characters/{name}`;
 - read-only public guild details and membership at `GET /guilds/{name}`;
 - read-only configured channel metadata at `GET /servers`;
+- cluster-wide read-only online-character list at `GET /online` using fresh `cluster_sessions` identity joined to public player and approved channel fields;
 - integration tests that exercise PublicGameData routes after placing an isolated Canary SQLite connection in `query_only` mode;
-- an approved cluster-wide online-character read contract using sanitized `cluster_sessions` identity joined to public player fields, with mandatory `ONLINE` status, unexpired lease and active-character filters;
-- explicit online-read stale/failure semantics: expired lease rows are excluded, Canary DB failure is not converted to an empty list, and raw session/security fields remain non-public;
+- online-list integration coverage for fresh `ONLINE`, expired, non-`ONLINE`, deleted-player, dependency-failure and public-field allowlist cases;
+- mandatory online filters `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms` and `players.deletion = 0`;
+- explicit online-read stale/failure semantics: expired lease rows are excluded, Canary DB failure is returned as dependency unavailable rather than an empty list, and raw session/security fields remain non-public;
 - proven rejection of shared `players_online` as a multichannel authority because every process periodically rewrites/prunes it from only its local player set.
 
 ## Phase 3 Identity summary
@@ -96,27 +99,28 @@ Administrator authentication policy:
 
 ## PublicGameData implementation summary
 
-The initial PublicGameData implementation is intentionally narrow and read-only.
+The current PublicGameData implementation is intentionally narrow and read-only.
 
 Proven implementation properties:
 
 - shared Canary tables are accessed through a dedicated query service using Laravel query builder rather than mutation-capable shared Eloquent models;
-- deployment documentation requires a separate least-privilege SELECT-only Canary database credential;
+- deployment documentation requires a separate least-privilege SELECT-only Canary database credential, and the verifier/provisioning allowlist now includes `cluster_sessions` because the online-list adapter reads it;
 - character/highscore/guild member reads filter `players.deletion = 0`;
 - highscores select only public fields, use deterministic `level DESC, name ASC` ordering and paginate 50 rows;
 - public character profiles expose only `id`, `name`, `level` and `vocation` to the query layer, while the view renders only name/level/vocation;
 - guild details exclude `guilds.balance` and membership data is joined in one paginated read path without per-member N+1 queries;
 - Blade output escapes guild content by default and XSS regression coverage exists for MOTD rendering;
 - server/channel page exposes configured enabled channel metadata and maintenance state only;
-- no cluster-wide online-character route is implemented yet;
+- `GET /online` reads `cluster_sessions` joined to `players` and `channels`, selects only public player fields plus durable `channel_id` and channel name, and applies mandatory online/expiry/deletion filters;
+- Canary DB query failure for `/online` becomes an explicit HTTP 503 dependency-unavailable result rather than a synthetic empty list;
 - no application caching is used yet.
 
-The approved next PublicGameData online-list implementation contract is:
+The implemented PublicGameData online-list contract is:
 
 - backend identity source: `cluster_sessions` joined to `players`;
 - mandatory positive filters: `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms`, `players.deletion = 0`;
-- output: explicit public player allowlist plus durable `channels.id`, never raw account/session/lease identifiers;
-- dependency failure: Canary DB read failure must remain an explicit unavailable/error result, never a synthetic empty list;
+- output: explicit public player allowlist plus durable `channels.id` and approved channel name, never raw account/session/lease identifiers;
+- dependency failure: Canary DB read failure remains an explicit unavailable/error result, never a synthetic empty list;
 - `players_online`, process-local `ProtocolStatus`, and unbounded stale cache are forbidden fallbacks;
 - SQL `channel_runtime_status` is not a required hard identity gate because it is a best-effort diagnostic mirror; fresh channel availability remains a separate integration concern.
 
@@ -141,7 +145,7 @@ Key proven points:
 - account/IP bans, namelocks and session structures are documented;
 - `account_sessions` and `cluster_sessions` are separate concepts;
 - current `players_online` lifecycle is incompatible with cluster-wide completeness and is rejected as a multichannel authority;
-- `cluster_sessions` acquire/heartbeat/expiry behavior supports a bounded sanitized online-character read contract when status and expiry are both filtered;
+- `cluster_sessions` acquire/heartbeat/expiry behavior supports the implemented bounded sanitized online-character read model when status and expiry are both filtered;
 - Redis `ChannelRuntimeRegistry` is the fail-closed per-channel liveness fast path, while SQL `channel_runtime_status` is a best-effort diagnostic mirror;
 - process-local `ProtocolStatus` is not a cluster-wide character-identity source;
 - there are no approved direct Oteryn Platform writes to shared Canary data.
@@ -179,7 +183,6 @@ Unless source is added after this state update, the following are **not implemen
 - global game-login enforcement of Platform MFA/email verification;
 - account management beyond Identity-owned credential/security operations;
 - character creation/delete/rename;
-- cluster-wide online character list route/UI despite its read contract now being approved;
 - live multichannel availability integration;
 - Admin/RBAC/audit UI and administrator identity classification;
 - Canary/shared-data write paths;
@@ -189,19 +192,21 @@ Unless source is added after this state update, the following are **not implemen
 
 Agents must verify repository source before relying on this list because later tasks may supersede it.
 
-## Next planned task
+## Current active task
 
 `OTERYN-20260719-online-list-read-model`
 
 Objective:
 
-- implement the cluster-wide online-character read model through the existing dedicated Canary query boundary;
-- select only the approved public player fields plus durable `channel_id`/approved channel metadata;
+- deliver the cluster-wide online-character read model through the existing dedicated Canary query boundary;
+- select only approved public player fields plus durable `channel_id`/approved channel metadata;
 - enforce `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms` and `players.deletion = 0`;
 - preserve Canary DB dependency failure explicitly rather than converting it to an empty list;
-- add integration tests for fresh, expired, deleted-character and dependency-failure cases under the read-only/query-only Canary test boundary;
+- keep the enforced SELECT-only database privilege allowlist synchronized with the implemented `cluster_sessions` read;
 - do not use `players_online`, process-local `ProtocolStatus` or SQL `channel_runtime_status` as replacement identity authorities;
 - do not add shared Canary writes.
+
+No successor bounded task is approved by this change. Re-evaluate the remaining Phase 4 roadmap against live repository/task state after this task is merged.
 
 ## High-priority unknowns and blockers
 
