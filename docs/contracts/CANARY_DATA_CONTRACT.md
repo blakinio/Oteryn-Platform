@@ -727,6 +727,47 @@ Tests:
 
 A schema-level ability to execute an `INSERT`, `UPDATE` or `DELETE` is not sufficient approval.
 
+## Database privilege boundary for Oteryn Platform
+
+### Required deployment invariant
+
+The dedicated Laravel `canary` connection is read-only by contract **and must also be read-only by database privilege enforcement**. A username such as `oteryn_readonly` or application code that intends to issue only `SELECT` statements is not a security boundary by itself.
+
+Production and production-like deployments must satisfy all of the following:
+
+- use a database credential dedicated to Oteryn Platform for the `canary` connection;
+- never reuse the credential used by the Canary game server;
+- never configure the `canary` connection with a root, administrator, migration-owner or other broadly privileged database account;
+- enforce least privilege at the MySQL/MariaDB server with direct table-level `SELECT` only;
+- do not grant `INSERT`, `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `DROP`, `TRIGGER`, `GRANT OPTION`, schema-wide/global privileges or any other privilege not required by the implemented read surface;
+- treat role-based or otherwise indirect/unrecognized privilege arrangements as unverified unless the deployment check can deterministically expand and validate them; the current verifier intentionally fails closed instead of assuming they are safe.
+
+### Current implemented table allowlist
+
+The current Oteryn Platform code on this contract revision reads exactly these Canary tables through `app/PublicGameData/CanaryGameDataRepository.php`:
+
+- `players`;
+- `guilds`;
+- `guild_membership`;
+- `guild_ranks`;
+- `channels`.
+
+The provisioning artifact under `database/provisioning/canary-readonly.sql.template` and the application verifier must grant/accept exactly this implemented table surface. Contract approval for a future read does not justify pre-granting an unused table. In particular, `cluster_sessions` is approved above for the future bounded online-list adapter but is **not** part of the current database credential allowlist until application code actually implements that read.
+
+Whenever a change adds another Canary table to the implemented read surface, that same reviewed change must update:
+
+1. the evidence-backed read contract;
+2. the database provisioning grants;
+3. the privilege-verifier allowlist and regression tests.
+
+Deployment must update the database grants before or atomically with enabling code that requires the new table. Stale excess grants must be removed rather than left in place for convenience.
+
+### Non-destructive verification
+
+Deployments must run `php artisan canary:verify-db-privileges` (or an equivalent deterministic deployment check) against the actual `canary` connection before treating the boundary as enforced. The current command inspects `SHOW GRANTS FOR CURRENT_USER`, never logs raw grant statements, never logs a password, and never attempts a destructive write test. It fails when required table `SELECT` grants are missing or when it sees write/DDL/admin/global/schema-wide/extra-table grants, `GRANT OPTION`, role grants or another grant shape it cannot prove safe.
+
+The exact production MySQL/MariaDB server product/version remains `UNKNOWN` from repository evidence. The committed provisioning and verifier therefore target direct grant syntax common to MySQL/MariaDB (Canary is built with `libmariadb`, while Laravel uses the MySQL driver) and deliberately report unsupported privilege models as unverified rather than claiming enforcement.
+
 ## Remaining UNKNOWN items
 
 - exact deployed production database schema/version and whether it contains `tournament_coins` or `coins_tournament`;
