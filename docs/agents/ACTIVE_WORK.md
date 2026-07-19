@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-online-list-read-model` — bounded Phase 4 PublicGameData cluster-wide online-character read model; branch `task/OTERYN-20260719-online-list-read-model`; draft PR to be opened early. Scope is limited to `cluster_sessions` + public `players` fields through the dedicated query-only Canary boundary, mandatory `ONLINE`/unexpired/deletion filters, explicit dependency-failure semantics, sanitized public output, and synchronized expansion of the enforced Canary DB SELECT allowlist to `cluster_sessions`. No shared Canary writes or fallback to `players_online`/process-local status are allowed.
+- `OTERYN-20260719-online-list-read-model` — bounded Phase 4 PublicGameData cluster-wide online-character read model; branch `task/OTERYN-20260719-online-list-read-model`; draft PR #18; checkpoint status `validating`. Scope is limited to `cluster_sessions` + public `players` fields through the dedicated query-only Canary boundary, mandatory `ONLINE`/unexpired/deletion filters, explicit dependency-failure semantics, sanitized public output, and synchronized expansion of the enforced Canary DB SELECT allowlist to `cluster_sessions`. Delivery head `1a584d862af1802d5d0cd9d1604f1f5a7a1f93d2` passed CI #280 and Agent Governance #201; a fresh exact-head pass is required after the final ready checkpoint before merge.
 
 ## Recommended next task
 
