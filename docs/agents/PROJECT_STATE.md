@@ -26,7 +26,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Public site shell and exact-name character search: COMPLETE**
 
-**Public news read model: IMPLEMENTED IN CURRENT DELIVERY / VALIDATING**
+**Public news read model: COMPLETE**
+
+**Channel runtime availability transport discovery: CONTRACT APPROVED IN CURRENT DELIVERY / VALIDATING**
 
 ## What exists on main after the current delivery PR is merged
 
@@ -71,7 +73,8 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - online-list integration coverage for fresh `ONLINE`, expired, non-`ONLINE`, deleted-player, dependency-failure and public-field allowlist cases;
 - mandatory online filters `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms` and `players.deletion = 0`;
 - explicit online-read stale/failure semantics: expired lease rows are excluded, Canary DB failure is returned as dependency unavailable rather than an empty list, and raw session/security fields remain non-public;
-- proven rejection of shared `players_online` as a multichannel authority because every process periodically rewrites/prunes it from only its local player set.
+- proven rejection of shared `players_online` as a multichannel authority because every process periodically rewrites/prunes it from only its local player set;
+- an evidence-backed approved next integration contract for per-channel runtime availability/count using dedicated read-only Redis access to deterministic `cluster:channel:{id}:runtime` keys, with Redis-TTL freshness, complete-snapshot failure semantics and no SQL/`ProtocolStatus` fallback; runtime integration code is not yet implemented.
 
 ## Phase 3 Identity summary
 
@@ -122,7 +125,7 @@ Proven implementation properties:
 - public character profiles expose only `id`, `name`, `level` and `vocation` to the query layer, while the view renders only name/level/vocation;
 - guild details exclude `guilds.balance` and membership data is joined in one paginated read path without per-member N+1 queries;
 - Blade output escapes guild content by default and XSS regression coverage exists for MOTD rendering;
-- server/channel page exposes configured enabled channel metadata and maintenance state only;
+- server/channel page currently exposes configured enabled channel metadata and maintenance state only;
 - `GET /online` reads `cluster_sessions` joined to `players` and `channels`, selects only public player fields plus durable `channel_id` and channel name, and applies mandatory online/expiry/deletion filters;
 - Canary DB query failure for `/online` becomes an explicit HTTP 503 dependency-unavailable result rather than a synthetic empty list;
 - no application caching is used yet.
@@ -134,14 +137,26 @@ The implemented PublicGameData online-list contract is:
 - output: explicit public player allowlist plus durable `channels.id` and approved channel name, never raw account/session/lease identifiers;
 - dependency failure: Canary DB read failure remains an explicit unavailable/error result, never a synthetic empty list;
 - `players_online`, process-local `ProtocolStatus`, and unbounded stale cache are forbidden fallbacks;
-- SQL `channel_runtime_status` is not a required hard identity gate because it is a best-effort diagnostic mirror; fresh channel availability remains a separate integration concern.
+- runtime availability remains independent from online-character identity.
+
+The approved, not-yet-implemented per-channel runtime-availability contract is:
+
+- expected channel IDs come from the existing enabled `channels` database read;
+- runtime source is the deterministic Redis hash `cluster:channel:{channels.id}:runtime` through a dedicated read-only Platform connection/credential;
+- Redis key existence plus positive TTL and valid runtime fields/state define external freshness; missing/expired keys while Redis is healthy mean runtime availability is unknown/unavailable, not synthetic `OFFLINE` or zero players;
+- any Redis transport/protocol failure while reading one logical configured-channel snapshot invalidates all runtime fields for that snapshot; static configured metadata may still render independently;
+- public runtime output is limited to durable `channel_id`, explicit runtime `status` and non-negative `players_online`; operational instance/node/build/map/data metadata remains private;
+- SQL `channel_runtime_status` is a best-effort diagnostic mirror and is forbidden as an authoritative fallback because Canary queues its write even after Redis runtime publish/refresh failure;
+- current process-local `ProtocolStatus` is also forbidden as a cluster runtime fallback;
+- no application cache is approved initially;
+- the current Platform codebase still lacks the dedicated Canary-runtime Redis dependency/config boundary required to implement this contract.
 
 Known PublicGameData unknowns:
 
-- transport from Canary multichannel runtime state to Oteryn Platform for independent fresh per-channel availability/count;
 - privileged/group-hidden character filtering policy for public rankings;
-- production cache/staleness expectations outside the bounded online-lease freshness contract;
-- maximum production wall-clock skew relevant to the exact online freshness SLA.
+- production cache/staleness expectations outside the bounded online-lease and approved Redis-runtime freshness contracts;
+- maximum production wall-clock skew relevant to the exact `cluster_sessions` online-character freshness SLA;
+- production provisioning details for the dedicated read-only Canary runtime Redis credential/endpoint, to be supplied outside Git while implementing the approved adapter.
 
 ## CMS implementation summary
 
@@ -174,6 +189,7 @@ Those mutation and privileged-management capabilities remain Phase 6 work and mu
 
 Key proven points:
 
+- the contract is revalidated against Canary `main` at `d4f8bb3aa3a6ca31b54f324797078360da28f8f8`;
 - accounts and characters are global across channels;
 - `players.account_id` owns the account-to-character relationship;
 - persistent channel identity is `channels.id`;
@@ -183,8 +199,9 @@ Key proven points:
 - `account_sessions` and `cluster_sessions` are separate concepts;
 - current `players_online` lifecycle is incompatible with cluster-wide completeness and is rejected as a multichannel authority;
 - `cluster_sessions` acquire/heartbeat/expiry behavior supports the implemented bounded sanitized online-character read model when status and expiry are both filtered;
-- Redis `ChannelRuntimeRegistry` is the fail-closed per-channel liveness fast path, while SQL `channel_runtime_status` is a best-effort diagnostic mirror;
-- process-local `ProtocolStatus` is not a cluster-wide character-identity source;
+- Redis `ChannelRuntimeRegistry` is the fail-closed per-channel liveness fast path and the dedicated direct read-only Redis runtime-key boundary is approved for the next Platform adapter;
+- SQL `channel_runtime_status` is a best-effort asynchronous diagnostic mirror and is not approved as an authoritative public runtime fallback;
+- process-local `ProtocolStatus` is not a cluster-wide runtime or character-identity source;
 - there are no approved direct Oteryn Platform writes to shared Canary data.
 
 Known data-contract blockers/unknowns:
@@ -192,7 +209,7 @@ Known data-contract blockers/unknowns:
 - `schema.sql` defines `accounts.tournament_coins`, while Canary repository code expects `accounts.coins_tournament` for tournament coin access;
 - actual deployed database shape for that field is not proven;
 - whether another cleanup path eventually physically deletes every expired orphaned `cluster_sessions` row is not proven, but online-read correctness no longer depends on physical deletion because expiry filtering is mandatory;
-- maximum production wall-clock skew relevant to the lease-expiry SLA is not proven;
+- maximum production wall-clock skew relevant to the `cluster_sessions` lease-expiry SLA is not proven;
 - product initialization rules for Platform-driven character creation are not proven.
 
 ## Authentication contract summary
@@ -220,7 +237,7 @@ Unless source is added after this state update, the following are **not implemen
 - global game-login enforcement of Platform MFA/email verification;
 - account management beyond Identity-owned credential/security operations;
 - character creation/delete/rename;
-- live multichannel availability integration;
+- live multichannel availability integration through the now-approved dedicated Redis runtime adapter;
 - Admin/RBAC/audit UI and administrator identity classification;
 - Canary/shared-data write paths;
 - login-server integration code owned by Oteryn Platform;
@@ -231,17 +248,20 @@ Agents must verify repository source before relying on this list because later t
 
 ## Current active task
 
-`OTERYN-20260719-public-news-read-model`
+`OTERYN-20260719-channel-runtime-availability-discovery`
 
 Objective:
 
-- add Platform-owned `news_posts` persistence through a Laravel migration;
-- expose published-only `GET /news` and `GET /news/{slug}` public reads through a dedicated CMS query boundary;
-- exclude drafts and future-scheduled posts using `published_at` visibility semantics;
-- provide deterministic bounded pagination and escaped plain-text rendering;
-- do not add authoring, Admin/RBAC, rich HTML, media uploads, Canary access, caching or production deployment work.
+- verify the current Canary runtime availability source/transport against live `main`;
+- define explicit freshness, least-privilege and dependency-failure semantics for Platform consumption;
+- reject SQL `channel_runtime_status` and process-local `ProtocolStatus` as authoritative fallbacks;
+- approve the smallest safe next Platform integration boundary without adding runtime integration code in this discovery task.
 
-No successor bounded task is approved by this change. Re-evaluate remaining Phase 4 work against live repository/task state after this task is merged.
+Approved successor bounded task after this discovery is merged:
+
+`OTERYN-20260719-channel-runtime-availability-read-model`
+
+That task must implement the dedicated read-only Redis runtime adapter and server/channel public projection under the approved contract, including a dedicated dependency/config boundary and fail-closed tests. It must not broaden the Canary database table allowlist to `channel_runtime_status`.
 
 ## High-priority unknowns and blockers
 
@@ -250,7 +270,7 @@ No successor bounded task is approved by this change. Re-evaluate remaining Phas
 - password reset/change and global game-credential revocation behavior;
 - MFA/email-verification enforcement across every game-login path;
 - tournament-coin schema/code conflict;
-- maximum production wall-clock skew for exact lease freshness SLA;
+- maximum production wall-clock skew for exact `cluster_sessions` lease freshness SLA;
 - final production hosting/network topology;
 - production mail/cache/queue providers.
 

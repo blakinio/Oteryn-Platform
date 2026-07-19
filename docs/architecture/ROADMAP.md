@@ -113,7 +113,7 @@ Deliverables:
 - efficient read/query services;
 - caching only after correctness/freshness policy is defined.
 
-Current implementation includes a shared public Blade shell/navigation, homepage exact-name character search routing, read-only highscores, character profiles, guild pages, configured server/channel metadata, the cluster-wide online-character list, and a Platform-owned published-only public news list/detail read model. News authoring/management remains a future privileged CMS concern, live multichannel runtime availability remains a separate integration concern, and caching remains deferred until correctness/freshness policy is defined.
+Current implementation includes a shared public Blade shell/navigation, homepage exact-name character search routing, read-only highscores, character profiles, guild pages, configured server/channel metadata, the cluster-wide online-character list, and a Platform-owned published-only public news list/detail read model. The remaining live multichannel availability transport uncertainty is now resolved at contract level: the approved next bounded implementation is a dedicated read-only Redis adapter over deterministic Canary runtime keys with Redis-TTL freshness and fail-closed complete-snapshot semantics; SQL `channel_runtime_status` and process-local `ProtocolStatus` are forbidden authoritative fallbacks. That adapter is not implemented yet. News authoring/management remains a future privileged CMS concern, and caching remains deferred until correctness/freshness policy is defined.
 
 Exit gate:
 
