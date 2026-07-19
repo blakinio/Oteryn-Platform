@@ -7,7 +7,7 @@
     <p class="muted">Configured channel metadata with fresh Canary runtime availability when the dedicated runtime dependency is available.</p>
 
     @if (! $runtimeSnapshot->available)
-        <p class="notice">Live runtime status is temporarily unavailable. Configured channel metadata remains available below.</p>
+        <p class="notice">The live runtime dependency is temporarily unavailable, so live player availability is intentionally not shown. Configured channel metadata remains available below.</p>
     @endif
 
     @forelse ($channels as $channel)
