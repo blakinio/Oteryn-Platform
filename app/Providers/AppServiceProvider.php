@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Accounts\Contracts\CanaryAccountProvisioningGateway;
+use App\CanaryIntegration\CanaryAccountProvisioner;
 use App\Identity\Mfa\PendingMfaLogin;
 use App\Identity\Support\CanonicalEmail;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -13,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->bind(CanaryAccountProvisioningGateway::class, CanaryAccountProvisioner::class);
     }
 
     public function boot(): void
