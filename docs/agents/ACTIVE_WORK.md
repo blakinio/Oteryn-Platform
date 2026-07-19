@@ -4,18 +4,21 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-None.
+- `OTERYN-20260719-phase5-ownership-binding-dependency-gate` — bounded Phase 5 dependency-direction revalidation; branch `task/OTERYN-20260719-phase5-ownership-binding-dependency-gate`; draft PR #29. Current decision: **Bounded discovery / blocked**. Neither ownership-binding direction is implementable inside the current Platform-only authorization boundary. Account-control proof lacks a purpose-built auth-side assertion capability; Platform-originated Canary account creation lacks approved credential/account-create/lifecycle contracts and a separate least-privilege write boundary.
 
 ## Recommended next task
 
-Phase 5 user-scoped Canary mutations remain blocked. The next task must be explicitly coordinated around one of these dependencies: (1) an authoritative account-control claim capability on the Canary/login-server authentication side that returns a short-lived single-use `accounts.id`-bound assertion without creating a game session, or (2) an approved Canary account-creation flow where Platform originates the account and persists the Identity binding atomically. Either path also requires explicit product ownership cardinality/unlink/rebind/recovery policy before a binding implementation is approved.
+After PR #29 is validated and merged, the nearest minimal dependency is a **separately authorized Canary/login-server account-control proof capability**. The authoritative auth side must authenticate using a compatible authoritative verifier and issue a short-lived, single-use, replay-resistant assertion bound to one exact `accounts.id` and Platform claim attempt/audience, without creating a reusable game session or exposing credential hashes. Any write to `blakinio/canary` or `opentibiabr/login-server` requires separate explicit authorization.
+
+Before Platform persists ownership bindings, product/security policy must also explicitly decide Identity-to-account cardinality plus unlink, rebind/transfer and recovery semantics.
 
 ## Other queued work
 
-- Character-create implementation remains blocked until durable account ownership binding, product character-name normalization/reserved-name policy and exact starter-state rules are approved; a separate least-privilege Canary write credential/connection must then be defined rather than broadening the existing read-only connection.
-- Authoritative cross-component credential/game-login migration remains a separately coordinated programme under `AUTH_GAME_LOGIN_CONTRACT.md`; any new account-control proof capability must use the selected authoritative verifier rather than duplicating password hashing in Platform.
+- Character-create implementation remains blocked until durable ownership binding is actually implemented and tested, then product character-name normalization/reserved-name policy and exact starter-state rules are approved; a future character write must use a separate least-privilege Canary write credential/connection rather than broadening the existing read-only connection.
+- Platform-originated Canary account creation remains a possible later direction only after an explicit account-create operation contract, credential storage compatibility, ownership lifecycle/cardinality, cross-database failure semantics and a separate operation-scoped write credential are approved.
+- Authoritative cross-component credential/game-login migration remains a separately coordinated programme under `AUTH_GAME_LOGIN_CONTRACT.md`; ownership proof must not become a new Platform-side password verifier.
 - Admin/RBAC identity classification and permissions remain Phase 6. Future privileged recovery/binding routes must combine explicit authorization with the Phase 3 `mfa.confirmed` gate rather than an `is_admin` shortcut.
-- Privileged/group-hidden public-ranking policy, production runtime Redis ACL/endpoint provisioning, exact production wall-clock skew and broader cache policy remain explicit later policy/deployment unknowns.
+- Privileged/group-hidden public-ranking policy, production runtime Redis ACL/endpoint provisioning, exact production wall-clock skew and broader cache policy remain explicit later product/deployment unknowns.
 
 ## Recently completed
 
