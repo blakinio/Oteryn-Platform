@@ -62,7 +62,7 @@ final class PublicGameDataController
     {
         $channels = $this->gameData->configuredChannels();
 
-        /** @var list<int> $channelIds */
+        /** @var list<int> */
         $channelIds = $channels
             ->pluck('id')
             ->map(static fn (mixed $channelId): int => (int) $channelId)
