@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-phase3-identity-closure` — final Phase 3 Identity foundation closure; branch `task/OTERYN-20260719-phase3-identity-closure`; draft PR #17. Scope archives merged T3.4c unchanged, adds and tests the reusable `mfa.confirmed` privileged-route gate, formalizes Platform credential isolation and current email-verification policy, defines administrator authentication composition without introducing Admin/RBAC semantics, and synchronizes ROADMAP/MODULE_CATALOG/PROJECT_STATE with the completed Identity foundation.
+- `OTERYN-20260719-phase3-identity-closure` — final Phase 3 Identity foundation closure; branch `task/OTERYN-20260719-phase3-identity-closure`; draft PR #17; checkpoint status `ready`. Exact validation head `f007a06c15a7e6198a5fa93945aed1e5fa5bdb6f` passed CI #256 and Agent Governance #177 after the temporary contract-sync workflow was removed. Scope archives merged T3.4c unchanged, adds and tests the reusable `mfa.confirmed` privileged-route gate, formalizes Platform credential isolation and current email-verification policy, defines administrator authentication composition without introducing Admin/RBAC semantics, synchronizes the auth contract current state, and marks Phase 3 complete in ROADMAP/MODULE_CATALOG/PROJECT_STATE. The final ready-checkpoint head must pass CI/Governance again before merge.
 
 ## Recommended next task
 
