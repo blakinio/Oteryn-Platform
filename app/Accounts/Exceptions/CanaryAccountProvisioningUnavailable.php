@@ -2,6 +2,4 @@
 
 namespace App\Accounts\Exceptions;
 
-final class CanaryAccountProvisioningUnavailable extends CanaryAccountProvisioningException
-{
-}
+final class CanaryAccountProvisioningUnavailable extends CanaryAccountProvisioningException {}
