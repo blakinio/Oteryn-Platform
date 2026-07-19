@@ -10,7 +10,7 @@ final readonly class CanaryChannelRuntimeService
     public function __construct(private CanaryRuntimeRedisReader $reader) {}
 
     /**
-     * @param list<int> $channelIds
+     * @param  list<int>  $channelIds
      */
     public function snapshot(array $channelIds): CanaryRuntimeSnapshot
     {
