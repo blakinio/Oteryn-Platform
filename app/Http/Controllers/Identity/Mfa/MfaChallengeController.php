@@ -9,13 +9,13 @@ use App\Identity\Mfa\MfaCodeRejected;
 use App\Identity\Mfa\MfaStateRejected;
 use App\Identity\Mfa\PendingMfaLogin;
 use App\Identity\Sessions\IdentityWebSessionManager;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 final class MfaChallengeController
 {
-    public function create(Request $request, PendingMfaLogin $pendingMfa): View|RedirectResponse
+    public function create(Request $request, PendingMfaLogin $pendingMfa): Response|RedirectResponse
     {
         if ($pendingMfa->state($request) === null) {
             return redirect()
@@ -23,7 +23,10 @@ final class MfaChallengeController
                 ->with('status', 'Your sign-in challenge has expired. Please sign in again.');
         }
 
-        return view('identity.mfa.challenge');
+        return response()
+            ->view('identity.mfa.challenge')
+            ->header('Cache-Control', 'no-store, private')
+            ->header('Pragma', 'no-cache');
     }
 
     public function store(

@@ -27,14 +27,8 @@ final class StartIdentityMfaEnrollment
             }
 
             if ($lockedIdentity->two_factor_secret === null) {
-                $secret = $this->google2fa->generateSecretKey();
-
-                if (! is_string($secret) || $secret === '') {
-                    throw new MfaStateRejected;
-                }
-
                 $lockedIdentity->forceFill([
-                    'two_factor_secret' => $secret,
+                    'two_factor_secret' => $this->google2fa->generateSecretKey(),
                     'two_factor_recovery_codes' => null,
                     'two_factor_confirmed_at' => null,
                     'two_factor_last_used_timestep' => null,

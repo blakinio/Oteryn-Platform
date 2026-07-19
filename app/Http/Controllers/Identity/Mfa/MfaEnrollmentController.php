@@ -12,13 +12,13 @@ use App\Identity\Mfa\MfaStateRejected;
 use App\Identity\Mfa\StartIdentityMfaEnrollment;
 use App\Identity\Models\Identity;
 use App\Identity\Sessions\IdentityWebSessionManager;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 final class MfaEnrollmentController
 {
-    public function show(Request $request, MfaProvisioningUri $provisioningUri): View
+    public function show(Request $request, MfaProvisioningUri $provisioningUri): Response
     {
         $identity = $this->identity($request);
         $identity->refresh();
@@ -28,10 +28,13 @@ final class MfaEnrollmentController
             $uri = $provisioningUri->forIdentity($identity);
         }
 
-        return view('identity.mfa.settings', [
-            'identity' => $identity,
-            'provisioningUri' => $uri,
-        ]);
+        return response()
+            ->view('identity.mfa.settings', [
+                'identity' => $identity,
+                'provisioningUri' => $uri,
+            ])
+            ->header('Cache-Control', 'no-store, private')
+            ->header('Pragma', 'no-cache');
     }
 
     public function store(
@@ -55,7 +58,7 @@ final class MfaEnrollmentController
         ConfirmMfaEnrollmentRequest $request,
         ConfirmIdentityMfaEnrollment $enrollment,
         IdentityWebSessionManager $sessions,
-    ): View|RedirectResponse {
+    ): Response|RedirectResponse {
         try {
             $confirmation = $enrollment->execute(
                 $this->identity($request),
@@ -70,9 +73,12 @@ final class MfaEnrollmentController
 
         $sessions->establish($request, $confirmation->identity);
 
-        return view('identity.mfa.recovery-codes', [
-            'recoveryCodes' => $confirmation->recoveryCodes,
-        ]);
+        return response()
+            ->view('identity.mfa.recovery-codes', [
+                'recoveryCodes' => $confirmation->recoveryCodes,
+            ])
+            ->header('Cache-Control', 'no-store, private')
+            ->header('Pragma', 'no-cache');
     }
 
     public function destroy(

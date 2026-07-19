@@ -47,13 +47,13 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('identity-mfa-challenge', function (Request $request): Limit {
-            $pendingIdentityId = $request->session()->get(PendingMfaLogin::IDENTITY_ID_KEY);
-            $identityKey = is_int($pendingIdentityId) || is_string($pendingIdentityId)
-                ? hash('sha256', (string) $pendingIdentityId)
-                : 'unknown';
             $sourceIp = $request->ip() ?? 'unknown';
 
-            return Limit::perMinute(5)->by($identityKey.'|'.$sourceIp);
+            return Limit::perMinute(5)->by($this->pendingMfaIdentityKey($request).'|'.$sourceIp);
+        });
+
+        RateLimiter::for('identity-mfa-challenge-identity', function (Request $request): Limit {
+            return Limit::perMinute(10)->by($this->pendingMfaIdentityKey($request));
         });
 
         RateLimiter::for('identity-mfa-challenge-source', function (Request $request): Limit {
@@ -88,5 +88,14 @@ class AppServiceProvider extends ServiceProvider
         $sourceIp = $request->ip() ?? 'unknown';
 
         return $identityKey.'|'.$sourceIp;
+    }
+
+    private function pendingMfaIdentityKey(Request $request): string
+    {
+        $pendingIdentityId = $request->session()->get(PendingMfaLogin::IDENTITY_ID_KEY);
+
+        return is_int($pendingIdentityId) || is_string($pendingIdentityId)
+            ? hash('sha256', (string) $pendingIdentityId)
+            : 'unknown';
     }
 }

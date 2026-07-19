@@ -33,7 +33,12 @@ Route::get('/mfa/challenge', [MfaChallengeController::class, 'create'])
     ->middleware('guest')
     ->name('identity.mfa.challenge.create');
 Route::post('/mfa/challenge', [MfaChallengeController::class, 'store'])
-    ->middleware(['guest', 'throttle:identity-mfa-challenge', 'throttle:identity-mfa-challenge-source'])
+    ->middleware([
+        'guest',
+        'throttle:identity-mfa-challenge',
+        'throttle:identity-mfa-challenge-identity',
+        'throttle:identity-mfa-challenge-source',
+    ])
     ->name('identity.mfa.challenge.store');
 
 Route::get('/mfa', [MfaEnrollmentController::class, 'show'])

@@ -19,22 +19,17 @@ final class MfaProvisioningUri
             throw new MfaStateRejected;
         }
 
-        $algorithm = $this->google2fa->getAlgorithm();
-        $digits = $this->google2fa->getOneTimePasswordLength();
-        $period = $this->google2fa->getKeyRegeneration();
-
-        if (! is_string($algorithm) || ! is_int($digits) || ! is_int($period)) {
-            throw new MfaStateRejected;
-        }
-
-        $issuer = (string) config('app.name', 'Oteryn Platform');
+        $configuredIssuer = config('app.name');
+        $issuer = is_string($configuredIssuer) && $configuredIssuer !== ''
+            ? $configuredIssuer
+            : 'Oteryn Platform';
         $label = rawurlencode($issuer.':'.$identity->email);
         $query = http_build_query([
             'secret' => $secret,
             'issuer' => $issuer,
-            'algorithm' => strtoupper($algorithm),
-            'digits' => $digits,
-            'period' => $period,
+            'algorithm' => strtoupper($this->google2fa->getAlgorithm()),
+            'digits' => $this->google2fa->getOneTimePasswordLength(),
+            'period' => $this->google2fa->getKeyRegeneration(),
         ], '', '&', PHP_QUERY_RFC3986);
 
         return 'otpauth://totp/'.$label.'?'.$query;
