@@ -17,7 +17,7 @@ Revalidate the two explicitly allowed dependency directions for establishing a t
 - [x] Add a durable ADR for the authoritative Platform account-ownership model and update the ownership-binding contract with unlink/rebind/recovery rules.
 - [x] Select Platform-originated Canary account creation as the product direction while retaining the exact account-create/game-login/write-boundary implementation blockers.
 - [x] Do not implement character creation/deletion/rename, ownership binding persistence, Canary account creation, credential migration or any shared Canary write.
-- [ ] Run exact-head CI and Agent Governance before readiness/merge.
+- [x] Run exact-head CI and Agent Governance before readiness/merge.
 
 ## Ownership
 
@@ -52,11 +52,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T00:20:00+02:00
-head: ca492807eeec8f9eb4aad5350aee8fd477fbb45a
+updated_at: 2026-07-20T00:26:00+02:00
+head: c8b7a5187a2e4c82db13b1c357aded6e0707f00c
 branch: task/OTERYN-20260719-phase5-ownership-binding-dependency-gate
 pr: 29
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -84,6 +84,7 @@ proven:
   - The canonical ownership cardinality is exactly one Platform Identity to one Canary accounts.id and one supported Canary account to one Platform Identity.
   - Self-service unlink, rebind and transfer are not supported; normal recovery restores the same Platform Identity and retains the same immutable binding.
   - ADR 0004 records the authoritative Platform account-ownership model and selects Platform-originated Canary account creation as the primary ownership path.
+  - PR #29 delivery-validation head c8b7a5187a2e4c82db13b1c357aded6e0707f00c passed Agent Governance run 29705567523 (#330) and CI run 29705567509 (#409).
 derived:
   - Existing-account account-control proof is not required for the primary greenfield Phase 5 model because supported accounts originate in Platform.
   - Ownership can be established without claiming a pre-existing account only if the future Platform-originated account creation operation durably binds the exact created accounts.id to the creating Identity.
@@ -124,9 +125,15 @@ validation:
   - command: shared-write safety review
     result: PASS
     evidence: no Canary/login-server repository was modified; no binding persistence, account creation, credential migration or character/shared write was implemented
+  - command: delivery-validation Agent Governance run 29705567523 (#330)
+    result: PASS
+    evidence: exact delivery-validation head c8b7a5187a2e4c82db13b1c357aded6e0707f00c completed successfully
+  - command: delivery-validation CI run 29705567509 (#409)
+    result: PASS
+    evidence: exact delivery-validation head c8b7a5187a2e4c82db13b1c357aded6e0707f00c completed successfully, including formatting, static analysis and tests
 blockers:
   - account creation plus binding implementation remains blocked pending a bounded Platform-originated Canary account creation operation contract and compatible game-login authority/write-boundary design
-next_action: Run exact-head CI and Agent Governance for PR #29, inspect final diff/review/base divergence, then merge only if the merge gate remains clean.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, inspect final diff/review/base divergence, then squash-merge PR #29 only if the merge gate remains clean.
 ```
 
 ## Notes
