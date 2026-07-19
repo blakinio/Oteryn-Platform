@@ -32,9 +32,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Channel runtime availability read model: COMPLETE**
 
-**Phase 4 closure revalidation: COMPLETE IN CURRENT DELIVERY / FINAL MERGE GATE PENDING**
+**Phase 4 closure revalidation: COMPLETE**
 
-## What exists on main after the current delivery PR is merged
+## What exists on main
 
 - root agent governance in `AGENTS.md`;
 - repository map and context routing;
@@ -258,17 +258,11 @@ Agents must verify repository source before relying on this list because later t
 
 ## Current active task
 
-`OTERYN-20260719-phase4-public-read-closure`
+None.
 
-Objective:
+## Recommended next work
 
-- close Phase 4 only after proving every public read deliverable and exit-gate invariant against post-PR22 source;
-- fix the concrete unbounded `/online` mass-query gap with bounded pagination and regression coverage;
-- keep known ranking-policy, Redis deployment, wall-clock skew and broader cache-policy unknowns explicit rather than guessing;
-- require fresh exact-head CI and Agent Governance on the final ready checkpoint before squash merge;
-- leave Phase 5 as one bounded operation-contract/discovery task without starting shared account/character writes.
-
-After PR #23 merges, no Phase 5 mutation implementation is authorized automatically. The next task must first select one concrete operation and prove its shared-data ownership, authorization, validation, transaction, concurrency, side-effect and rollback contract from live repository/Canary evidence.
+Derive one bounded Phase 5 operation-contract/discovery task from live repository and Canary evidence. Select one concrete account or character operation and prove its shared-data ownership, authorization, validation, transaction, concurrency, side-effect and rollback contract before implementing any shared write.
 
 ## High-priority unknowns and blockers
 

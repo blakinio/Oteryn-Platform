@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-phase4-public-read-closure` — bounded Phase 4 closure/revalidation; branch `task/OTERYN-20260719-phase4-public-read-closure`; draft PR #23; checkpoint status `ready`. Source-level revalidation found and fixed one concrete Phase 4 exit-gate gap: the cluster-wide `/online` read ended in an unbounded `get()`. It now paginates 100 rows per page with route-level regression coverage. Delivery-validation head `3bd2a7ede415f2dc386ca1f7dc39f4d14d062e15` passed CI #380 and Agent Governance #301. Phase 4 is marked complete by this closure only if the final ready-checkpoint head also passes exact-head CI/Governance before squash merge. No Phase 5 shared writes, Phase 6 Admin/RBAC/CMS authoring, deployment or payments work is authorized by this task.
+None.
 
 ## Recommended next task
 
-After PR #23 is squash-merged and Phase 4 is verified complete on `main`, derive one bounded Phase 5 operation-contract/discovery task from live repository state. Select one concrete account or character operation, prove its Canary/shared-data ownership, authorization, validation, transaction, concurrency, side-effect and rollback contract, and do not implement any shared write until that operation contract is explicitly approved.
+Derive one bounded Phase 5 operation-contract/discovery task from live repository state. Select one concrete account or character operation, prove its Canary/shared-data ownership, authorization, validation, transaction, concurrency, side-effect and rollback contract, and do not implement any shared write until that operation contract is explicitly approved.
 
 ## Other queued work
 
@@ -18,7 +18,8 @@ After PR #23 is squash-merged and Phase 4 is verified complete on `main`, derive
 
 ## Recently completed
 
-- `OTERYN-20260719-channel-runtime-availability-read-model` — dedicated read-only `canary_runtime` Redis adapter and fail-closed per-channel runtime availability/count projection merged through PR #22 as `795ce5642eec7a69efe07e6f0037768cb0eed37e`; task record archived unchanged by exact blob identity when the current Phase 4 closure started.
+- `OTERYN-20260719-phase4-public-read-closure` — Phase 4 public website/read-only game-data closure, including the bounded `/online` pagination fix and regression coverage, squash-merged through PR #23 as `3c52420d35f995338818b6c2c013fa518dc2c0ca`; task record archived unchanged with blob `658b31db4627da388f08054a21dcdca8def63c88` after merge.
+- `OTERYN-20260719-channel-runtime-availability-read-model` — dedicated read-only `canary_runtime` Redis adapter and fail-closed per-channel runtime availability/count projection merged through PR #22 as `795ce5642eec7a69efe07e6f0037768cb0eed37e`; task record archived unchanged by exact blob identity when the Phase 4 closure started.
 - `OTERYN-20260719-channel-runtime-availability-discovery` — approved the dedicated read-only Redis runtime-key transport and fail-closed freshness/failure contract, merged through PR #21 as `1e3a1aaf0f595c60283545a95393da71d8924d51`; task record archived unchanged by exact blob identity when the runtime read-model task started.
 - `OTERYN-20260719-public-news-read-model` — Platform-owned published-only public news list/detail merged through PR #20 as `3031f299d15a3761d6c332d6138a46629b59d009`; task record archived unchanged by exact blob identity when the runtime-availability discovery started.
 - `OTERYN-20260719-public-site-shell-and-search` — shared public Blade shell/navigation and exact-name character search merged through PR #19 as `fc50b92208de67a4630d994a8ad3923f2e1fa07e`; task record archived unchanged by exact blob identity when the public-news task started.
