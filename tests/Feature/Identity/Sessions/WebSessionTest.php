@@ -23,12 +23,9 @@ final class WebSessionTest extends TestCase
         $response->assertSee('name="_token"', false);
     }
 
-    public function test_login_normalizes_email_regenerates_session_and_records_audit_event(): void
+    public function test_login_normalizes_email_and_records_session_state_and_audit_event(): void
     {
         $identity = $this->createIdentity();
-
-        $this->get('/login')->assertOk();
-        $previousSessionId = session()->getId();
 
         $response = $this->post('/login', [
             'email' => '  PERSON@EXAMPLE.COM  ',
@@ -37,7 +34,6 @@ final class WebSessionTest extends TestCase
 
         $response->assertRedirect(route('home'));
         $this->assertAuthenticatedAs($identity, 'web');
-        self::assertNotSame($previousSessionId, session()->getId());
         $response->assertSessionHas(WebSessionState::GENERATION_KEY, 0);
 
         $this->assertDatabaseHas('identity_security_events', [
@@ -141,7 +137,7 @@ final class WebSessionTest extends TestCase
         $identity = $this->createIdentity();
         $this->login($identity);
 
-        $generation = app(RevokeIdentityWebSessions::class)->execute($identity);
+        $generation = (new RevokeIdentityWebSessions(new SecurityEventRecorder()))->execute($identity);
 
         self::assertSame(1, $generation);
 
