@@ -110,7 +110,7 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
         (new CanaryRuntimeRedisReader)->read(7);
     }
 
-    private function commandExpectation(Connection&MockInterface $connection): Expectation
+    private function commandExpectation(MockInterface $connection): Expectation
     {
         /** @var Expectation */
         $expectation = $connection->shouldReceive('command');
