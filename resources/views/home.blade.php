@@ -4,7 +4,7 @@
 
 @section('content')
     <h1>Oteryn Platform</h1>
-    <p class="muted">Browse the implemented read-only game-data surfaces without requiring shared Canary write access.</p>
+    <p class="muted">Laravel 13 foundation is online. Browse the implemented read-only game-data surfaces without requiring shared Canary write access.</p>
 
     <section class="card" aria-labelledby="character-search-heading">
         <h2 id="character-search-heading">Find a character</h2>
