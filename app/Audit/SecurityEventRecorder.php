@@ -20,6 +20,8 @@ final class SecurityEventRecorder
 
     public const IDENTITY_PASSWORD_RESET_COMPLETED = 'identity.password_reset_completed';
 
+    public const IDENTITY_MFA_RESET = 'identity.mfa_reset';
+
     public function recordIdentityRegistered(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_REGISTERED);
@@ -53,6 +55,11 @@ final class SecurityEventRecorder
     public function recordIdentityPasswordResetCompleted(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_PASSWORD_RESET_COMPLETED);
+    }
+
+    public function recordIdentityMfaReset(int $identityId): void
+    {
+        $this->record($identityId, self::IDENTITY_MFA_RESET);
     }
 
     private function record(int $identityId, string $eventType): void
