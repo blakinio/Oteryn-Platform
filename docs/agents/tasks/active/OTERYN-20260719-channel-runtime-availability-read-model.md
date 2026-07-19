@@ -17,8 +17,8 @@ Implement the approved Phase 4 per-channel runtime availability/count boundary u
 - [x] Preserve explicit runtime states and derive `full` only for `ONLINE` where `max_players > 0` and `players_online >= max_players`.
 - [x] Do not read or grant SQL `channel_runtime_status`, do not use process-local `ProtocolStatus`, do not add runtime caching, and do not gate the existing `/online` identity list on runtime availability.
 - [x] Add focused unit/feature coverage for healthy ONLINE/full/state reads, missing/expired keys, malformed data, transport failure snapshot discard, no synthetic zero/offline, and public output allowlist.
-- [ ] Synchronize contract/state/module/roadmap documentation with the implemented Redis runtime boundary without adding Canary/shared-data writes.
-- [ ] Run repository CI and Agent Governance on the delivery-validation head; require a fresh exact-head pass after the final ready checkpoint before merge.
+- [x] Synchronize contract/state/module/roadmap documentation with the implemented Redis runtime boundary without adding Canary/shared-data writes. The merged `CANARY_DATA_CONTRACT.md` already defines the exact implemented Redis boundary, so this task verified it remains current and required no semantic contract edit.
+- [x] Run repository CI and Agent Governance on the delivery-validation head; require a fresh exact-head pass after the final ready checkpoint before merge.
 
 ## Ownership
 
@@ -64,11 +64,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T20:20:00+02:00
-head: 032f8bb5b842972befaa7f0a248cc41b0a68161a
+updated_at: 2026-07-19T20:55:00+02:00
+head: 15c35487a15aa73e4935416580e3834266d2e75d
 branch: task/OTERYN-20260719-channel-runtime-availability-read-model
 pr: 22
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - public-game-data
@@ -105,23 +105,31 @@ proven:
   - Positive TTL plus validated fields produces a runtime value; missing/expired keys produce per-channel unknown; malformed data or any thrown Redis failure discards the complete runtime snapshot while static channel metadata remains renderable.
   - Runtime output exposes only explicit state and players_online; operational instance/node/build/map/data fields are not read or rendered; full is derived only for ONLINE with a positive configured max and count at or above max.
   - Focused unit/feature tests cover deterministic-key reads, missing/expired keys, malformed data, channel mismatch, state allowlist, whole-snapshot discard, explicit runtime states/counts/full, and no synthetic OFFLINE/zero on failure.
-  - CI #341 and CI #343 both stopped at composer format:check; static analysis and tests were skipped, so no test-suite failure has yet been proven on this task.
-  - Agent Governance #262 and #264 passed on the corresponding pre-documentation heads.
+  - The merged CANARY_DATA_CONTRACT already specifies the exact deterministic Redis-key, TTL, public-projection, snapshot-failure and forbidden-fallback semantics implemented here; no semantic contract amendment was required.
+  - PROJECT_STATE, MODULE_CATALOG, ROADMAP and ACTIVE_WORK were synchronized with the implemented runtime read boundary.
+  - Temporary CI diagnostics used to expose Pint, PHPStan and PHPUnit failure details were removed; the delivery-validation diff uses the repository's original CI workflow.
+  - Delivery-validation head 15c35487a15aa73e4935416580e3834266d2e75d passed CI #370, including Composer validation/install, Pint, PHPStan/Larastan level 10 and the full test suite.
+  - Delivery-validation head 15c35487a15aa73e4935416580e3834266d2e75d passed Agent Governance #290.
 derived:
-  - The first proven delivery failure is formatting-only; static-analysis and test outcomes remain unknown until Pint passes.
-  - The smallest safe repair is to match the repository Pint preset rather than weaken or bypass formatting checks.
+  - The runtime adapter completes the previously unresolved Phase 4 fresh per-channel availability/count surface without widening Canary database privileges or coupling public correctness to the SQL diagnostic mirror.
+  - No runtime cache should be introduced as part of Phase 4 closure because the current uncached implementation already preserves the approved Redis-TTL freshness boundary and a cache would require a separately bounded staleness policy.
 unknown:
   - production Redis host/ACL username/password remain deployment inputs and must not be committed
-  - exact static-analysis and full-test outcome on the repaired implementation head remains unknown until CI reaches those steps
 conflicts: []
 first_failure:
   marker: PINT_FORMAT_CHECK
-  evidence: GitHub Actions CI #341 and #343 failed at Check formatting; Run static analysis and Run tests were skipped
+  evidence: CI #341 and #343 stopped at Check formatting before static analysis or tests; exact Pint diagnostics identified only PHPDoc spacing issues and those were corrected without weakening formatting rules
+subsequent_failures:
+  - marker: PHPSTAN_RUNTIME_TEST_TYPING
+    evidence: after Pint passed, Larastan level 10 exposed mixed channel-id narrowing and Mockery expectation typing issues; production channel IDs were narrowed explicitly and test expectation configuration was typed without reducing analysis level
+  - marker: MOCKERY_COMPOSITE_EXPECTATION_RUNTIME_TYPE
+    evidence: after static analysis passed, PHPUnit exposed that Mockery shouldReceive returned CompositeExpectation rather than Expectation in these generated mocks; tests were changed to configure the real CompositeExpectation through its declared delegation boundary
 rejected_hypotheses:
-  - The early CI failure was a failing test suite: rejected because CI #341/#343 job steps show formatting failed and both static analysis and tests were skipped.
+  - The early CI failure was a failing test suite: rejected because CI #341/#343 failed at formatting and skipped both static analysis and tests.
   - Add Predis solely for this adapter: rejected because Laravel 13 supports PhpRedis directly and the bounded implementation does not need a new Composer dependency.
   - Reuse a generic Platform cache Redis connection: rejected because the contract requires a dedicated Canary runtime credential/connection and Platform currently has no Redis cache/session boundary to reuse.
   - Read SQL channel_runtime_status instead: rejected by the merged discovery contract because the mirror can overstate authoritative availability after Redis failure.
+  - Weaken Pint, PHPStan/Larastan or test checks to unblock delivery: rejected; every discovered failure was repaired while keeping the existing CI gates unchanged.
 changed_paths:
   - .env.example
   - config/database.php
@@ -134,6 +142,9 @@ changed_paths:
   - tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php
   - tests/Unit/PublicGameData/CanaryChannelRuntimeServiceTest.php
   - tests/Feature/PublicGameData/ServerRuntimeAvailabilityTest.php
+  - docs/architecture/MODULE_CATALOG.md
+  - docs/architecture/ROADMAP.md
+  - docs/agents/PROJECT_STATE.md
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/archive/OTERYN-20260719-channel-runtime-availability-discovery.md
   - docs/agents/tasks/active/OTERYN-20260719-channel-runtime-availability-read-model.md
@@ -144,21 +155,24 @@ validation:
   - command: Laravel 13 Redis boundary verification
     result: PASS
     evidence: official Laravel 13 Redis documentation confirms named connections and PhpRedis support; no new Composer dependency is required for the selected boundary
-  - command: GitHub Actions CI #341
+  - command: GitHub Actions CI #341 and #343
     result: FAIL
-    evidence: Check formatting failed; static analysis and tests were skipped
-  - command: GitHub Actions CI #343
-    result: FAIL
-    evidence: Check formatting failed; static analysis and tests were skipped
-  - command: Agent Governance #262 and #264
+    evidence: initial formatting failures; static analysis and tests skipped
+  - command: GitHub Actions CI iterative repair loop
     result: PASS
-    evidence: checkpoint governance passed on the corresponding pre-documentation heads
+    evidence: Pint diagnostics, then Larastan diagnostics, then PHPUnit diagnostics were used only temporarily; each diagnostic workflow change was removed after identifying the root cause
+  - command: GitHub Actions CI #370
+    result: PASS
+    evidence: exact delivery-validation head 15c35487a15aa73e4935416580e3834266d2e75d passed Composer validation/install, Pint, PHPStan/Larastan level 10 and the full test suite
+  - command: Agent Governance #290
+    result: PASS
+    evidence: exact delivery-validation head 15c35487a15aa73e4935416580e3834266d2e75d passed checkpoint validation
   - command: local Composer/Pint/PHPStan/tests
     result: NOT_RUN
-    evidence: current execution environment cannot resolve github.com and has no usable local Oteryn-Platform checkout; GitHub Actions remains the executable validation source
+    evidence: current execution environment had no usable local Oteryn-Platform checkout; GitHub Actions was used as the executable validation source
 blockers:
   - none
-next_action: Validate the checkpoint head through GitHub Actions, inspect the first failing step if any, and repair only the proven root cause before synchronizing Phase 4 documentation.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, then perform the full PR #22 merge gate and squash-merge only if main divergence, final diff and review state remain clean.
 ```
 
 ## Notes
