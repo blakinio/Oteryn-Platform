@@ -15,7 +15,7 @@ Deliver the next bounded Phase 4 public website slice as a Platform-owned, read-
 - [x] Render title/body through escaped Blade output only; this task stores/renders plain text and does not introduce raw rich HTML or file/media uploads.
 - [x] Add focused feature/database coverage for published visibility, draft/scheduled exclusion, detail 404 semantics, deterministic ordering/pagination and XSS escaping.
 - [x] Update Phase 4/CMS project documentation without claiming CMS authoring, Admin/RBAC or live multichannel runtime availability are complete.
-- [ ] Run repository CI and Agent Governance on the delivery-validation head; require a fresh exact-head pass after the final ready checkpoint before merge.
+- [x] Run repository CI and Agent Governance on the delivery-validation head; require a fresh exact-head pass after this ready checkpoint before merge.
 
 ## Ownership
 
@@ -55,11 +55,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T18:10:00+02:00
-head: 355d3adb50e1deb1cf51139f198b7bb8cb99cabf
+updated_at: 2026-07-19T18:15:00+02:00
+head: 02913cab0121fc7165ef0a02efd945c0e64c3093
 branch: task/OTERYN-20260719-public-news-read-model
 pr: 20
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -93,12 +93,14 @@ proven:
   - The implementation adds Platform-owned news_posts persistence with unique slug, title, plain-text body, nullable indexed published_at and timestamps.
   - PublicNewsQuery reads only the Platform-owned NewsPost model and applies published_at IS NOT NULL plus published_at <= read_time for both list and detail reads.
   - Public news list ordering is published_at DESC then id DESC and is bounded to 10 rows per page by the public query boundary.
-  - GET /news and GET /news/{slug} are implemented; the shared public navigation now exposes News alongside Home, Online, Highscores and Servers.
+  - GET /news and GET /news/{slug} are implemented; the shared public navigation exposes News alongside Home, Online, Highscores and Servers.
   - Draft and future-scheduled posts are excluded from list results and direct detail lookup returns 404 for them.
   - News title/body use escaped Blade interpolation only; body is treated as plain text with whitespace preservation and no raw-HTML directive or upload path is introduced.
   - Focused RefreshDatabase feature tests cover required schema, database slug uniqueness, publication-state visibility, deterministic order/pagination, detail 404 semantics and XSS escaping.
-  - ROADMAP, MODULE_CATALOG and PROJECT_STATE now describe the public CMS read boundary while leaving authoring/management, Admin/RBAC, rich HTML, media uploads and live multichannel runtime availability incomplete.
-  - Agent Governance run 29693989967 (#233) passed on intermediate implementation/test head 75c9b0dd288a607b134602223a21d43b7f766c5e; stable delivery-head validation is still required after documentation synchronization.
+  - ROADMAP, MODULE_CATALOG and PROJECT_STATE describe the public CMS read boundary while leaving authoring/management, Admin/RBAC, rich HTML, media uploads and live multichannel runtime availability incomplete.
+  - PR #20 contains exactly 15 task-owned paths; the archived public-site task is represented as an exact-content rename with zero additions and zero deletions.
+  - Delivery-validation head 02913cab0121fc7165ef0a02efd945c0e64c3093 passed CI run 29694191399 (#317), including Composer validation/install, Pint, PHPStan/Larastan level 10 and the full test suite.
+  - Delivery-validation head 02913cab0121fc7165ef0a02efd945c0e64c3093 passed Agent Governance run 29694191397 (#238).
 derived:
   - A published-only Platform-owned news read model is the smallest remaining Phase 4 slice that does not depend on unresolved Canary runtime transport or Phase 6 Admin/RBAC.
   - Using nullable published_at as the sole public visibility gate supports both drafts and future scheduling without introducing an authoring workflow in this task.
@@ -138,12 +140,15 @@ validation:
   - command: Agent Governance run 29693989967 (#233)
     result: PASS
     evidence: intermediate implementation/test head 75c9b0dd288a607b134602223a21d43b7f766c5e passed active checkpoint validation
-  - command: stable delivery-head CI and Agent Governance
-    result: NOT_RUN
-    evidence: documentation synchronization has just completed; exact-head workflows must be inspected next
+  - command: GitHub Actions CI run 29694191399 (#317)
+    result: PASS
+    evidence: exact delivery-validation head 02913cab0121fc7165ef0a02efd945c0e64c3093 passed Composer validation/install, Pint, PHPStan/Larastan level 10 and the full test suite
+  - command: Agent Governance run 29694191397 (#238)
+    result: PASS
+    evidence: exact delivery-validation head 02913cab0121fc7165ef0a02efd945c0e64c3093 passed active checkpoint validation
 blockers:
   - none
-next_action: Inspect the exact delivery-head CI and Agent Governance results for this implementation, fix any task-owned failure, then write one final ready checkpoint and revalidate the exact ready head before merge.
+next_action: Revalidate CI and Agent Governance on the final ready-checkpoint head, then perform the full PR #20 merge gate and squash-merge only if main divergence, final diff and review state remain clean.
 ```
 
 ## Notes
