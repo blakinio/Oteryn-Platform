@@ -54,28 +54,20 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       # Temporary hard-fail diagnostics for PR #33. Remove before merge.
-      - name: Pint ProvisionCanaryAccount action
-        run: vendor/bin/pint --test app/Accounts/Actions/ProvisionCanaryAccount.php
-      - name: Pint provisioning gateway contract
-        run: vendor/bin/pint --test app/Accounts/Contracts/CanaryAccountProvisioningGateway.php
-      - name: Pint provisioning conflict exception
-        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningConflict.php
-      - name: Pint provisioning base exception
-        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningException.php
-      - name: Pint provisioning unavailable exception
-        run: vendor/bin/pint --test app/Accounts/Exceptions/CanaryAccountProvisioningUnavailable.php
-      - name: Pint IdentityCanaryAccount model
-        run: vendor/bin/pint --test app/Accounts/Models/IdentityCanaryAccount.php
-      - name: Pint SecurityEventRecorder
-        run: vendor/bin/pint --test app/Audit/SecurityEventRecorder.php
-      - name: Pint CanaryAccountProvisioner
-        run: vendor/bin/pint --test app/CanaryIntegration/CanaryAccountProvisioner.php
-      - name: Pint Canary provisioning privilege verifier
-        run: vendor/bin/pint --test app/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifier.php
-      - name: Pint RegisterIdentity
-        run: vendor/bin/pint --test app/Identity/Actions/RegisterIdentity.php
-      - name: Pint AppServiceProvider
-        run: vendor/bin/pint --test app/Providers/AppServiceProvider.php
+      - name: Pint config/database.php
+        run: vendor/bin/pint --test config/database.php
+      - name: Pint identity Canary migration
+        run: vendor/bin/pint --test database/migrations/2026_07_20_011000_create_identity_canary_accounts_table.php
+      - name: Pint routes/console.php
+        run: vendor/bin/pint --test routes/console.php
+      - name: Pint MariaDB integration test
+        run: vendor/bin/pint --test tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
+      - name: Pint provisioning saga test
+        run: vendor/bin/pint --test tests/Feature/Accounts/ProvisionCanaryAccountTest.php
+      - name: Pint registration test
+        run: vendor/bin/pint --test tests/Feature/Identity/RegistrationTest.php
+      - name: Pint provisioning privilege verifier test
+        run: vendor/bin/pint --test tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php
 
       - name: Check formatting
         run: vendor/bin/pint --test
