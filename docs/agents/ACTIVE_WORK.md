@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-mfa-totp-provider-resolution` — Phase 3 T3.4b dependency-resolution-only follow-up for Platform MFA; branch `task/OTERYN-20260719-mfa-totp-provider-resolution`; draft PR #15; task checkpoint status `validating`. Real Composer resolution added `pragmarx/google2fa:^9.0`, locking `pragmarx/google2fa` v9.0.0 and `paragonie/constant_time_encoding` v3.1.3. The ephemeral resolver workflow has been removed. Generated dependency metadata passed normal CI run #228; final documentation-head CI and Agent Governance remain required before merge. No public MFA routes, challenge/enforcement logic, Admin/RBAC semantics or Canary/login-server changes are in scope.
+- `OTERYN-20260719-mfa-totp-provider-resolution` — Phase 3 T3.4b dependency-resolution-only follow-up for Platform MFA; branch `task/OTERYN-20260719-mfa-totp-provider-resolution`; draft PR #15; task checkpoint status `ready`. Real Composer resolution added `pragmarx/google2fa:^9.0`, locking `pragmarx/google2fa` v9.0.0 and `paragonie/constant_time_encoding` v3.1.3. The ephemeral resolver workflow has been removed. Generated dependency metadata and the documentation checkpoint have passed normal CI and Agent Governance; final exact-head merge-gate revalidation remains. No public MFA routes, challenge/enforcement logic, Admin/RBAC semantics or Canary/login-server changes are in scope.
 
 ## Recommended next task
 
