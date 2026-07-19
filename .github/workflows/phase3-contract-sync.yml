@@ -1,0 +1,102 @@
+name: Phase 3 Contract Sync
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  sync-contract:
+    if: github.head_ref == 'task/OTERYN-20260719-phase3-identity-closure'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Synchronize current Platform Identity status
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md')
+          text = path.read_text()
+
+          replacements = [
+              (
+                  'Do not implement credential migration, MFA enforcement, password reset integration or a new game-login token path until a separately approved implementation task satisfies the rollout gates in this document.',
+                  'Do not implement shared credential migration, global game-login MFA/email enforcement or a new game-login token path until a separately approved implementation task satisfies the rollout gates in this document. Platform-local web Identity controls may be implemented without changing that global-auth boundary, but they must not be represented as Canary/login-server enforcement.',
+              ),
+              (
+                  '- Current state: Laravel foundation exists; real Identity/Auth is not implemented.',
+                  '- Current state: Platform-owned web Identity is implemented for registration, framework-hashed credentials, login/logout, revocable web sessions, password recovery/change and opt-in web MFA. It remains separate from Canary/login-server reusable credentials and is not yet the authoritative game-login credential verifier.',
+              ),
+              (
+                  'This is especially relevant to future:',
+                  'This is especially relevant to any future claim of global enforcement for:',
+              ),
+              (
+                  'No real Oteryn Platform Identity implementation exists yet.',
+                  'Oteryn Platform now has a Platform-owned web Identity implementation with password recovery/change, revocable web sessions and opt-in MFA. These controls govern Platform web authentication only and do not change the inspected Canary or external login-server paths listed above.',
+              ),
+              (
+                  '### Deployment/product status — UNKNOWN\n\nA separately deployed website/admin component could implement its own email verification or MFA behavior, but no evidence was provided that such a policy gates every game-login path.',
+                  '### Platform policy status — PARTIALLY PROVEN / GLOBAL GAME POLICY UNKNOWN\n\nOteryn Platform web Identity now implements opt-in MFA for identities that enroll. Current Phase 3 product policy does not require email verification, so no Platform email-verification gate is enabled. No evidence proves that Platform MFA or any future email-verification policy gates every native Canary or external login-server authentication path.',
+              ),
+              (
+                  '### Current end-to-end behavior — UNKNOWN\n\nThe inspected Canary and upstream login-server sources prove password verification/session issuance, but do not prove the currently deployed website\'s password-change/reset implementation.\n\nNo evidence proves that password change/reset currently:\n\n- deletes `account_sessions`;\n- invalidates pending LoginSessionManager tokens;\n- disconnects active game sessions;\n- rotates all web sessions;\n- enforces email verification/MFA recovery policy.',
+                  '### Current global end-to-end behavior — PARTIALLY PROVEN / GAME REVOCATION UNKNOWN\n\nOteryn Platform web Identity implements password change and password reset and revokes Platform web sessions according to its `web_session_generation` policy. The inspected Canary and upstream login-server paths remain separate reusable-credential/session authorities.\n\nNo evidence proves that Platform password change/reset currently:\n\n- deletes Canary/login-server `account_sessions`;\n- invalidates pending Canary LoginSessionManager tokens;\n- disconnects active game sessions;\n- enforces Platform email-verification or MFA policy across every game-login path.',
+              ),
+              (
+                  '### Platform outage — CURRENTLY NOT AUTHORITATIVE',
+                  '### Platform outage — CURRENTLY NOT AUTHORITATIVE FOR GAME AUTHENTICATION',
+              ),
+              (
+                  '| Password change | NOT_IMPLEMENTED/UNKNOWN | Not proven revoked | Not proven revoked | Not proven disconnected | UNKNOWN |',
+                  '| Password change | Revoked by Platform `web_session_generation` policy | Not proven revoked | Not proven revoked | Not proven disconnected | PROVEN for Platform web / game revocation UNKNOWN |',
+              ),
+              (
+                  '| Password reset | NOT_IMPLEMENTED/UNKNOWN | Not proven revoked | Not proven revoked | Not proven disconnected | UNKNOWN |',
+                  '| Password reset | Revoked by Platform `web_session_generation` policy | Not proven revoked | Not proven revoked | Not proven disconnected | PROVEN for Platform web / game revocation UNKNOWN |',
+              ),
+              (
+                  '| MFA reset | NOT_IMPLEMENTED | No current MFA binding | No current MFA binding | No current MFA binding | PROVEN/DERIVED |',
+                  '| MFA reset | Revoked by Platform `web_session_generation` policy | No current game MFA binding | No current game MFA binding | No current game MFA binding | PROVEN for Platform web / DERIVED for game non-binding |',
+              ),
+          ]
+
+          for old, new in replacements:
+              if old in text:
+                  text = text.replace(old, new, 1)
+              elif new not in text:
+                  raise SystemExit(f'expected contract marker not found: {old[:120]}')
+
+          path.write_text(text)
+          PY
+
+          changed="$(git diff --name-only)"
+          if [ -n "$changed" ] && [ "$changed" != "docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md" ]; then
+            echo "Unexpected changed paths:"
+            printf '%s\n' "$changed"
+            exit 1
+          fi
+
+      - name: Commit synchronized contract
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md; then
+            echo "Contract already synchronized."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md
+          git commit -m "docs(auth): synchronize Phase 3 Identity current state"
+          git push origin HEAD:${{ github.head_ref }}
