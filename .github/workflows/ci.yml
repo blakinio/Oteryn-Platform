@@ -67,9 +67,18 @@ jobs:
       - name: Pint directory database
         continue-on-error: true
         run: vendor/bin/pint --test database
+      - name: Pint directory public
+        continue-on-error: true
+        run: vendor/bin/pint --test public
+      - name: Pint directory resources
+        continue-on-error: true
+        run: vendor/bin/pint --test resources
       - name: Pint directory routes
         continue-on-error: true
         run: vendor/bin/pint --test routes
+      - name: Pint directory storage
+        continue-on-error: true
+        run: vendor/bin/pint --test storage
       - name: Pint directory tests
         continue-on-error: true
         run: vendor/bin/pint --test tests
