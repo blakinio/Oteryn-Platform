@@ -1,0 +1,45 @@
+name: Agent Governance
+
+on:
+  pull_request:
+    paths:
+      - AGENTS.md
+      - docs/agents/**
+      - tools/agents/**
+      - .github/workflows/agent-governance.yml
+  push:
+    branches:
+      - main
+    paths:
+      - AGENTS.md
+      - docs/agents/**
+      - tools/agents/**
+      - .github/workflows/agent-governance.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checkpoint-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run checkpoint validator tests
+        run: python tools/agents/test_checkpoint.py
+
+      - name: Validate active task checkpoints
+        shell: bash
+        run: |
+          if find docs/agents/tasks/active -maxdepth 1 -type f -name '*.md' -print -quit | grep -q .; then
+            python tools/agents/checkpoint.py --tasks docs/agents/tasks/active --require-checkpoint
+          else
+            echo "Validated 0 active task checkpoints."
+          fi

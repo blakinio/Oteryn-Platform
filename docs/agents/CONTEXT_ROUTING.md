@@ -4,6 +4,13 @@
 
 Load the smallest authoritative context required for the current task. Do not preload broad repository documentation when targeted search can identify the relevant records.
 
+## Governance contract boundary
+
+- `docs/agents/GOVERNANCE_CONTRACT.json` is the machine-readable version marker for the shared checkpoint/handoff contract.
+- `docs/agents/CONTEXT_HANDOFF.md` is the human-readable checkpoint/handoff contract used by Oteryn Platform.
+- This routing document is repository-specific. It is not required to match Canary routing content or Canary's machine-readable router.
+- A change to shared checkpoint/handoff structure must follow the upgrade process in `GOVERNANCE_CONTRACT.json`; repository-specific routing changes do not by themselves require a shared contract version bump.
+
 ## Core startup context
 
 Every agent starts with:
@@ -21,7 +28,7 @@ Then classify the task and load only the matching context.
 
 | Route | Trigger | Load / search |
 |---|---|---|
-| `agent-governance` | `AGENTS.md`, `docs/agents/**`, ownership or handoff | Read relevant governance/handoff records, `ACTIVE_WORK.md` and overlapping active tasks. |
+| `agent-governance` | `AGENTS.md`, `docs/agents/**`, `tools/agents/**`, ownership or handoff | Read `GOVERNANCE_CONTRACT.json`, relevant governance/handoff records, `TASK_TEMPLATE.md`, `ACTIVE_WORK.md` and overlapping active tasks. |
 | `architecture` | new module, durable boundary, major dependency, product architecture | Read `SYSTEM_ARCHITECTURE.md`, search `MODULE_CATALOG.md`, relevant ADRs and contracts. Create/update ADR when decision outlives one task. |
 | `web-cms` | Blade/views/CMS/news/public pages | Read relevant module catalog section; search affected routes, controllers, views and tests. Check escaping, sanitization, authorization and CSRF boundaries. |
 | `auth-identity` | login, password, sessions, MFA, verification, recovery | Read `SECURITY_ARCHITECTURE.md` and `AUTH_GAME_LOGIN_CONTRACT.md`, then relevant auth config/code/tests. Treat unresolved game-login compatibility as a blocker for global-security claims. |
