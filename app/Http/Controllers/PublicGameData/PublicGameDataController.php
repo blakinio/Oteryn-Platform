@@ -2,16 +2,21 @@
 
 namespace App\Http\Controllers\PublicGameData;
 
+use App\PublicGameData\CanaryChannelRuntimeService;
 use App\PublicGameData\CanaryGameDataRepository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
+use UnexpectedValueException;
 
 final class PublicGameDataController
 {
-    public function __construct(private readonly CanaryGameDataRepository $gameData) {}
+    public function __construct(
+        private readonly CanaryGameDataRepository $gameData,
+        private readonly CanaryChannelRuntimeService $runtime,
+    ) {}
 
     public function highscores(): View
     {
@@ -56,8 +61,32 @@ final class PublicGameDataController
 
     public function servers(): View
     {
+        $channels = $this->gameData->configuredChannels();
+
+        /** @var list<int> */
+        $channelIds = $channels
+            ->pluck('id')
+            ->map(static function (mixed $channelId): int {
+                if (is_int($channelId)) {
+                    return $channelId;
+                }
+
+                if (is_string($channelId) && ctype_digit($channelId)) {
+                    $parsedChannelId = (int) $channelId;
+
+                    if ($parsedChannelId > 0) {
+                        return $parsedChannelId;
+                    }
+                }
+
+                throw new UnexpectedValueException('Configured Canary channel ID is invalid.');
+            })
+            ->values()
+            ->all();
+
         return view('game.servers', [
-            'channels' => $this->gameData->configuredChannels(),
+            'channels' => $channels,
+            'runtimeSnapshot' => $this->runtime->snapshot($channelIds),
         ]);
     }
 
