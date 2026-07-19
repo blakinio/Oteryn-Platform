@@ -102,6 +102,16 @@ Phase 1 should establish CI that at minimum:
 4. runs unit/feature tests;
 5. runs isolated migration/database tests where configured.
 
+The current mandatory PHP CI gate runs, in order:
+
+1. `composer validate --strict`;
+2. `composer install --no-interaction --prefer-dist --no-progress` from the committed lockfile;
+3. `composer format:check`;
+4. `composer analyse` using PHPStan with Larastan at level 10 across `app`, `bootstrap`, `config`, `database`, `routes` and `tests`;
+5. `composer test`.
+
+No PHPStan baseline is currently committed. New static-analysis errors therefore fail CI directly rather than being absorbed into an ignore list or baseline.
+
 Later workflows may add:
 
 - dependency vulnerability scanning;

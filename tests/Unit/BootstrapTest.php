@@ -2,12 +2,13 @@
 
 namespace Tests\Unit;
 
+use PDO;
 use PHPUnit\Framework\TestCase;
 
 class BootstrapTest extends TestCase
 {
-    public function test_unit_test_harness_is_available(): void
+    public function test_sqlite_driver_is_available_for_tests(): void
     {
-        $this->assertTrue(true);
+        $this->assertContains('sqlite', PDO::getAvailableDrivers());
     }
 }
