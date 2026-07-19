@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-identity-core-registration` — Phase 3 T3.1 Platform-owned Identity core and registration; branch `task/OTERYN-20260719-identity-core-registration`; PR #11; task checkpoint status `ready`. Scope is explicitly limited to Platform-owned identity persistence/registration, password hashing/policy, rate limiting and registration audit. It owns no Canary/shared write path and does not implement game-login authorization.
+- `OTERYN-20260719-web-login-sessions` — Phase 3 T3.2 Platform-only web login/logout and revocable web sessions; branch `task/OTERYN-20260719-web-login-sessions`; PR #12; task checkpoint status `ready`. Code-validation head passed Composer validation, lockfile install, Pint, PHPStan/Larastan level 10, full tests and Agent Governance. Scope excludes remember-me, password recovery, MFA, Canary/shared writes and game-login authorization.
 
 ## Recommended next task
 
-After PR #11 is merged, create `OTERYN-20260719-web-login-sessions` as a separate Phase 3 T3.2 task/branch after re-verifying live prerequisites and owned-path overlap. Keep game-login authorization, credential migration and global cross-session revocation outside that task unless the relevant `AUTH_GAME_LOGIN_CONTRACT.md` blockers have been separately resolved.
+After T3.2 is merged, create `OTERYN-20260719-password-recovery-credentials` as a separate Phase 3 T3.3 task after re-verifying session-revocation primitives and current auth-contract blockers. Platform-only password recovery must not be described as revoking Canary/login-server credentials or active game sessions while those cross-repository paths remain unresolved.
 
 ## Other queued work
 
@@ -16,6 +16,7 @@ After PR #11 is merged, create `OTERYN-20260719-web-login-sessions` as a separat
 
 ## Recently completed
 
+- `OTERYN-20260719-identity-core-registration` — Phase 3 T3.1 Platform-owned Identity core and registration merged through PR #11 as `6f48cf97288963c25b0ca97563865f5b3514de3b`; archived task record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-online-status-discovery` — current Canary online/status sources inspected read-only; `players_online` rejected as a multichannel authority; sanitized `cluster_sessions` status/expiry/deletion read contract approved with explicit stale/failure semantics; archive record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-game-read-model` — read-only level highscores, active character profiles, guild details/membership and configured channel metadata implemented with a dedicated Canary connection and query-only integration tests; global online list remains intentionally unimplemented; archive record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260718-auth-discovery` — current web/login-server/Canary credential and game-session paths mapped; credential migration remains blocked; target authoritative Identity contract documented; archive record under `docs/agents/tasks/archive/`.
