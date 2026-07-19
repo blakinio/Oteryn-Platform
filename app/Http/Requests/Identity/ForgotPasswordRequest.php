@@ -3,11 +3,9 @@
 namespace App\Http\Requests\Identity;
 
 use App\Identity\Support\CanonicalEmail;
-use App\Identity\Support\IdentityPasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-final class RegisterIdentityRequest extends FormRequest
+final class ForgotPasswordRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -36,15 +34,16 @@ final class RegisterIdentityRequest extends FormRequest
                 'string',
                 'max:254',
                 'email:rfc',
-                Rule::unique('identities', 'email'),
-            ],
-            'password' => [
-                'required',
-                'string',
-                'max:1024',
-                'confirmed',
-                IdentityPasswordPolicy::rule(),
             ],
         ];
+    }
+
+    public function email(): string
+    {
+        $email = $this->validated('email');
+
+        abort_unless(is_string($email), 422);
+
+        return $email;
     }
 }

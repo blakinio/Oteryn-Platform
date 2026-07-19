@@ -2,27 +2,14 @@
 
 namespace App\Http\Requests\Identity;
 
-use App\Identity\Support\CanonicalEmail;
 use App\Identity\Support\IdentityPasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-final class RegisterIdentityRequest extends FormRequest
+final class ChangePasswordRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
-    }
-
-    protected function prepareForValidation(): void
-    {
-        $email = $this->input('email');
-
-        if (is_string($email)) {
-            $this->merge([
-                'email' => CanonicalEmail::normalize($email),
-            ]);
-        }
     }
 
     /**
@@ -31,20 +18,29 @@ final class RegisterIdentityRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => [
+            'current_password' => [
                 'required',
                 'string',
-                'max:254',
-                'email:rfc',
-                Rule::unique('identities', 'email'),
+                'max:1024',
+                'current_password:web',
             ],
             'password' => [
                 'required',
                 'string',
                 'max:1024',
                 'confirmed',
+                'different:current_password',
                 IdentityPasswordPolicy::rule(),
             ],
         ];
+    }
+
+    public function newPassword(): string
+    {
+        $password = $this->validated('password');
+
+        abort_unless(is_string($password), 422);
+
+        return $password;
     }
 }
