@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-phase5-identity-canary-account-binding` — bounded Phase 5 discovery for durable Platform Identity → Canary `accounts.id` ownership; branch `task/OTERYN-20260719-phase5-identity-canary-account-binding`; draft PR #27; checkpoint status `ready`. Current evidence does **not** approve a binding implementation: email is non-unique, direct shared-password verification would create another credential authority, normal external login creates a reusable 24-hour game session and is SHA-1-only, and no purpose-built side-effect-free account-control claim API is proven. `docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md` records the exact blocker and target claim properties.
+None.
 
 ## Recommended next task
 
-After PR #27 is validated and merged, do not implement user-scoped Canary mutations yet. The next dependency must be selected explicitly between: (1) a separately coordinated authoritative account-control claim capability on the Canary/login-server authentication side that returns a short-lived single-use `accounts.id`-bound assertion without creating a game session, or (2) an approved future Canary account-creation flow where Platform originates the account and persists the binding atomically. Either path also requires explicit product ownership cardinality/unlink/rebind/recovery policy.
+Phase 5 user-scoped Canary mutations remain blocked. The next task must be explicitly coordinated around one of these dependencies: (1) an authoritative account-control claim capability on the Canary/login-server authentication side that returns a short-lived single-use `accounts.id`-bound assertion without creating a game session, or (2) an approved Canary account-creation flow where Platform originates the account and persists the Identity binding atomically. Either path also requires explicit product ownership cardinality/unlink/rebind/recovery policy before a binding implementation is approved.
 
 ## Other queued work
 
@@ -19,7 +19,8 @@ After PR #27 is validated and merged, do not implement user-scoped Canary mutati
 
 ## Recently completed
 
-- `OTERYN-20260719-phase5-character-creation-contract` — first Phase 5 bounded character-create operation discovery, merged through PR #26 as `ab78d6ac3bc674deb0868195563b61a753d95f98`; no shared write was approved because Identity→Canary account ownership binding and product starter/name policy remain unresolved. The task record is archived unchanged by exact blob identity when this successor task starts.
+- `OTERYN-20260719-phase5-identity-canary-account-binding` — bounded Phase 5 ownership-binding discovery, merged through PR #27 as `c683e6b6e37851447aaa0701237750828d6ed23c`; no binding implementation was approved because no current side-effect-free, credential-compatible existing-account claim capability is proven. The task record is archived unchanged with blob `59abf3c86fdca19aa0bd97e90711f13607132f53` by post-merge housekeeping.
+- `OTERYN-20260719-phase5-character-creation-contract` — first Phase 5 bounded character-create operation discovery, merged through PR #26 as `ab78d6ac3bc674deb0868195563b61a753d95f98`; no shared write was approved because Identity→Canary account ownership binding and product starter/name policy remain unresolved. The task record was archived unchanged by exact blob identity when the successor task started.
 - `OTERYN-20260719-phase4-public-read-closure` — Phase 4 public website/read-only game-data closure, including the bounded `/online` pagination fix and regression coverage, squash-merged through PR #23 as `3c52420d35f995338818b6c2c013fa518dc2c0ca`; task record archived unchanged with blob `658b31db4627da388f08054a21dcdca8def63c88` after merge.
 - `OTERYN-20260719-channel-runtime-availability-read-model` — dedicated read-only `canary_runtime` Redis adapter and fail-closed per-channel runtime availability/count projection merged through PR #22 as `795ce5642eec7a69efe07e6f0037768cb0eed37e`; task record archived unchanged by exact blob identity when the Phase 4 closure started.
 - `OTERYN-20260719-channel-runtime-availability-discovery` — approved the dedicated read-only Redis runtime-key transport and fail-closed freshness/failure contract, merged through PR #21 as `1e3a1aaf0f595c60283545a95393da71d8924d51`; task record archived unchanged by exact blob identity when the runtime read-model task started.
