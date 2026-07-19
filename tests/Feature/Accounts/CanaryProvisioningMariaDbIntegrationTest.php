@@ -199,7 +199,13 @@ final class CanaryProvisioningMariaDbIntegrationTest extends TestCase
 
     private function rootCount(string $query): int
     {
-        return (int) $this->rootValue($query);
+        $value = $this->rootValue($query);
+
+        if (! is_int($value) && ! is_string($value)) {
+            self::fail('MariaDB integration count query returned a non-scalar value.');
+        }
+
+        return (int) $value;
     }
 
     private function rootValue(string $query): mixed
