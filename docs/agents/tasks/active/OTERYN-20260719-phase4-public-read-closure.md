@@ -49,8 +49,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T22:45:00+02:00
-head: 3bd2a7ede415f2dc386ca1f7dc39f4d14d062e15
+updated_at: 2026-07-19T22:58:00+02:00
+head: 9f484fa7e6b690e12c94a4e8b9920f489c010b78
 branch: task/OTERYN-20260719-phase4-public-read-closure
 pr: 23
 status: ready
@@ -84,6 +84,7 @@ proven:
   - Runtime availability still uses deterministic canary_runtime Redis keys, positive TTL and whole-snapshot fail-closed behavior, with no SQL, process-local or cache fallback.
   - Blade public output is escaped by default; the existing guild MOTD and news XSS regressions remain applicable, and the online pagination view uses escaped interpolation.
   - Delivery-validation head 3bd2a7ede415f2dc386ca1f7dc39f4d14d062e15 passed CI run #380 and Agent Governance run #301.
+  - ROADMAP and PROJECT_STATE now mark Phase 4 complete on the closure branch and preserve the later policy/deployment unknowns explicitly.
 derived:
   - The Phase 4 exit gate is satisfied after bounding the online list: no public game-data write access is required, obvious N+1/mass-query patterns are avoided by bounded lookups/joins/pagination, and implemented public output remains escaped or plain-text rendered.
   - Privileged/group-hidden ranking policy is a later product-policy unknown, not a blocker for the currently specified Phase 4 read-only level highscore surface.
