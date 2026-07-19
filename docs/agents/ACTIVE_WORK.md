@@ -4,14 +4,15 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-None.
+- `OTERYN-20260719-phase5-character-creation-contract` — first bounded Phase 5 operation-contract/discovery task; branch `task/OTERYN-20260719-phase5-character-creation-contract`; draft PR #26; checkpoint status `validating`. Current evidence does **not** approve a character-create write: Platform Identity has no durable binding to one Canary `accounts.id`, Canary `accounts.email` is not unique, product starter-state/name policy is not proven, and the existing `canary` SQL connection remains the database-enforced read-only boundary. `docs/contracts/CHARACTER_CREATION_CONTRACT.md` records the exact blockers and safe future transaction/write-boundary requirements.
 
 ## Recommended next task
 
-Derive one bounded Phase 5 operation-contract/discovery task from live repository state. Select one concrete account or character operation, prove its Canary/shared-data ownership, authorization, validation, transaction, concurrency, side-effect and rollback contract, and do not implement any shared write until that operation contract is explicitly approved.
+After PR #26 is validated and merged, start one bounded Phase 5 Identity-to-Canary-account ownership-binding contract/discovery task. Prove how an authenticated Platform Identity is durably and unambiguously linked to exactly one Canary `accounts.id`, including claim/link lifecycle, duplicate/conflict handling, authorization, migration/rollback and compatibility with the still-separate game-login credential model. Do not authorize character/account mutations from client-supplied account IDs or email-only matching.
 
 ## Other queued work
 
+- Character-create implementation remains blocked after the ownership-binding task until product character-name normalization/reserved-name policy and exact starter-state rules are approved; a separate least-privilege Canary write credential/connection must then be defined rather than broadening the existing read-only connection.
 - Authoritative cross-component credential/game-login migration remains a later separately coordinated programme under `AUTH_GAME_LOGIN_CONTRACT.md`; Phase 3 completion does not authorize shared Canary credential writes.
 - Admin/RBAC identity classification and permissions remain Phase 6. Future privileged routes must combine explicit authorization with the Phase 3 `mfa.confirmed` gate rather than an `is_admin` shortcut.
 - Privileged/group-hidden public-ranking policy, production runtime Redis ACL/endpoint provisioning, exact production wall-clock skew and broader cache policy remain explicit later policy/deployment unknowns; Phase 4 closure does not guess or silently resolve them.
