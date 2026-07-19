@@ -48,7 +48,7 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
                 throw new RuntimeException('Unexpected Redis command in test.');
             });
 
-        $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader()))->snapshot([1, 2]);
+        $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader))->snapshot([1, 2]);
 
         self::assertTrue($snapshot->available);
         self::assertNotNull($snapshot->forChannel(1));
@@ -88,7 +88,7 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
                 throw new RuntimeException('Unexpected Redis command in test.');
             });
 
-        $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader()))->snapshot([1, 2]);
+        $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader))->snapshot([1, 2]);
 
         self::assertFalse($snapshot->available);
         self::assertNull($snapshot->forChannel(1));
@@ -135,7 +135,7 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
                 throw new RuntimeException('Unexpected Redis command in test.');
             });
 
-        $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader()))->snapshot([1, 2]);
+        $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader))->snapshot([1, 2]);
 
         self::assertFalse($snapshot->available);
         self::assertNull($snapshot->forChannel(1));
