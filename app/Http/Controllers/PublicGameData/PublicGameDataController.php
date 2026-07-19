@@ -25,9 +25,14 @@ final class PublicGameDataController
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
         ]);
+        $name = $validated['name'];
+
+        if (! is_string($name)) {
+            abort(422);
+        }
 
         return redirect()->route('game.characters.show', [
-            'name' => $validated['name'],
+            'name' => $name,
         ]);
     }
 
