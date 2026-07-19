@@ -53,38 +53,16 @@ jobs:
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      # Temporary finder diagnostics for PR #33. Remove before merge once the
-      # global-only Pint failure is isolated; the repository-wide gate remains below.
-      - name: Pint directory app
-        continue-on-error: true
-        run: vendor/bin/pint --test app
-      - name: Pint directory bootstrap
-        continue-on-error: true
-        run: vendor/bin/pint --test bootstrap
-      - name: Pint directory config
-        continue-on-error: true
-        run: vendor/bin/pint --test config
-      - name: Pint directory database
-        continue-on-error: true
-        run: vendor/bin/pint --test database
-      - name: Pint directory public
-        continue-on-error: true
-        run: vendor/bin/pint --test public
-      - name: Pint directory resources
-        continue-on-error: true
-        run: vendor/bin/pint --test resources
-      - name: Pint directory routes
-        continue-on-error: true
-        run: vendor/bin/pint --test routes
-      - name: Pint directory storage
-        continue-on-error: true
-        run: vendor/bin/pint --test storage
-      - name: Pint directory tests
-        continue-on-error: true
-        run: vendor/bin/pint --test tests
-      - name: Pint global direct
+      # Temporary command-resolution diagnostics for PR #33. Remove before merge.
+      - name: Pint vendor binary direct
         continue-on-error: true
         run: vendor/bin/pint --test
+      - name: Pint PATH direct
+        continue-on-error: true
+        run: pint --test
+      - name: Pint through composer exec
+        continue-on-error: true
+        run: composer exec -- pint --test
 
       - name: Check formatting
         run: composer format:check
