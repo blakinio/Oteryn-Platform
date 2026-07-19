@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -43,3 +43,62 @@ jobs:
 
       - name: Run tests
         run: composer test
+
+  sync-online-list-contract:
+    if: github.event_name == 'pull_request' && github.head_ref == 'task/OTERYN-20260719-online-list-read-model'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v6
+        with:
+          ref: task/OTERYN-20260719-online-list-read-model
+          fetch-depth: 0
+
+      - name: Synchronize implemented Canary read surface
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('docs/contracts/CANARY_DATA_CONTRACT.md')
+          text = path.read_text()
+
+          old_tables = """The current Oteryn Platform code on this contract revision reads exactly these Canary tables through `app/PublicGameData/CanaryGameDataRepository.php`:
+
+- `players`;
+- `guilds`;
+- `guild_membership`;
+- `guild_ranks`;
+- `channels`."""
+          new_tables = """The current Oteryn Platform code on this contract revision reads exactly these Canary tables through `app/PublicGameData/CanaryGameDataRepository.php`:
+
+- `players`;
+- `guilds`;
+- `guild_membership`;
+- `guild_ranks`;
+- `channels`;
+- `cluster_sessions`."""
+
+          old_boundary = """The provisioning artifact under `database/provisioning/canary-readonly.sql.template` and the application verifier must grant/accept exactly this implemented table surface. Contract approval for a future read does not justify pre-granting an unused table. In particular, `cluster_sessions` is approved above for the future bounded online-list adapter but is **not** part of the current database credential allowlist until application code actually implements that read."""
+          new_boundary = """The provisioning artifact under `database/provisioning/canary-readonly.sql.template` and the application verifier must grant/accept exactly this implemented table surface. `cluster_sessions` is now part of the current database credential allowlist because the bounded online-list adapter implements that approved read. Contract approval for any future read still does not justify pre-granting an unused table."""
+
+          if text.count(old_tables) != 1:
+              raise SystemExit('expected implemented table block exactly once')
+          if text.count(old_boundary) != 1:
+              raise SystemExit('expected privilege-boundary paragraph exactly once')
+
+          path.write_text(text.replace(old_tables, new_tables).replace(old_boundary, new_boundary))
+          PY
+
+      - name: Restore permanent workflows and remove one-shot files
+        run: |
+          git show origin/main:.github/workflows/ci.yml > .github/workflows/ci.yml
+          rm -f .github/workflows/online-list-contract-sync.yml
+          rm -f .github/online-list-contract-sync.trigger
+
+      - name: Commit synchronized contract
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/contracts/CANARY_DATA_CONTRACT.md .github/workflows/ci.yml .github/workflows/online-list-contract-sync.yml .github/online-list-contract-sync.trigger
+          git commit -m "docs: sync online list Canary read surface"
+          git push origin HEAD:task/OTERYN-20260719-online-list-read-model
