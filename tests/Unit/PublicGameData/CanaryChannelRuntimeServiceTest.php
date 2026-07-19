@@ -7,6 +7,8 @@ use App\PublicGameData\CanaryChannelRuntimeService;
 use Illuminate\Redis\Connections\Connection;
 use Illuminate\Support\Facades\Redis;
 use Mockery;
+use Mockery\Expectation;
+use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -21,7 +23,7 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
             ->with('canary_runtime')
             ->andReturn($connection);
 
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->andReturnUsing(function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
@@ -49,10 +51,11 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
             });
 
         $snapshot = (new CanaryChannelRuntimeService(new CanaryRuntimeRedisReader))->snapshot([1, 2]);
+        $channelOneStatus = $snapshot->forChannel(1);
 
         self::assertTrue($snapshot->available);
-        self::assertNotNull($snapshot->forChannel(1));
-        self::assertTrue($snapshot->forChannel(1)?->isFull(100));
+        self::assertNotNull($channelOneStatus);
+        self::assertTrue($channelOneStatus->isFull(100));
         self::assertNull($snapshot->forChannel(2));
     }
 
@@ -65,7 +68,7 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
             ->with('canary_runtime')
             ->andReturn($connection);
 
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->andReturnUsing(function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
@@ -104,7 +107,7 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
             ->with('canary_runtime')
             ->andReturn($connection);
 
-        $connection->shouldReceive('command')
+        $this->commandExpectation($connection)
             ->andReturnUsing(function (string $command, array $arguments): mixed {
                 $key = $arguments[0] ?? null;
 
@@ -140,5 +143,13 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
         self::assertFalse($snapshot->available);
         self::assertNull($snapshot->forChannel(1));
         self::assertNull($snapshot->forChannel(2));
+    }
+
+    private function commandExpectation(Connection&MockInterface $connection): Expectation
+    {
+        /** @var Expectation */
+        $expectation = $connection->shouldReceive('command');
+
+        return $expectation;
     }
 }
