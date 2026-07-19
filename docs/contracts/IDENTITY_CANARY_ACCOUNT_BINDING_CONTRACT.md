@@ -2,173 +2,156 @@
 
 ## Status
 
-`DIRECTION SELECTED — PLATFORM-ORIGINATED ACCOUNT CREATION / IMPLEMENTATION STILL BLOCKED`
+`IMPLEMENTED FOR GREENFIELD ACCOUNTS — IMMUTABLE 1:1 PLATFORM-OWNED BINDING`
 
 This contract defines the authorization boundary between an authenticated Oteryn Platform Identity and Canary `accounts.id`.
 
-The product is greenfield for account ownership. Oteryn Platform is the authoritative owner of user Identity, account lifecycle and credential policy. Existing Canary accounts are not migration inputs and are not claimable in Phase 5.
+Oteryn Platform is the authoritative owner of user Identity, account lifecycle and credential policy. Existing Canary accounts are outside the supported Phase 5 ownership model and are not imported or claimed.
 
-No account or character mutation is approved by this contract alone. The next implementation dependency is an explicit Platform-originated Canary account-creation operation contract plus the required least-privilege write boundary and game-login credential/session integration contract.
+The greenfield ownership-binding implementation is delivered by the Platform-originated account provisioning flow governed by `docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`.
 
-## Authoritative ownership decision
+## Authoritative ownership model
 
-### PROVEN PRODUCT DECISION
-
-The supported ownership model is:
+Canonical cardinality:
 
 `1 Platform Identity <-> 1 Canary accounts.id`
 
 Rules:
 
 - every supported product account originates as an Oteryn Platform Identity;
-- each Platform Identity owns exactly one Canary account;
-- each supported Canary account is created for and owned by exactly one Platform Identity;
-- ownership is established only when the Platform-originated account creation operation durably records the exact created Canary `accounts.id`;
-- existing Canary accounts are outside the supported migration/claim scope;
-- email equality, client-supplied `account_id`, account name or any other browser-controlled attribute never establishes ownership;
-- the durable binding is Platform-owned state and is not recomputed from Canary attributes at request time.
+- each Platform Identity has at most one durable Platform-owned provisioning/binding record;
+- each ready binding references exactly one Canary `accounts.id`;
+- one Canary `accounts.id` cannot be actively bound to two Platform Identities;
+- ownership is established only from the exact Canary account created/recovered by the server-generated provisioning intent;
+- email equality, account name, client-supplied `account_id` or other browser-controlled attributes never establish ownership;
+- supported existing-account claim/import is not part of Phase 5.
 
-This decision is durable architecture and is recorded in `docs/architecture/adr/0004-authoritative-platform-account-ownership.md`.
+ADR 0004 remains the durable product decision.
 
-## Lifecycle policy
+## Implemented trusted state
 
-### Unlink
+Platform-owned `identity_canary_accounts` persistence provides:
 
-Self-service unlink is forbidden. A supported Identity must not voluntarily detach from its single Canary account.
+- `identity_id` as the one-row-per-Identity key;
+- nullable unique `canary_account_id` while provisioning is pending;
+- unique immutable server-generated `provisioning_name`;
+- immutable `canary_creation_epoch` recovery marker;
+- pending / ready / conflict lifecycle state;
+- bounded failure metadata and timestamps.
 
-### Rebind / transfer
+A binding authorizes user-scoped Canary operations only when it is ready and contains a non-null exact `canary_account_id`.
 
-Self-service rebind and transfer are forbidden. A Canary account must not be moved between Platform Identities in normal operation.
-
-Any future exceptional transfer requires a separate privileged recovery contract with implemented Admin/RBAC, confirmed MFA, independent evidence and audit. It is outside Phase 5.
-
-### Recovery
-
-Normal recovery is performed through Oteryn Platform Identity recovery. Recovery restores access to the same Identity and therefore the same immutable Canary account binding.
-
-The Platform must not automatically create a replacement Canary account when a binding or Canary account is missing/corrupted. That state fails closed and requires a separately approved privileged recovery procedure.
-
-### Disablement / deletion
-
-Disabling a Platform Identity must disable Platform authorization to user-scoped operations without transferring its Canary account to another Identity.
-
-Exact irreversible deletion semantics for the Canary account require a separate account-lifecycle operation contract and are not approved here.
+Pending or conflict state fails closed.
 
 ## Required authorization answer
 
 For every future user-scoped Canary operation the Platform must answer server-side:
 
-> Does the currently authenticated Platform Identity have the active immutable binding to this exact Canary `accounts.id`?
+> Does the currently authenticated Platform Identity have the ready immutable binding to this exact Canary `accounts.id`?
 
-The answer must be resolved from Platform-owned trusted state. A requested account ID may be used only as a lookup/target after it is matched against the authenticated Identity's stored binding; it is never ownership evidence by itself.
+The answer is resolved from Platform-owned trusted persistence.
 
-## Direction 1 — Account-control proof
+A requested account ID may be used only as a target after comparison with the authenticated Identity's stored ready binding. It is never ownership evidence by itself.
 
-### Decision
+## Binding establishment
 
-`NOT REQUIRED FOR THE PRIMARY GREENFIELD MODEL`
+The only supported Phase 5 establishment path is Platform-originated Canary account provisioning.
 
-Current Canary/login-server still does not expose a purpose-built account-control proof endpoint that is simultaneously short-lived, single-use, replay-resistant, bound to one `accounts.id`, credential-compatible and free of game-session side effects.
+The implementation:
 
-Normal external login remains unsuitable as a claim API because it verifies SHA-1 and creates `account_sessions` game-session state. Native Canary supports broader password verification but exposes a game login protocol, not a dedicated server-to-server ownership claim capability.
+1. creates the Platform Identity and durable pending provisioning intent before any Canary write;
+2. uses a server-generated immutable provisioning name and creation marker;
+3. creates or deterministically recovers the exact Canary account through the dedicated `canary_provisioning` connection;
+4. stores the exact created/recovered `accounts.id` in Platform-owned binding state;
+5. marks the binding ready only after durable Platform finalization;
+6. treats retry of the same completed binding as idempotent;
+7. enters fail-closed conflict state if recovered ownership evidence conflicts.
 
-Because existing Canary accounts are not migration inputs, Phase 5 does not block on implementing an existing-account claim ceremony. A future import/migration feature would require a new explicitly authorized cross-repository design.
+The implementation never accepts a client-selected Canary account ID for binding.
 
-## Direction 2 — Platform-originated Canary account creation
+## Lifecycle policy
 
-### Decision
+### Unlink
 
-`SELECTED PRODUCT DIRECTION`
+Self-service unlink is forbidden.
 
-Ownership originates from the authenticated Platform operation that creates the Canary account. The successful operation must establish the exact created `accounts.id` as the immutable binding for the creating Platform Identity.
+### Rebind / transfer
 
-The implementation is not yet approved because the following operation-level details remain unresolved:
+Self-service rebind and transfer are forbidden in normal operation.
 
-- exact Canary account fields/defaults accepted for product account creation;
-- exact credential representation or non-password game-login transition compatible with the authoritative Platform credential model;
-- rollout order for replacing/fencing current native Canary and external login-server reusable-password paths;
-- separate least-privilege Canary write credential/connection;
-- cross-database transaction/saga/compensation semantics;
-- duplicate, retry, idempotency and race behavior;
-- audit and readiness-state semantics.
+Any future exceptional transfer requires a separately approved privileged recovery contract with Admin/RBAC, confirmed MFA, independent evidence and audit.
 
-## Transaction and failure invariants
+### Recovery
 
-The future operation-level contract must ensure:
+Normal account recovery restores access to the same Platform Identity and therefore retains the same immutable Canary binding.
 
-1. a Platform Identity is never considered game-account-ready without one durable exact Canary `accounts.id` binding;
-2. no active binding can point to an account that was not successfully created for that Identity;
-3. retries cannot create multiple Canary accounts for one Identity;
-4. two Platform Identities cannot bind to the same Canary account;
-5. a partial failure after Canary account creation but before Platform binding persistence must be recoverable deterministically through an approved saga/compensation or pending-provisioning mechanism;
-6. compensation must never silently reassign an account to another Identity;
-7. operation audit must not contain plaintext credentials, credential hashes or reusable game-session material.
+Missing/corrupted binding or Canary-account state must fail closed. Automatic replacement-account creation or silent rebind is forbidden.
 
-Because Platform and Canary persistence are separate ownership/database boundaries, a single local database transaction cannot be assumed to cover both. The exact atomicity strategy must be proven by the account-creation operation contract.
+### Disablement / deletion
+
+Disabling a Platform Identity must disable Platform authorization for user-scoped operations without transferring ownership.
+
+Exact irreversible Canary account deletion semantics require a separate account-lifecycle contract.
 
 ## Security boundary
 
-- Oteryn Platform is authoritative for user Identity, account lifecycle and credential policy.
-- Canary remains semantic owner of game state and Canary-owned schema.
-- The existing `canary` SQL connection remains SELECT-only and must not be broadened.
-- Account creation must use a new dedicated least-privilege write credential/connection restricted to the approved operation surface.
-- Platform must not read `accounts.password` or duplicate Canary password verification.
-- Current native Canary/external login-server password verification is not the target authority model.
-- Future game login must be redesigned so Canary/login-server consumes Platform-authorized authentication/session material or delegates to the Platform authority; changing those repositories requires separate authorization.
+- Oteryn Platform remains authoritative for user credentials and ownership policy.
+- Canary remains semantic owner of Canary-owned schema/game state.
+- Existing `canary` / `oteryn_readonly` remains SELECT-only and unchanged.
+- Account provisioning uses separate `canary_provisioning` credentials restricted to the approved column-level account-create/recovery surface.
+- Platform does not read `accounts.password` and does not verify Canary passwords.
+- Canary `accounts.password` receives only the non-user random sink-credential compatibility digest defined by the provisioning contract.
+- Sink plaintext and digest are never stored in Platform binding/audit state or exposed to users.
 
-## Current evidence
+## Failure and concurrency invariants
 
-### Oteryn Platform — PROVEN
+The implemented provisioning saga ensures:
 
-- Platform Identity persistence contains no Canary account binding today.
-- Platform Identity credentials are Platform-owned and framework-hashed.
-- the current `canary` SQL connection is configured as the read-only `oteryn_readonly` boundary;
-- current provisioning grants SELECT only on the approved PublicGameData tables and grants no access to `accounts` or `account_sessions`.
+- a Platform Identity is never treated as ready without a durable exact `canary_account_id` binding;
+- Canary dependency failure leaves durable pending state for retry;
+- a committed Canary account followed by Platform-finalization failure is recovered forward by immutable provisioning name + creation epoch;
+- retries cannot authorize multiple accounts for one Identity;
+- database uniqueness prevents one Canary account ID from being bound to two Identities;
+- mismatched recovery evidence fails closed as conflict;
+- no destructive automatic account deletion is used as partial-failure compensation.
 
-### Canary — PROVEN
+## Validation evidence
 
-At current inspected `blakinio/canary` main `183d7224cb5de57585294d72631f37783b93dc89`:
+PR #33 implementation validation includes:
 
-- `accounts.id` is the durable primary key;
-- `accounts.name` is unique;
-- `accounts.email` is indexed but not unique;
-- `accounts.password` is required;
-- an account insert triggers creation of default VIP-group rows;
-- native password authentication accepts Canary custom Argon2 verification and SHA-1 fallback.
+- registration tests proving client-supplied `account_id` and `provisioning_name` cannot control ownership;
+- saga tests for success, pending dependency failure, retry, idempotent completed state, hard conflict and binding uniqueness;
+- privilege-policy tests rejecting table-level/excessive grants and password-read capability;
+- real MariaDB 11.8 integration coverage proving the effective column-level provisioning grants, Canary-compatible account trigger side effects, denial of `accounts.password` reads, duplicate-free retry and forward recovery of an already committed Canary account;
+- formatting and PHPStan level-10 validation.
 
-The three commits after the previous binding-discovery pin do not change the inspected account/auth/schema/login-session implementation paths.
+Delivery-validation head `9d404bec37410ab1ef5c9954896f544b40963f54` passed CI run `29707658067` (#474) and Agent Governance run `29707658068` (#395).
 
-### External login-server — PROVEN
+## Existing-account proof
 
-At current upstream main `2612930de4d97123a397f8f2cd0d5f784094af40`:
+A side-effect-free authoritative existing-account control proof remains unimplemented, but it is not required for the greenfield product because existing Canary accounts are out of scope.
 
-- password authentication computes SHA-1 and queries `(email = ? OR name = ?) AND password = ?`;
-- successful normal login creates a new `account_sessions` row and returns reusable game-login session material;
-- therefore normal login is not a side-effect-free ownership proof and the external server is not compatible with a Platform-only modern password hash without further integration work.
+Adding import/claim later requires a new explicitly approved contract and, likely, separately authorized auth-side work.
 
-## Rejected ownership mechanisms
+## Game-login follow-up
 
-- existing-account claim as the Phase 5 primary path — rejected because the product is greenfield and existing Canary accounts are out of scope;
-- email-only binding — rejected because Canary email is not unique and equality is not ownership proof;
-- client-supplied `accounts.id` — rejected because an identifier is not authorization;
-- Platform verification of `accounts.password` — rejected because it duplicates credential authority and violates least privilege;
-- normal external login as ownership proof — rejected because it creates reusable game-session state and is SHA-1-only;
-- broadening the existing read-only Canary connection — rejected because the read boundary is database-enforced and must remain independent.
+Ownership binding and game-login availability are separate boundaries.
+
+The immutable ownership binding is implemented, but Platform-originated users still require the separately authorized authoritative game-login integration recorded in `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md` before they can authenticate to the game without knowledge of the intentionally undisclosed sink credential.
+
+Required future direction:
+
+- `opentibiabr/login-server`: Platform-authorized short-lived cryptographic assertion/session exchange bound to exact `accounts.id`, with explicit expiry/replay/session semantics and no sink-password dependency;
+- `blakinio/canary`: only if the final login contract requires stronger single-use/revocation/direct assertion/fencing semantics beyond current DB-backed session consumption; any such change requires a separate authorized task and rollout/backward-compatibility contract update.
+
+No Canary/login-server repository was modified by the ownership-binding implementation task.
 
 ## Decision
 
-`PLATFORM-ORIGINATED CANARY ACCOUNT CREATION IS THE SELECTED OWNERSHIP DIRECTION.`
+`PLATFORM IDENTITY -> AUTHORIZED CANARY accounts.id OWNERSHIP BINDING: IMPLEMENTED FOR GREENFIELD ACCOUNTS.`
 
-The previous blocker around product cardinality/unlink/rebind/recovery is resolved by the greenfield authoritative Platform decision:
+The original Phase 5 ownership-binding blocker is resolved for supported greenfield accounts.
 
-- cardinality: exactly 1:1;
-- unlink: not supported;
-- rebind/transfer: not supported in normal operation;
-- recovery: recover the same Platform Identity and retain the same binding;
-- exceptional transfer/recovery: future privileged contract only.
-
-The remaining blocker is narrower: an account-creation operation-level contract and compatible future game-login authority path must be designed before any Canary account shared write is implemented.
-
-Until account creation plus immutable binding are implemented and tested, user-scoped Canary mutations remain fail-closed.
+Character creation remains blocked only by its independent operation-contract requirements: authoritative character naming policy, exact starter-state policy and approved least-privilege character-create write/initialization semantics.
 
 `CHARACTER CREATION: BLOCKED`
