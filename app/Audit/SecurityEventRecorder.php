@@ -16,6 +16,10 @@ final class SecurityEventRecorder
 
     public const IDENTITY_WEB_SESSION_REJECTED = 'identity.web_session_rejected';
 
+    public const IDENTITY_PASSWORD_CHANGED = 'identity.password_changed';
+
+    public const IDENTITY_PASSWORD_RESET_COMPLETED = 'identity.password_reset_completed';
+
     public function recordIdentityRegistered(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_REGISTERED);
@@ -39,6 +43,16 @@ final class SecurityEventRecorder
     public function recordIdentityWebSessionRejected(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_WEB_SESSION_REJECTED);
+    }
+
+    public function recordIdentityPasswordChanged(int $identityId): void
+    {
+        $this->record($identityId, self::IDENTITY_PASSWORD_CHANGED);
+    }
+
+    public function recordIdentityPasswordResetCompleted(int $identityId): void
+    {
+        $this->record($identityId, self::IDENTITY_PASSWORD_RESET_COMPLETED);
     }
 
     private function record(int $identityId, string $eventType): void
