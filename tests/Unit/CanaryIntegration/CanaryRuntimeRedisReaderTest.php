@@ -6,7 +6,7 @@ use App\CanaryIntegration\CanaryRuntimeRedisReader;
 use Illuminate\Redis\Connections\Connection;
 use Illuminate\Support\Facades\Redis;
 use Mockery;
-use Mockery\Expectation;
+use Mockery\CompositeExpectation;
 use Mockery\MockInterface;
 use Tests\TestCase;
 use UnexpectedValueException;
@@ -110,9 +110,9 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
         (new CanaryRuntimeRedisReader)->read(7);
     }
 
-    private function commandExpectation(MockInterface $connection): Expectation
+    private function commandExpectation(MockInterface $connection): CompositeExpectation
     {
-        /** @var Expectation */
+        /** @var CompositeExpectation */
         $expectation = $connection->shouldReceive('command');
 
         return $expectation;
