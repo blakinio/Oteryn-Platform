@@ -22,17 +22,17 @@ final class MfaStateFoundationTest extends TestCase
         $recoveryCodes = ['recovery-alpha', 'recovery-bravo'];
 
         $identity->forceFill([
-            'mfa_secret' => $secret,
-            'mfa_recovery_codes' => $recoveryCodes,
-            'mfa_confirmed_at' => now(),
+            'two_factor_secret' => $secret,
+            'two_factor_recovery_codes' => $recoveryCodes,
+            'two_factor_confirmed_at' => now(),
         ])->save();
 
         $rawSecret = DB::table('identities')
             ->where('id', $identity->id)
-            ->value('mfa_secret');
+            ->value('two_factor_secret');
         $rawRecoveryCodes = DB::table('identities')
             ->where('id', $identity->id)
-            ->value('mfa_recovery_codes');
+            ->value('two_factor_recovery_codes');
 
         self::assertIsString($rawSecret);
         self::assertIsString($rawRecoveryCodes);
@@ -41,13 +41,13 @@ final class MfaStateFoundationTest extends TestCase
         self::assertStringNotContainsString('recovery-bravo', $rawRecoveryCodes);
 
         $fresh = Identity::query()->findOrFail($identity->id);
-        self::assertSame($secret, $fresh->mfa_secret);
-        self::assertSame($recoveryCodes, $fresh->mfa_recovery_codes);
+        self::assertSame($secret, $fresh->two_factor_secret);
+        self::assertSame($recoveryCodes, $fresh->two_factor_recovery_codes);
         self::assertTrue($fresh->hasConfirmedMfa());
 
         $serialized = $fresh->toArray();
-        self::assertArrayNotHasKey('mfa_secret', $serialized);
-        self::assertArrayNotHasKey('mfa_recovery_codes', $serialized);
+        self::assertArrayNotHasKey('two_factor_secret', $serialized);
+        self::assertArrayNotHasKey('two_factor_recovery_codes', $serialized);
     }
 
     public function test_confirmed_mfa_state_fails_closed_when_secret_or_confirmation_is_missing(): void
@@ -56,15 +56,15 @@ final class MfaStateFoundationTest extends TestCase
         self::assertFalse($identity->hasConfirmedMfa());
 
         $identity->forceFill([
-            'mfa_secret' => 'TEST-MFA-SECRET-NOT-REAL',
-            'mfa_confirmed_at' => null,
+            'two_factor_secret' => 'TEST-MFA-SECRET-NOT-REAL',
+            'two_factor_confirmed_at' => null,
         ])->save();
         $identity->refresh();
         self::assertFalse($identity->hasConfirmedMfa());
 
         $identity->forceFill([
-            'mfa_secret' => null,
-            'mfa_confirmed_at' => now(),
+            'two_factor_secret' => null,
+            'two_factor_confirmed_at' => now(),
         ])->save();
         $identity->refresh();
         self::assertFalse($identity->hasConfirmedMfa());
@@ -74,9 +74,9 @@ final class MfaStateFoundationTest extends TestCase
     {
         $identity = $this->createIdentity();
         $identity->forceFill([
-            'mfa_secret' => 'TEST-MFA-SECRET-NOT-REAL',
-            'mfa_recovery_codes' => ['recovery-alpha', 'recovery-bravo'],
-            'mfa_confirmed_at' => now(),
+            'two_factor_secret' => 'TEST-MFA-SECRET-NOT-REAL',
+            'two_factor_recovery_codes' => ['recovery-alpha', 'recovery-bravo'],
+            'two_factor_confirmed_at' => now(),
         ])->save();
 
         $this->post('/login', [
@@ -94,9 +94,9 @@ final class MfaStateFoundationTest extends TestCase
         $resetMfa->execute($identity);
 
         $fresh = Identity::query()->findOrFail($identity->id);
-        self::assertNull($fresh->mfa_secret);
-        self::assertNull($fresh->mfa_recovery_codes);
-        self::assertNull($fresh->mfa_confirmed_at);
+        self::assertNull($fresh->two_factor_secret);
+        self::assertNull($fresh->two_factor_recovery_codes);
+        self::assertNull($fresh->two_factor_confirmed_at);
         self::assertFalse($fresh->hasConfirmedMfa());
         self::assertSame(1, $fresh->web_session_generation);
 
