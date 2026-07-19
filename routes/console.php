@@ -77,19 +77,19 @@ Artisan::command('canary:provision-pending-accounts {--limit=100}', function () 
         return 1;
     }
 
-    $identityIds = IdentityCanaryAccount::query()
+    $pendingBindings = IdentityCanaryAccount::query()
         ->where('status', IdentityCanaryAccount::STATUS_PENDING)
         ->orderBy('identity_id')
         ->limit($limit)
-        ->pluck('identity_id');
+        ->get();
 
     $completed = 0;
     $failed = 0;
     $provision = app(ProvisionCanaryAccount::class);
 
-    foreach ($identityIds as $identityId) {
+    foreach ($pendingBindings as $pendingBinding) {
         try {
-            $binding = $provision->execute((int) $identityId);
+            $binding = $provision->execute($pendingBinding->identity_id);
 
             if ($binding->isReady()) {
                 $completed++;
@@ -99,7 +99,7 @@ Artisan::command('canary:provision-pending-accounts {--limit=100}', function () 
         }
     }
 
-    $this->info("Processed {$identityIds->count()} pending account provisioning record(s): {$completed} ready, {$failed} failed.");
+    $this->info("Processed {$pendingBindings->count()} pending account provisioning record(s): {$completed} ready, {$failed} failed.");
 
     return $failed === 0 ? 0 : 1;
 })->purpose('Retry bounded pending Platform-originated Canary account provisioning records');
