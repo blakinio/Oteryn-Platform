@@ -36,7 +36,7 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
             ->with('pttl', ['cluster:channel:7:runtime'])
             ->andReturn(25000);
 
-        $status = (new CanaryRuntimeRedisReader())->read(7);
+        $status = (new CanaryRuntimeRedisReader)->read(7);
 
         self::assertNotNull($status);
         self::assertSame(7, $status->channelId);
@@ -61,7 +61,7 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
             ->with('pttl', ['cluster:channel:7:runtime'])
             ->andReturn(-2);
 
-        self::assertNull((new CanaryRuntimeRedisReader())->read(7));
+        self::assertNull((new CanaryRuntimeRedisReader)->read(7));
     }
 
     public function test_positive_ttl_with_malformed_runtime_data_fails_closed(): void
@@ -87,7 +87,7 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
 
         $this->expectException(UnexpectedValueException::class);
 
-        (new CanaryRuntimeRedisReader())->read(7);
+        (new CanaryRuntimeRedisReader)->read(7);
     }
 
     public function test_channel_id_must_match_the_deterministic_key(): void
@@ -113,7 +113,7 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
 
         $this->expectException(UnexpectedValueException::class);
 
-        (new CanaryRuntimeRedisReader())->read(7);
+        (new CanaryRuntimeRedisReader)->read(7);
     }
 
     public function test_runtime_state_must_be_from_the_canary_allowlist(): void
@@ -139,6 +139,6 @@ final class CanaryRuntimeRedisReaderTest extends TestCase
 
         $this->expectException(UnexpectedValueException::class);
 
-        (new CanaryRuntimeRedisReader())->read(7);
+        (new CanaryRuntimeRedisReader)->read(7);
     }
 }
