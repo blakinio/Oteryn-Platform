@@ -4,13 +4,13 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-phase5-ownership-binding-dependency-gate` — selects the greenfield authoritative Platform account-ownership model and narrows the next dependency to a Platform-originated Canary account creation operation contract; active on PR #29.
+None.
 
 ## Recommended next task
 
-After PR #29 is merged, create a bounded operation-contract task for **Platform-originated Canary account creation plus immutable 1:1 ownership binding**.
+Create a bounded operation-contract task for **Platform-originated Canary account creation plus immutable 1:1 ownership binding**.
 
-The product decision is now explicit:
+The product decision is explicit and merged:
 
 - Oteryn Platform is authoritative for user Identity, account lifecycle and credential policy;
 - existing Canary accounts are not migration/claim inputs;
@@ -30,6 +30,7 @@ The next contract must prove exact Canary account creation fields, credential/ga
 
 ## Recently completed
 
+- `OTERYN-20260719-phase5-ownership-binding-dependency-gate` — selected the greenfield authoritative Platform account model and immutable `1 Platform Identity <-> 1 Canary accounts.id` ownership direction, merged through PR #29 as `bb007f5dbe30711b1c951b621506c2cca6834a07`; existing-account claim is out of scope and Platform-originated Canary account creation is the next bounded dependency. The task record is archived unchanged with blob `4bb13c70b1ae1793c7ce93d2f0f5c07c11dc6e1b` by post-merge housekeeping.
 - `OTERYN-20260719-phase5-identity-canary-account-binding` — bounded Phase 5 ownership-binding discovery, merged through PR #27 as `c683e6b6e37851447aaa0701237750828d6ed23c`; no binding implementation was approved because no current side-effect-free, credential-compatible existing-account claim capability is proven. The task record is archived unchanged with blob `59abf3c86fdca19aa0bd97e90711f13607132f53` by post-merge housekeeping.
 - `OTERYN-20260719-phase5-character-creation-contract` — first Phase 5 bounded character-create operation discovery, merged through PR #26 as `ab78d6ac3bc674deb0868195563b61a753d95f98`; no shared write was approved because Identity→Canary account ownership binding and product starter/name policy remain unresolved. The task record was archived unchanged by exact blob identity when the successor task started.
 - `OTERYN-20260719-phase4-public-read-closure` — Phase 4 public website/read-only game-data closure, including the bounded `/online` pagination fix and regression coverage, squash-merged through PR #23 as `3c52420d35f995338818b6c2c013fa518dc2c0ca`; task record archived unchanged with blob `658b31db4627da388f08054a21dcdca8def63c88` after merge.
