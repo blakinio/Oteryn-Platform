@@ -28,8 +28,10 @@ jobs:
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git fetch -q --depth=1 origin "refs/pull/${{ github.event.pull_request.number }}/merge"
           git checkout -q FETCH_HEAD
-          composer install --no-interaction --prefer-dist --no-progress --quiet
-          vendor/bin/pint tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php >/dev/null
+          curl -sS https://getcomposer.org/download/latest-stable/composer.phar -o composer.phar
+          docker pull -q php:8.5-cli >/dev/null
+          docker run --rm -v "$PWD:/app" -w /app php:8.5-cli php composer.phar install --no-interaction --prefer-dist --no-progress --quiet --ignore-platform-reqs
+          docker run --rm -v "$PWD:/app" -w /app php:8.5-cli php vendor/bin/pint tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php >/dev/null
           git diff -- tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php
 
   test:
