@@ -72,7 +72,7 @@ final class LoginIdentityRequest extends FormRequest
             $this->failAuthentication();
         }
 
-        Auth::guard('web')->login($identity, false);
+        Auth::login($identity, false);
 
         return $identity;
     }
