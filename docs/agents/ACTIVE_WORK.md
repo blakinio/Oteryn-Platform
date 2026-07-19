@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-platform-web-mfa` — Phase 3 T3.4c complete Oteryn Platform web MFA lifecycle; branch `task/OTERYN-20260719-platform-web-mfa`; draft PR #16. Scope covers secure enrollment confirmation, pending-login challenge, replay-resistant TOTP, single-use recovery codes, rate limiting, audit and Platform web-session semantics. It explicitly excludes Admin/RBAC, Canary/login-server writes and any global game-login MFA claim.
+- `OTERYN-20260719-platform-web-mfa` — Phase 3 T3.4c complete Oteryn Platform web MFA lifecycle; branch `task/OTERYN-20260719-platform-web-mfa`; draft PR #16; task checkpoint status `ready`. Exact code-validation head `29be1190dc9de47a6f727b4811c6afb5d17ff8d1` passed CI #241 (Composer validation/install, Pint, PHPStan/Larastan and full tests) and Agent Governance #162. Scope covers secure enrollment confirmation, pending-login challenge, replay-resistant TOTP, hash-only single-use recovery codes inside encrypted state, layered rate limiting, audit and Platform web-session revocation/rotation. It explicitly excludes Admin/RBAC, Canary/login-server writes and any global game-login MFA claim. Final documentation-head validation is pending before merge readiness.
 
 ## Recommended next task
 
