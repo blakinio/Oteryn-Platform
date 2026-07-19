@@ -16,6 +16,7 @@ class CanaryDatabasePrivilegeVerifierTest extends TestCase
             'GRANT SELECT ON `canary`.`guild_membership` TO `oteryn_readonly`@`%`',
             'GRANT SELECT ON `canary`.`guild_ranks` TO `oteryn_readonly`@`%`',
             'GRANT SELECT ON `canary`.`channels` TO `oteryn_readonly`@`%`',
+            'GRANT SELECT ON `canary`.`cluster_sessions` TO `oteryn_readonly`@`%`',
         ]);
 
         $this->assertSame([], $violations);
@@ -48,17 +49,17 @@ class CanaryDatabasePrivilegeVerifierTest extends TestCase
             'GRANT SELECT ON `canary`.`accounts` TO `oteryn_readonly`@`%`',
         ]);
 
-        $this->assertContains('Grant #6 targets a table outside the approved Canary read allowlist.', $violations);
+        $this->assertContains('Grant #7 targets a table outside the approved Canary read allowlist.', $violations);
     }
 
-    public function test_missing_required_table_grant_is_rejected(): void
+    public function test_missing_cluster_sessions_grant_is_rejected(): void
     {
         $violations = (new CanaryDatabasePrivilegeVerifier)->verify(
             'canary',
-            $this->remainingRequiredSelectGrants(except: 'channels'),
+            $this->remainingRequiredSelectGrants(except: 'cluster_sessions'),
         );
 
-        $this->assertContains('Missing direct SELECT grant for required Canary table: channels.', $violations);
+        $this->assertContains('Missing direct SELECT grant for required Canary table: cluster_sessions.', $violations);
     }
 
     public function test_role_based_grant_is_rejected_as_unverifiable(): void
@@ -68,7 +69,7 @@ class CanaryDatabasePrivilegeVerifierTest extends TestCase
             'GRANT `canary_reader`@`%` TO `oteryn_readonly`@`%`',
         ]);
 
-        $this->assertContains('Grant #6 has an unsupported grant shape.', $violations);
+        $this->assertContains('Grant #7 has an unsupported grant shape.', $violations);
     }
 
     public function test_grant_option_is_rejected(): void
