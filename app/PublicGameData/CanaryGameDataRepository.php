@@ -86,9 +86,9 @@ final class CanaryGameDataRepository
     }
 
     /**
-     * @return Collection<int, stdClass>
+     * @return LengthAwarePaginator<int, stdClass>
      */
-    public function onlineCharacters(?int $readTimeEpochMs = null): Collection
+    public function onlineCharacters(?int $readTimeEpochMs = null, int $perPage = 100): LengthAwarePaginator
     {
         $readTimeEpochMs ??= (int) floor(microtime(true) * 1000);
 
@@ -110,6 +110,6 @@ final class CanaryGameDataRepository
             ->orderBy('channel.sort_order')
             ->orderBy('channel.id')
             ->orderBy('player.name')
-            ->get();
+            ->paginate($perPage);
     }
 }
