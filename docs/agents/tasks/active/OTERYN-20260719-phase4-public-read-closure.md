@@ -119,7 +119,7 @@ validation:
     result: PASS
     evidence: post-PR22 main at 795ce5642eec7a69efe07e6f0037768cb0eed37e, PR #23 ownership and exact previous-task archive identity verified
   - command: Phase 4 source-level deliverable and exit-gate revalidation
-    result: PASS_AFTER_FIX
+    result: PASS
     evidence: all implemented public surfaces revalidated; the only concrete mass-query gap found was unbounded onlineCharacters(), now paginated at 100 rows
   - command: regression coverage for /online pagination
     result: PASS
