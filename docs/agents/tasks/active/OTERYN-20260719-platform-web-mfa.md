@@ -8,7 +8,7 @@ This task is strictly a Platform web-authentication control. It does not change 
 
 ## Acceptance criteria
 
-- [ ] Archive merged `OTERYN-20260719-mfa-totp-provider-resolution` without changing its contents and update `ACTIVE_WORK.md` to this task.
+- [x] Archive merged `OTERYN-20260719-mfa-totp-provider-resolution` without changing its contents and update `ACTIVE_WORK.md` to this task.
 - [ ] Add reversible Platform-owned persistence for the last successfully consumed TOTP timestep so a confirmed TOTP cannot be replayed.
 - [ ] Add authenticated MFA enrollment that generates a secret only through the maintained `pragmarx/google2fa` provider, protects it with the existing encrypted model cast, and does not mark MFA confirmed until a valid TOTP is submitted.
 - [ ] Generate recovery codes only after successful enrollment confirmation; return plaintext codes only in that one response, store only framework-hashed recovery-code values inside the encrypted recovery-code state, and never log them.
@@ -23,7 +23,7 @@ This task is strictly a Platform web-authentication control. It does not change 
 - [ ] Preserve CSRF protection and regenerate session identifiers on password-to-MFA and MFA-to-authenticated security transitions.
 - [ ] Add security regression coverage for unconfirmed enrollment, challenge gating, pending-state expiry/revocation, TOTP replay, concurrent-safe persisted timestep semantics, recovery-code single use, rate limiting, enrollment session revocation, disable/logout and non-MFA login compatibility.
 - [ ] Run Composer validation, lockfile installation, Pint, PHPStan/Larastan level 10 and the full test suite on the exact final head; inspect current-head Agent Governance before readiness.
-- [ ] Do not add Admin/RBAC semantics, an administrator boolean, custom TOTP/HOTP cryptography, Canary/login-server writes or any global game-login MFA claim.
+- [x] Do not add Admin/RBAC semantics, an administrator boolean, custom TOTP/HOTP cryptography, Canary/login-server writes or any global game-login MFA claim.
 
 ## Ownership
 
@@ -41,8 +41,10 @@ owned_paths:
   - routes/web.php
   - tests/Feature/Identity/Mfa/**
   - tests/Unit/Identity/Mfa/**
+  - .github/workflows/mfa-static-diagnostics.yml
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260719-platform-web-mfa.md
+  - docs/agents/tasks/active/OTERYN-20260719-mfa-totp-provider-resolution.md
   - docs/agents/tasks/archive/OTERYN-20260719-mfa-totp-provider-resolution.md
 modules:
   - Identity MFA
@@ -79,10 +81,10 @@ Administrator MFA remains a production-readiness requirement, but no Admin/RBAC 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T13:49:26+02:00
-head: d4cc4189cbc99f47b4cec69ce198bd5ded43d719
+updated_at: 2026-07-19T14:08:00+02:00
+head: 5e683698f02700979dab783c3529efcd08fff9ca
 branch: task/OTERYN-20260719-platform-web-mfa
-pr: none
+pr: 16
 status: investigating
 context_routes:
   - agent-governance
@@ -103,50 +105,96 @@ owned_paths:
   - routes/web.php
   - tests/Feature/Identity/Mfa/**
   - tests/Unit/Identity/Mfa/**
+  - .github/workflows/mfa-static-diagnostics.yml
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260719-platform-web-mfa.md
+  - docs/agents/tasks/active/OTERYN-20260719-mfa-totp-provider-resolution.md
   - docs/agents/tasks/archive/OTERYN-20260719-mfa-totp-provider-resolution.md
 proven:
   - Current main is d4cc4189cbc99f47b4cec69ce198bd5ded43d719 from merged PR #15.
   - PR #15 resolved pragmarx/google2fa v9.0.0 and paragonie/constant_time_encoding v3.1.3 through real Composer resolution and passed final CI and Agent Governance.
-  - No open Oteryn Platform PR overlaps this task at task start.
-  - Existing SessionController authenticates the Identity by password and immediately calls Auth::login through IdentityWebSessionManager before establishing the web-session generation marker.
-  - Existing Identity MFA state uses encrypted two_factor_secret and encrypted:array two_factor_recovery_codes plus two_factor_confirmed_at; hasConfirmedMfa requires both secret and confirmation timestamp.
-  - Existing ResetIdentityMfa clears MFA state, revokes Platform web sessions and records identity.mfa_reset, but no public MFA route exists.
-  - Existing EnsureIdentitySessionIsCurrent fails closed for missing/stale web_session_generation and disabled identities.
-  - Google2FA v9.0.0 source exposes generateSecretKey() and verifyKeyNewer(), where verifyKeyNewer prevents accepting a timestep at or before the supplied old timestamp.
+  - No open Oteryn Platform PR overlapped this task at task start.
+  - The merged T3.4b task record was moved to archive with the exact original blob on this branch and ACTIVE_WORK points to PR #16.
+  - Existing SessionController authenticated by password and immediately called Auth::login before this task; current implementation defers Auth::login for confirmed-MFA identities and records a bounded pending challenge instead.
+  - Existing Identity MFA state uses encrypted two_factor_secret and encrypted:array two_factor_recovery_codes plus two_factor_confirmed_at; this task adds nullable persisted two_factor_last_used_timestep for replay resistance.
+  - Current implementation uses Google2FA verifyKeyNewer under row locking, hashes recovery codes with the framework Hash service and consumes recovery codes atomically.
+  - Current implementation requires current password plus fresh TOTP for enrollment confirmation, revokes Platform web sessions on enrollment and re-establishes the current browser generation marker.
+  - Current implementation requires current password plus valid TOTP/recovery factor for disable, clears MFA state, revokes all Platform web sessions and logs out the current browser.
   - SECURITY_ARCHITECTURE requires secure enrollment confirmation, MFA verification/recovery rate limiting, audit, secret protection at rest and administrator MFA before production readiness.
   - AUTH_GAME_LOGIN_CONTRACT proves alternate Canary/login-server password/session paths, so Platform MFA cannot be represented as global game-login enforcement.
+  - Agent Governance run 29686245682 passed on implementation/test head e868e278257126952544dceb2ac1a1d12dfc60d3.
 derived:
   - Confirmed-MFA password login must stop before Auth::login and use a server-side pending state so the browser remains a guest until the second factor succeeds.
   - Persisting the last accepted TOTP timestep and consuming it under a database row lock is required to make verifyKeyNewer replay protection durable across requests and concurrent workers.
-  - Enrollment should revoke other web sessions but re-establish the current session after generation increment so the security transition does not unexpectedly log out the browser performing enrollment.
+  - Enrollment revokes other web sessions but re-establishes the current session after generation increment so the security transition preserves the browser performing enrollment.
   - A direct provider integration is narrower and safer than introducing Fortify routes into the existing custom authentication stack.
 unknown:
-  - Final product UX/policy for requiring MFA from normal users remains outside this task; implementation will be opt-in for identities that enroll.
+  - Exact PHPStan diagnostics for the current implementation remain to be extracted because the standard job log connector truncates the tail containing the error list.
+  - Final product UX/policy for requiring MFA from normal users remains outside this task; implementation is opt-in for identities that enroll.
 conflicts:
   - Platform web MFA cannot be claimed as global game-login MFA while alternate Canary/login-server auth paths remain available.
 first_failure:
-  marker: none
-  evidence: implementation validation has not run yet
+  marker: CI run 29686245679 / Run static analysis
+  evidence: Composer validation, lockfile install and Pint passed on e868e278257126952544dceb2ac1a1d12dfc60d3; PHPStan failed and tests were skipped. CI run 29686349648 still failed at PHPStan after narrowing likely Google2FA mixed boundaries, so an exact diagnostic artifact is required before further code changes.
 rejected_hypotheses:
   - Add enrollment without login challenge enforcement: rejected because it creates configured MFA state without an enforced authentication path.
   - Authenticate with Auth::login before MFA challenge: rejected because middleware and application code would treat the session as fully authenticated during the second-factor step.
-  - Implement a custom TOTP/HOTP algorithm: rejected because a maintained provider is now installed and repository security policy prefers maintained/framework mechanisms.
+  - Implement a custom TOTP/HOTP algorithm: rejected because a maintained provider is installed and repository security policy prefers maintained/framework mechanisms.
   - Add an admin boolean solely to force MFA: rejected because Admin/RBAC is not implemented and a boolean must not become an authorization shortcut.
+  - Keep guessing PHPStan failures from truncated logs: rejected after two exact-head CI failures; use a temporary task-owned diagnostics artifact instead.
 changed_paths:
+  - app/Audit/SecurityEventRecorder.php
+  - app/Http/Controllers/Identity/SessionController.php
+  - app/Http/Controllers/Identity/Mfa/MfaChallengeController.php
+  - app/Http/Controllers/Identity/Mfa/MfaEnrollmentController.php
+  - app/Http/Requests/Identity/Mfa/ConfirmMfaEnrollmentRequest.php
+  - app/Http/Requests/Identity/Mfa/DisableMfaRequest.php
+  - app/Http/Requests/Identity/Mfa/MfaChallengeRequest.php
+  - app/Identity/Mfa/ConfirmIdentityMfaEnrollment.php
+  - app/Identity/Mfa/DisableIdentityMfa.php
+  - app/Identity/Mfa/MfaCodeConsumer.php
+  - app/Identity/Mfa/MfaCodeRejected.php
+  - app/Identity/Mfa/MfaEnrollmentConfirmation.php
+  - app/Identity/Mfa/MfaFactor.php
+  - app/Identity/Mfa/MfaProvisioningUri.php
+  - app/Identity/Mfa/MfaRecoveryCodes.php
+  - app/Identity/Mfa/MfaStateRejected.php
+  - app/Identity/Mfa/PendingMfaLogin.php
+  - app/Identity/Mfa/ResetIdentityMfa.php
+  - app/Identity/Mfa/StartIdentityMfaEnrollment.php
+  - app/Identity/Models/Identity.php
+  - app/Providers/AppServiceProvider.php
+  - database/migrations/2026_07_19_135000_add_mfa_replay_state_to_identities_table.php
+  - resources/views/identity/mfa/challenge.blade.php
+  - resources/views/identity/mfa/recovery-codes.blade.php
+  - resources/views/identity/mfa/settings.blade.php
+  - routes/web.php
+  - tests/Feature/Identity/Mfa/MfaStateFoundationTest.php
+  - tests/Feature/Identity/Mfa/MfaWebFlowTest.php
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260719-platform-web-mfa.md
+  - docs/agents/tasks/active/OTERYN-20260719-mfa-totp-provider-resolution.md
+  - docs/agents/tasks/archive/OTERYN-20260719-mfa-totp-provider-resolution.md
 validation:
-  - command: implementation validation
+  - command: composer validate --strict; composer install --no-interaction --prefer-dist --no-progress; composer format:check
+    result: PASS
+    evidence: CI runs 29686245679 and 29686349648 passed dependency validation/install and Pint before failing at static analysis
+  - command: composer analyse
+    result: FAIL
+    evidence: CI runs 29686245679 and 29686349648 failed at Run static analysis; exact error tail is not exposed by the truncated standard job-log response
+  - command: composer test
     result: NOT_RUN
-    evidence: task branch has only the initial task record
+    evidence: both current implementation CI attempts stopped at PHPStan before tests
+  - command: python tools/agents/test_checkpoint.py; python tools/agents/checkpoint.py --tasks docs/agents/tasks/active --require-checkpoint
+    result: PASS
+    evidence: Agent Governance run 29686245682 passed on implementation/test head e868e278257126952544dceb2ac1a1d12dfc60d3
 blockers:
-  - none for optional/user-enabled Platform web MFA lifecycle
+  - current code is not ready until PHPStan passes and the full test suite runs successfully
   - mandatory admin-MFA policy awaits explicit Admin/RBAC classification
   - global game-login MFA remains outside Platform-only authority
-next_action: Archive the merged T3.4b task record, update ACTIVE_WORK, open a draft PR, then implement the complete Platform web MFA lifecycle only within declared owned_paths.
+next_action: Run the temporary task-owned MFA Static Diagnostics workflow, download its raw PHPStan artifact, fix only exact reported issues, then delete the diagnostic workflow before final readiness.
 ```
 
 ## Notes
 
-The task is deliberately one complete web-authentication slice: enrollment is not considered complete unless the same PR also enforces the second factor at login for confirmed-MFA identities and provides safe replay/recovery/session semantics.
+The task is deliberately one complete web-authentication slice: enrollment is not considered complete unless the same PR also enforces the second factor at login for confirmed-MFA identities and provides safe replay/recovery/session semantics. The temporary diagnostics workflow is not part of the intended final diff and must be deleted before merge.
