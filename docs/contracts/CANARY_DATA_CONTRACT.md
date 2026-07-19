@@ -821,3 +821,47 @@ Deployment must update the database grants before or atomically with enabling co
 ### Non-destructive verification
 
 Deployments must run `php artisan canary:verify-db-privileges` (or an equivalent deterministic deployment check) against the actual `canary` connection before treating the boundary as enforced. The current command inspects `SHOW GRANTS FOR CURRENT_USER`, never logs raw grant statements, never logs a password, and never attempts a destructive write test. It fails when required table `SELECT` grants are missing or when it sees write/DDL/admin/global/schema-wide/extra-table grants, `GRANT OPTION`, role grants or another grant shape it cannot prove safe.
+
+The exact production MySQL/MariaDB server product/version remains `UNKNOWN` from repository evidence. The committed provisioning and verifier therefore target direct grant syntax common to MySQL/MariaDB (Canary is built with `libmariadb`, while Laravel uses the MySQL driver) and deliberately report unsupported privilege models as unverified rather than claiming enforcement.
+
+## Remaining UNKNOWN items
+
+- exact deployed production database schema/version and whether it contains `tournament_coins` or `coins_tournament`;
+- whether a separate cleanup path eventually physically deletes every expired orphaned `cluster_sessions` row; online-read correctness must not depend on it;
+- maximum production wall-clock skew relevant to the `cluster_sessions` lease-expiry SLA;
+- production endpoint and ACL/user provisioning details for the dedicated read-only Canary runtime Redis connection;
+- exact supported Redis client/dependency selection for Laravel 13 / PHP 8.5, to be resolved from current primary documentation in the implementation task;
+- exact product rules and dependent initialization for character creation;
+- character rename/delete lifecycle and rollback policy;
+- operation-level account creation/change contract;
+- operation-level guild mutation contract;
+- auth/session issuance/revocation behavior owned by `AUTH_GAME_LOGIN_CONTRACT.md`;
+- which, if any, shared write operations Oteryn Platform should eventually own.
+
+## Current CONFLICT items
+
+1. `accounts.tournament_coins` in `schema.sql` vs `accounts.coins_tournament` expected by `AccountRepositoryDB`.
+
+This conflict blocks tournament-coin integration and must not be converted into an assumption.
+
+## Safety rules
+
+- `blakinio/canary` remains read-only unless a separately authorized task explicitly permits writes.
+- Do not copy MyAAC/TFS schema assumptions into Platform code.
+- Prefer explicit read models that select only approved columns.
+- Never expose `password`, session IDs/tokens, account email, IP addresses or other security/private fields through public game-data endpoints.
+- Never use `players_online` as cluster-wide online authority; its proven multi-process writer lifecycle destroys cross-channel completeness.
+- Never treat `cluster_sessions.status = 'ONLINE'` without `expires_at > read_time` as a fresh online identity result.
+- Never convert Canary DB read failure into an empty online list.
+- Never use SQL `channel_runtime_status` or process-local `ProtocolStatus` as an authoritative fallback for public per-channel runtime availability.
+- Never convert runtime Redis transport failure into `OFFLINE`, zero players, partial-as-complete runtime data, SQL-mirror data or an unbounded stale cache result.
+- Do not discover configured runtime channels with Redis `KEYS`/`SCAN`; use durable enabled `channels.id` values and deterministic runtime keys.
+- Do not use protocol world-list index as persistent channel identity; use `channels.id`.
+- Do not implement shared account/character/guild/ban/session/coin writes until a specific operation section is approved.
+- Schema drift or unresolved column conflicts must fail visibly rather than silently falling back to guessed names.
+
+## Next contract dependency
+
+No additional Canary discovery contract is required before the bounded `OTERYN-20260719-channel-runtime-availability-read-model` implementation task adds the dedicated read-only Redis runtime adapter defined above. That implementation must add its own supported Redis dependency/configuration and test boundary, read only deterministic configured-channel runtime keys, preserve Redis-TTL and complete-snapshot failure semantics, keep operational metadata private, and must not broaden the Canary database table allowlist to `channel_runtime_status`.
+
+The existing cluster-wide online-character list remains governed independently by the `cluster_sessions` status/expiry/deletion contract. Authentication/credential migration remains governed separately by `AUTH_GAME_LOGIN_CONTRACT.md` and is not approved by this runtime-read contract.
