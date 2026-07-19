@@ -5,7 +5,6 @@ namespace App\Http\Requests\Identity;
 use App\Identity\Models\Identity;
 use App\Identity\Support\CanonicalEmail;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -71,8 +70,6 @@ final class LoginIdentityRequest extends FormRequest
         if ($identity === null || ! $passwordIsValid || $identity->disabled_at !== null) {
             $this->failAuthentication();
         }
-
-        Auth::login($identity, false);
 
         return $identity;
     }
