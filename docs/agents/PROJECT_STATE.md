@@ -16,7 +16,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Phase 3 — Identity foundation: COMPLETE**
 
-**Phase 4 — Public website and read-only game data: IN PROGRESS**
+**Phase 4 — Public website and read-only game data: COMPLETE**
 
 **Initial read-only PublicGameData implementation: COMPLETE**
 
@@ -30,7 +30,9 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Channel runtime availability transport discovery: COMPLETE**
 
-**Channel runtime availability read model: IMPLEMENTED IN CURRENT DELIVERY / VALIDATING**
+**Channel runtime availability read model: COMPLETE**
+
+**Phase 4 closure revalidation: COMPLETE IN CURRENT DELIVERY / FINAL MERGE GATE PENDING**
 
 ## What exists on main after the current delivery PR is merged
 
@@ -67,19 +69,20 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - published-only public news list at `GET /news` and detail at `GET /news/{slug}`, excluding drafts and future-scheduled posts;
 - deterministic public news ordering by `published_at DESC, id DESC` with bounded pagination of 10 posts;
 - escaped plain-text public news rendering with no rich-HTML or media-upload boundary introduced;
-- read-only public level highscores at `GET /highscores`;
-- read-only active character profiles at `GET /characters/{name}`;
-- read-only public guild details and membership at `GET /guilds/{name}`;
+- read-only public level highscores at `GET /highscores`, ordered deterministically and paginated 50 rows per page;
+- read-only active character profiles at `GET /characters/{name}` through one bounded lookup;
+- read-only public guild details and membership at `GET /guilds/{name}` with joined membership pagination;
 - read-only configured channel metadata plus fresh per-channel runtime status/player counts at `GET /servers` when the dedicated runtime dependency is available;
-- cluster-wide read-only online-character list at `GET /online` using fresh `cluster_sessions` identity joined to public player and approved channel fields;
+- cluster-wide read-only online-character list at `GET /online` using fresh `cluster_sessions` identity joined to public player and approved channel fields, paginated 100 rows per page;
 - integration tests that exercise PublicGameData routes after placing an isolated Canary SQLite connection in `query_only` mode;
-- online-list integration coverage for fresh `ONLINE`, expired, non-`ONLINE`, deleted-player, dependency-failure and public-field allowlist cases;
+- online-list integration coverage for fresh `ONLINE`, expired, non-`ONLINE`, deleted-player, dependency-failure, public-field allowlist and 100-row pagination cases;
 - runtime availability coverage for deterministic runtime keys, positive TTL freshness, explicit states/counts/full, missing/expired keys, malformed data and whole-snapshot transport failure;
 - mandatory online filters `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms` and `players.deletion = 0`;
 - explicit online-read stale/failure semantics: expired lease rows are excluded, Canary DB failure is returned as dependency unavailable rather than an empty list, and raw session/security fields remain non-public;
 - explicit runtime stale/failure semantics: missing/expired Redis keys are unknown, malformed data or Redis dependency failure invalidates the whole runtime snapshot, configured channel metadata remains independently renderable, and no synthetic `OFFLINE` or zero-player fallback is produced;
 - proven rejection of shared `players_online` as a multichannel authority because every process periodically rewrites/prunes it from only its local player set;
-- proven rejection of SQL `channel_runtime_status` and process-local `ProtocolStatus` as authoritative runtime availability fallbacks.
+- proven rejection of SQL `channel_runtime_status` and process-local `ProtocolStatus` as authoritative runtime availability fallbacks;
+- Phase 4 closure revalidation proving the public read surface requires no Canary/shared-data writes, avoids the concrete obvious N+1/mass-query patterns found in source, and renders implemented public content through escaped/plain-text boundaries.
 
 ## Phase 3 Identity summary
 
@@ -117,7 +120,7 @@ Administrator authentication policy:
 
 ## PublicGameData implementation summary
 
-The current PublicGameData implementation is intentionally narrow and read-only.
+The current PublicGameData implementation is intentionally narrow and read-only, and Phase 4 closure revalidation has satisfied its roadmap exit gate.
 
 Proven implementation properties:
 
@@ -131,7 +134,8 @@ Proven implementation properties:
 - guild details exclude `guilds.balance` and membership data is joined in one paginated read path without per-member N+1 queries;
 - Blade output escapes guild content by default and XSS regression coverage exists for MOTD rendering;
 - server/channel page exposes configured enabled channel metadata plus the implemented independent runtime availability/count projection;
-- `GET /online` reads `cluster_sessions` joined to `players` and `channels`, selects only public player fields plus durable `channel_id` and channel name, and applies mandatory online/expiry/deletion filters;
+- `GET /online` reads `cluster_sessions` joined to `players` and `channels`, selects only public player fields plus durable `channel_id` and channel name, applies mandatory online/expiry/deletion filters, and paginates 100 rows per page;
+- the closure regression proves 101 fresh online characters split across two route pages rather than being loaded as one unbounded result set;
 - Canary DB query failure for `/online` becomes an explicit HTTP 503 dependency-unavailable result rather than a synthetic empty list;
 - no application caching is used yet.
 
@@ -140,6 +144,7 @@ The implemented PublicGameData online-list contract is:
 - backend identity source: `cluster_sessions` joined to `players`;
 - mandatory positive filters: `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms`, `players.deletion = 0`;
 - output: explicit public player allowlist plus durable `channels.id` and approved channel name, never raw account/session/lease identifiers;
+- pagination: `LengthAwarePaginator`, default 100 rows per page, deterministic ordering by channel sort order, durable channel ID and player name;
 - dependency failure: Canary DB read failure remains an explicit unavailable/error result, never a synthetic empty list;
 - `players_online`, process-local `ProtocolStatus`, and unbounded stale cache are forbidden fallbacks;
 - runtime availability remains independent from online-character identity.
@@ -157,12 +162,12 @@ The implemented per-channel runtime-availability boundary is:
 - no runtime application cache is used, so Platform does not extend data past the Redis-TTL freshness boundary;
 - runtime availability remains independent from the `/online` `cluster_sessions` identity contract.
 
-Known PublicGameData unknowns:
+Known PublicGameData unknowns retained after Phase 4 closure:
 
-- privileged/group-hidden character filtering policy for public rankings;
-- production cache/staleness expectations outside the bounded online-lease and Redis-runtime freshness contracts;
-- maximum production wall-clock skew relevant to the exact `cluster_sessions` online-character freshness SLA;
-- production provisioning details for the dedicated read-only Canary runtime Redis ACL credential/endpoint remain deployment input outside Git.
+- privileged/group-hidden character filtering policy for future public ranking policy — non-blocking for the currently specified deterministic read-only level highscore surface;
+- production cache/staleness expectations outside the bounded online-lease and Redis-runtime freshness contracts — non-blocking because Phase 4 intentionally leaves caching absent;
+- maximum production wall-clock skew relevant to the exact `cluster_sessions` online-character freshness SLA — operations/SLA unknown; expiry filtering remains fail-closed;
+- production provisioning details for the dedicated read-only Canary runtime Redis ACL credential/endpoint — deployment input outside Git, not a Phase 4 code blocker.
 
 ## CMS implementation summary
 
@@ -253,17 +258,17 @@ Agents must verify repository source before relying on this list because later t
 
 ## Current active task
 
-`OTERYN-20260719-channel-runtime-availability-read-model`
+`OTERYN-20260719-phase4-public-read-closure`
 
 Objective:
 
-- implement the dedicated named read-only `canary_runtime` Redis boundary approved by the runtime discovery contract;
-- read only deterministic configured-channel runtime keys and require positive TTL plus validated public-needed fields;
-- render explicit per-channel runtime state/player counts on `/servers` while keeping configured metadata independent from runtime dependency failure;
-- fail closed for malformed data or runtime dependency failure without SQL/`ProtocolStatus`/cache fallback;
-- validate the implementation and synchronize Phase 4 state before deciding the Phase 4 closure task.
+- close Phase 4 only after proving every public read deliverable and exit-gate invariant against post-PR22 source;
+- fix the concrete unbounded `/online` mass-query gap with bounded pagination and regression coverage;
+- keep known ranking-policy, Redis deployment, wall-clock skew and broader cache-policy unknowns explicit rather than guessing;
+- require fresh exact-head CI and Agent Governance on the final ready checkpoint before squash merge;
+- leave Phase 5 as one bounded operation-contract/discovery task without starting shared account/character writes.
 
-No successor task should be started until PR #22 is merged and the remaining Phase 4 exit gate is revalidated against live `main`.
+After PR #23 merges, no Phase 5 mutation implementation is authorized automatically. The next task must first select one concrete operation and prove its shared-data ownership, authorization, validation, transaction, concurrency, side-effect and rollback contract from live repository/Canary evidence.
 
 ## High-priority unknowns and blockers
 
@@ -273,6 +278,9 @@ No successor task should be started until PR #22 is merged and the remaining Pha
 - MFA/email-verification enforcement across every game-login path;
 - tournament-coin schema/code conflict;
 - maximum production wall-clock skew for exact `cluster_sessions` lease freshness SLA;
+- production endpoint and ACL/user provisioning for the dedicated read-only Canary runtime Redis connection;
+- privileged/group-hidden public-ranking product policy;
+- broader production cache/staleness policy outside the proven online-lease and runtime Redis-TTL contracts;
 - final production hosting/network topology;
 - production mail/cache/queue providers.
 
