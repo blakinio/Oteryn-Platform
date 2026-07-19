@@ -22,26 +22,27 @@ final class EnsureIdentitySessionIsCurrent
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $identity = $this->sessions->user();
+        $authenticatedIdentity = $this->sessions->user();
 
-        if ($identity === null) {
+        if ($authenticatedIdentity === null) {
             return $next($request);
         }
 
-        if (! $identity instanceof Identity) {
+        if (! $authenticatedIdentity instanceof Identity) {
             $this->sessions->invalidate($request);
 
             return $next($request);
         }
 
+        $identityId = $authenticatedIdentity->id;
+        $currentIdentity = Identity::query()->find($identityId);
         $sessionGeneration = $request->session()->get(WebSessionState::GENERATION_KEY);
-        $sessionIsCurrent = is_int($sessionGeneration)
-            && $sessionGeneration === $identity->web_session_generation
-            && $identity->disabled_at === null;
+        $sessionIsCurrent = $currentIdentity instanceof Identity
+            && is_int($sessionGeneration)
+            && $sessionGeneration === $currentIdentity->web_session_generation
+            && $currentIdentity->disabled_at === null;
 
         if (! $sessionIsCurrent) {
-            $identityId = $identity->id;
-
             $this->sessions->invalidate($request);
             $this->securityEvents->recordIdentityWebSessionRejected($identityId);
         }
