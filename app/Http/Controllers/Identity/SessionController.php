@@ -9,7 +9,6 @@ use App\Identity\Sessions\IdentityWebSessionManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 final class SessionController
 {
@@ -25,6 +24,7 @@ final class SessionController
     ): RedirectResponse {
         $identity = $request->authenticate();
 
+        $sessions->login($identity);
         $sessions->establish($request, $identity);
         $securityEvents->recordIdentityLoginSucceeded($identity->id);
 
@@ -36,7 +36,7 @@ final class SessionController
         IdentityWebSessionManager $sessions,
         SecurityEventRecorder $securityEvents,
     ): RedirectResponse {
-        $identity = Auth::user();
+        $identity = $sessions->user();
 
         $sessions->invalidate($request);
 
