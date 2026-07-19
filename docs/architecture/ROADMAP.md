@@ -8,7 +8,7 @@ The roadmap is ordered by risk: establish contracts and identity correctness bef
 
 ## Phase 0 — Architecture and agent bootstrap
 
-**Status: IN PROGRESS**
+**Status: COMPLETE**
 
 Deliverables:
 
@@ -28,7 +28,7 @@ Exit gate:
 
 ## Phase 1 — Laravel application bootstrap
 
-**Status: PLANNED**
+**Status: COMPLETE**
 
 Deliverables:
 
@@ -50,7 +50,7 @@ Exit gate:
 
 ## Phase 2 — Canary and login authentication discovery
 
-**Status: PLANNED / REQUIRED BEFORE SHARED AUTH MUTATIONS**
+**Status: COMPLETE FOR CURRENT IMPLEMENTATION BOUNDARIES**
 
 Deliverables:
 
@@ -67,33 +67,39 @@ Exit gate:
 
 - no critical auth/data integration question remains `UNKNOWN` for the next implementation scope.
 
+Unresolved production/global-auth facts remain explicit blockers for later authoritative game-login migration; completing Phase 2 does not convert those unknowns into assumptions.
+
 ## Phase 3 — Identity foundation
 
-**Status: PLANNED**
+**Status: COMPLETE**
 
-Deliverables:
+Delivered:
 
-- registration policy;
-- login/logout;
-- secure password storage/migration strategy proven compatible with game login;
-- session management;
-- password reset;
-- email verification if required;
-- rate limiting;
-- account security event audit;
-- administrator MFA foundation;
-- tests for auth, authorization and revocation invariants.
+- Platform-owned registration policy and Identity persistence;
+- secure Platform web login/logout;
+- revocable Platform web-session generation and session invalidation;
+- password recovery and authenticated password change with Platform web-session revocation;
+- current credential strategy: Platform Identity credentials remain Platform-owned and framework-hashed, with no shared Canary password migration/write until the authoritative-Identity rollout gates in `AUTH_GAME_LOGIN_CONTRACT.md` are satisfied;
+- current email-verification policy: not required for Phase 3 product scope and therefore intentionally not enabled; any future global requirement must account for alternate Canary/login-server authentication paths;
+- layered rate limiting for registration, login, recovery, password change and MFA flows;
+- append-oriented account security event audit primitives for implemented Identity security events;
+- complete opt-in Platform web MFA enrollment, challenge, recovery-code, replay-prevention, disable and session-revocation lifecycle using a maintained TOTP provider;
+- reusable `mfa.confirmed` middleware foundation for future privileged routes;
+- administrator authentication policy foundation: future privileged/Admin routes must combine `auth`, explicit Phase 6 RBAC/policy authorization and mandatory `mfa.confirmed`; the MFA gate does not classify administrators or grant authorization;
+- auth, MFA, rate-limit, session and revocation regression coverage.
 
 Exit gate:
 
-- end-to-end web auth works;
-- game-login compatibility is tested where relevant;
-- password reset/change behavior cannot leave unintended bypass sessions;
-- administrator authentication policy is defined and tested.
+- end-to-end Platform web auth works;
+- current game-login compatibility is preserved by credential-boundary non-interference: Phase 3 does not mutate Canary reusable credentials or game sessions;
+- password reset/change revokes Platform web sessions and does not claim to revoke unrelated Canary/login-server credentials;
+- administrator authentication policy is defined and the confirmed-MFA gate is tested independently from the future Phase 6 role/permission model.
+
+Phase 3 completion does **not** claim that Platform MFA, email verification, password change or password reset is globally enforced for native Canary or external login-server authentication. The cross-path authoritative Identity migration remains a separate later programme governed by `AUTH_GAME_LOGIN_CONTRACT.md`.
 
 ## Phase 4 — Public website and read-only game data
 
-**Status: PLANNED**
+**Status: IN PROGRESS**
 
 Deliverables:
 
@@ -106,6 +112,8 @@ Deliverables:
 - online list where supported;
 - efficient read/query services;
 - caching only after correctness/freshness policy is defined.
+
+Current implementation already includes initial read-only highscores, character profiles, guild pages and configured server/channel metadata. The approved next bounded task is the cluster-wide online-character read model.
 
 Exit gate:
 
@@ -141,7 +149,7 @@ Deliverables:
 - news/page management;
 - role/permission model;
 - dedicated privileged actions;
-- mandatory admin MFA;
+- mandatory admin MFA by combining explicit RBAC/policy authorization with the Phase 3 `mfa.confirmed` gate;
 - admin audit trail;
 - Cloudflare Access deployment option/documentation;
 - no arbitrary code/plugin upload feature.
