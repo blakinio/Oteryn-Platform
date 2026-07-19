@@ -77,8 +77,8 @@ owned_paths:
   - tests/Feature/PublicGameData/PublicGameDataTest.php
   - tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php
   - docs/contracts/CANARY_DATA_CONTRACT.md
-  - docs/agents/PROJECT_STATE.md
   - docs/agents/ACTIVE_WORK.md
+  - docs/agents/PROJECT_STATE.md
   - docs/agents/tasks/active/OTERYN-20260719-online-list-read-model.md
   - docs/agents/tasks/active/OTERYN-20260719-phase3-identity-closure.md
   - docs/agents/tasks/archive/OTERYN-20260719-phase3-identity-closure.md
