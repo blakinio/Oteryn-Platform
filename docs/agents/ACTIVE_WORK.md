@@ -4,11 +4,15 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-No active task is currently claimed.
+- `OTERYN-20260719-identity-core-registration` — Phase 3 T3.1 Platform-owned Identity core and registration; branch `task/OTERYN-20260719-identity-core-registration`; PR #11; task checkpoint status `ready`. Scope is explicitly limited to Platform-owned identity persistence/registration, password hashing/policy, rate limiting and registration audit. It owns no Canary/shared write path and does not implement game-login authorization.
 
 ## Recommended next task
 
-Create `OTERYN-20260719-online-list-read-model` to implement the approved cluster-wide online-character PublicGameData read model from `cluster_sessions` plus public player fields. Enforce `status = 'ONLINE'`, unexpired `expires_at`, `players.deletion = 0`, explicit dependency-failure semantics and the existing query-only Canary test boundary; do not use `players_online` or add shared writes.
+After PR #11 is merged, create `OTERYN-20260719-web-login-sessions` as a separate Phase 3 T3.2 task/branch after re-verifying live prerequisites and owned-path overlap. Keep game-login authorization, credential migration and global cross-session revocation outside that task unless the relevant `AUTH_GAME_LOGIN_CONTRACT.md` blockers have been separately resolved.
+
+## Other queued work
+
+- `OTERYN-20260719-online-list-read-model` remains a valid independent PublicGameData task to implement the approved cluster-wide online-character read model from `cluster_sessions` plus public player fields. It must enforce `status = 'ONLINE'`, unexpired `expires_at`, `players.deletion = 0`, explicit dependency-failure semantics and the existing query-only Canary boundary; do not use `players_online` or add shared writes.
 
 ## Recently completed
 
