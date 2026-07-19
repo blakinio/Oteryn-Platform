@@ -18,9 +18,9 @@ final class ResetIdentityMfa
     {
         DB::transaction(function () use ($identity): void {
             $identity->forceFill([
-                'mfa_secret' => null,
-                'mfa_recovery_codes' => null,
-                'mfa_confirmed_at' => null,
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
             ])->save();
 
             $this->webSessions->execute($identity);
