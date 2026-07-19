@@ -84,4 +84,32 @@ final class CanaryGameDataRepository
             ->orderBy('id')
             ->get();
     }
+
+    /**
+     * @return Collection<int, stdClass>
+     */
+    public function onlineCharacters(?int $readTimeEpochMs = null): Collection
+    {
+        $readTimeEpochMs ??= (int) floor(microtime(true) * 1000);
+
+        return DB::connection('canary')
+            ->table('cluster_sessions as session')
+            ->join('players as player', 'player.id', '=', 'session.player_id')
+            ->join('channels as channel', 'channel.id', '=', 'session.channel_id')
+            ->select([
+                'player.id',
+                'player.name',
+                'player.level',
+                'player.vocation',
+                'session.channel_id as channel_id',
+                'channel.name as channel_name',
+            ])
+            ->where('session.status', 'ONLINE')
+            ->where('session.expires_at', '>', $readTimeEpochMs)
+            ->where('player.deletion', 0)
+            ->orderBy('channel.sort_order')
+            ->orderBy('channel.id')
+            ->orderBy('player.name')
+            ->get();
+    }
 }

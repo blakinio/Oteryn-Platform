@@ -4,6 +4,8 @@ namespace App\Http\Controllers\PublicGameData;
 
 use App\PublicGameData\CanaryGameDataRepository;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\QueryException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 final class PublicGameDataController
 {
@@ -39,5 +41,20 @@ final class PublicGameDataController
         return view('game.servers', [
             'channels' => $this->gameData->configuredChannels(),
         ]);
+    }
+
+    public function online(): View
+    {
+        try {
+            $characters = $this->gameData->onlineCharacters();
+        } catch (QueryException $exception) {
+            throw new ServiceUnavailableHttpException(
+                null,
+                'Online character data is temporarily unavailable.',
+                $exception,
+            );
+        }
+
+        return view('game.online', ['characters' => $characters]);
     }
 }
