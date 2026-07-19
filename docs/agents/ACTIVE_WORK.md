@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-channel-runtime-availability-discovery` — bounded Phase 4 discovery for fresh per-channel runtime availability/player-count transport from Canary to Oteryn Platform; branch `task/OTERYN-20260719-channel-runtime-availability-discovery`; draft PR pending; checkpoint status `investigating`. Scope is evidence/contract only: verify current Canary Redis runtime registry, SQL diagnostic mirror, any purpose-built endpoint and the Platform dependency/config boundary, then approve the smallest safe transport or record the exact blocker. No runtime integration code or cross-repository writes are authorized.
+- `OTERYN-20260719-channel-runtime-availability-discovery` — bounded Phase 4 discovery for fresh per-channel runtime availability/player-count transport from Canary to Oteryn Platform; branch `task/OTERYN-20260719-channel-runtime-availability-discovery`; draft PR #21; checkpoint status `validating`. The discovery approves a dedicated read-only Redis adapter over deterministic `cluster:channel:{id}:runtime` keys with Redis-TTL freshness and fail-closed complete-snapshot semantics. SQL `channel_runtime_status` and process-local `ProtocolStatus` are forbidden authoritative fallbacks. No runtime integration code or cross-repository writes are included in this task.
 
 ## Recommended next task
 
-Complete the current runtime-availability transport discovery first. Only after the transport/freshness/failure contract is proven may a bounded implementation task be approved.
+After this discovery is merged, the approved next bounded task is `OTERYN-20260719-channel-runtime-availability-read-model`: implement the dedicated read-only Redis runtime adapter, dependency/config boundary and public server/channel runtime projection under the approved contract without broadening the Canary database table allowlist.
 
 ## Other queued work
 
