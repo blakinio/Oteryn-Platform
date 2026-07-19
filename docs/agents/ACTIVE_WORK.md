@@ -4,27 +4,37 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-None.
+- `OTERYN-20260720-phase5-platform-account-provisioning-contract` — defines the operation-level contract for Platform-originated Canary account creation plus immutable `1 Platform Identity <-> 1 Canary accounts.id` binding; active on PR #31. Scope is contract/discovery only and performs no Canary/shared write.
 
 ## Recommended next task
 
-Create a bounded operation-contract task for **Platform-originated Canary account creation plus immutable 1:1 ownership binding**.
+After PR #31 is merged, implement the approved **Platform-originated Canary account provisioning + immutable 1:1 binding** vertical slice exactly within `docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`.
 
-The product decision is explicit and merged:
+The approved implementation shape is:
 
-- Oteryn Platform is authoritative for user Identity, account lifecycle and credential policy;
-- existing Canary accounts are not migration/claim inputs;
-- canonical cardinality is `1 Platform Identity <-> 1 Canary accounts.id`;
-- unlink and normal rebind/transfer are not supported;
-- normal recovery restores the same Platform Identity and retains the same binding;
-- character creation and every other user-scoped Canary mutation remain blocked until account creation plus binding are implemented and tested.
+- create durable Platform provisioning intent before any Canary write;
+- generate an internal immutable `accounts.name` as `op` + 30 random lowercase hexadecimal characters;
+- fill required `accounts.password` with a generated non-user sink credential hash whose plaintext is never persisted or exposed;
+- insert only `accounts(name, password, email, creation)` through a new dedicated least-privilege `canary_provisioning` connection;
+- leave the existing `canary` / `oteryn_readonly` connection unchanged;
+- recover partial success forward by the persisted provisioning name + creation epoch rather than deleting a committed Canary account;
+- persist the exact returned/recovered `accounts.id` as the immutable Platform-owned binding;
+- treat an Identity as game-account-ready only after the binding is durable.
 
-The next contract must prove exact Canary account creation fields, credential/game-login representation under the authoritative Platform model, separate least-privilege write connection/grants, cross-database failure/compensation semantics, concurrency/idempotency, audit and rollout dependency on Canary/login-server authentication integration.
+Character creation and every other user-scoped Canary mutation remain blocked until account provisioning plus binding are implemented and tested.
+
+## Cross-repository follow-up
+
+No Canary repository change is currently required for the account-provisioning write itself.
+
+A future separately authorized game-login integration task is required before Platform-originated users can authenticate to the game under the authoritative Platform credential model. The durable required direction is recorded in `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`:
+
+- `opentibiabr/login-server` should gain a Platform-authorized assertion/session exchange bound to exact `accounts.id`, with explicit expiry/replay/session semantics and no sink-password dependency;
+- if final requirements demand single-use DB sessions, stronger revocation, direct Platform assertion verification in Canary, or fencing/removal of alternate login paths, those changes belong to a separately authorized `blakinio/canary` task with rollout/backward-compatibility updates to `AUTH_GAME_LOGIN_CONTRACT.md`.
 
 ## Other queued work
 
-- Character-create implementation remains blocked until durable account ownership binding, product character-name normalization/reserved-name policy and exact starter-state rules are approved; its future write path must use a separate least-privilege Canary write credential/connection rather than broadening the existing read-only connection.
-- Authoritative game-login integration is now the target architecture: current native Canary/external login-server reusable-password verification must eventually be replaced/fenced or changed to consume Platform-authorized authentication/session material. Any Canary/login-server repository changes require separate explicit authorization and rollout coordination.
+- Character-create implementation remains independently blocked by product character-name normalization/reserved-name policy and exact starter-state rules even after ownership binding is implemented; its future write path must use a separate least-privilege Canary write credential/connection.
 - Existing-account claim/import is out of scope for the greenfield product. Adding it later requires a new explicitly approved migration/claim contract.
 - Admin/RBAC identity classification and permissions remain Phase 6. Exceptional privileged transfer/recovery of a binding is not available until a dedicated contract and those controls exist.
 
