@@ -12,9 +12,11 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 **Phase 1 — Laravel application bootstrap: COMPLETE**
 
-**Canary data-contract discovery: COMPLETE**
+**Phase 2 — Canary and login authentication discovery for current implementation boundaries: COMPLETE**
 
-**Authentication / web-to-game session discovery: COMPLETE**
+**Phase 3 — Identity foundation: COMPLETE**
+
+**Phase 4 — Public website and read-only game data: IN PROGRESS**
 
 **Initial read-only PublicGameData implementation: COMPLETE**
 
@@ -37,10 +39,17 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - committed Composer lockfile;
 - SQLite as the default Platform local/test database connection;
 - `GET /health` application availability route;
-- Laravel Pint formatting checks and GitHub Actions CI;
+- Laravel Pint formatting checks, PHPStan/Larastan and GitHub Actions CI;
+- Platform-owned Identity registration using framework password hashing;
+- secure Platform web login/logout with revocable `web_session_generation` state and fail-closed current-session middleware;
+- Platform password recovery and authenticated password change with web-session revocation and security audit events;
+- complete opt-in Platform web MFA using maintained `pragmarx/google2fa`, including secure enrollment confirmation, pending-login second-factor challenge, replay-resistant persisted TOTP timestep, hash-only single-use recovery codes inside encrypted state, layered rate limits, audit, disable and session revocation;
+- reusable `mfa.confirmed` middleware for future privileged routes; this gate requires confirmed MFA but does not classify administrators or grant authorization;
+- Phase 3 administrator-authentication composition defined as `auth` + explicit Phase 6 RBAC/policy authorization + mandatory `mfa.confirmed`;
+- current email-verification policy explicitly not required for Phase 3 and therefore not enabled;
+- Phase 3 credential compatibility strategy explicitly preserves game-login behavior by keeping Platform Identity credentials separate from Canary reusable credentials and performing no shared password migration/write;
 - evidence-backed Canary data contract with approved read boundaries and zero approved direct shared-data writes;
-- evidence-backed current web/login-server/Canary authentication contract;
-- documented target direction for one authoritative Identity policy and short-lived atomic game-login authorization;
+- evidence-backed current web/login-server/Canary authentication contract and staged target direction for one authoritative Identity policy plus short-lived atomic game-login authorization;
 - dedicated Canary read connection configured independently from the Platform-owned database;
 - read-only public level highscores at `GET /highscores`;
 - read-only active character profiles at `GET /characters/{name}`;
@@ -50,6 +59,40 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - an approved cluster-wide online-character read contract using sanitized `cluster_sessions` identity joined to public player fields, with mandatory `ONLINE` status, unexpired lease and active-character filters;
 - explicit online-read stale/failure semantics: expired lease rows are excluded, Canary DB failure is not converted to an empty list, and raw session/security fields remain non-public;
 - proven rejection of shared `players_online` as a multichannel authority because every process periodically rewrites/prunes it from only its local player set.
+
+## Phase 3 Identity summary
+
+Phase 3 is complete for the Platform-owned web Identity boundary.
+
+Implemented properties:
+
+- registration, login/logout, password recovery/change, revocable sessions, layered rate limiting and account security event recording are available on main;
+- MFA enrollment does not become confirmed until a maintained-provider TOTP is verified;
+- confirmed-MFA identities remain unauthenticated after password verification until a valid TOTP or recovery code completes the pending login challenge;
+- TOTP replay prevention persists the last accepted timestep and verifies/updates under database row locking;
+- recovery codes are returned in plaintext only at creation, framework-hashed before encrypted persistence and consumed atomically once;
+- MFA reset/disable and credential changes revoke Platform web sessions according to explicit policy;
+- future privileged routes can require the tested `mfa.confirmed` middleware in addition to authentication and separate authorization;
+- no `is_admin` or equivalent authorization shortcut was introduced.
+
+Phase 3 credential strategy:
+
+- Platform Identity passwords are Platform-owned and framework-hashed;
+- Phase 3 does not read or write the shared Canary `accounts.password` field and therefore preserves current game-login compatibility by non-interference;
+- shared credential migration remains blocked until every supported login entry point is integrated with the authoritative Identity contract, direct/fallback reusable-password paths are fenced, revocation is implemented across game credentials and exact deployed versions are proven;
+- Platform password reset/change and MFA currently govern Platform web authentication only and must not be described as globally revoking or gating native Canary/external login-server authentication.
+
+Email verification policy:
+
+- current Phase 3 product policy does not require email verification, so no verification gate is enabled;
+- a future Platform-web requirement may be added as a dedicated policy task;
+- a future requirement intended to gate game login cannot be claimed globally until every supported Canary/login-server path consults the same authoritative policy.
+
+Administrator authentication policy:
+
+- administrator identity classification and permissions belong to Phase 6 Admin/RBAC;
+- every future privileged/Admin route must require normal authentication, explicit deny-by-default RBAC/policy authorization and confirmed MFA through `mfa.confirmed`;
+- the MFA middleware is deliberately not an authorization mechanism and does not determine administrator status.
 
 ## PublicGameData implementation summary
 
@@ -115,29 +158,30 @@ Known data-contract blockers/unknowns:
 
 `docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md` maps current behavior and separately documents a recommended target contract.
 
-Credential migration remains blocked because:
+Global credential migration remains blocked because:
 
 - native Canary and external login-server authentication paths can coexist;
 - current native Canary verifies custom Argon2 then SHA-1 fallback;
 - current upstream external login-server verifies SHA-1 only;
 - standard Laravel Argon2id stored-string compatibility with Canary is not proven;
 - password/reset revocation across all game-login credential classes is not proven;
-- no inspected current game-login path globally enforces MFA or email verification;
+- current game-login paths do not globally enforce Platform MFA or email verification;
 - failed native Canary password authentication logs the stored credential hash value and requires a separate Canary security fix.
+
+These blockers do not block the completed Platform-owned Phase 3 web Identity boundary because that implementation does not mutate shared Canary credentials or claim game-login enforcement.
 
 ## What does not exist yet
 
 Unless source is added after this state update, the following are **not implemented**:
 
 - full production public website/CMS;
-- real Oteryn Platform account authentication/login;
-- password/hash migration;
-- MFA;
-- account management;
+- shared password/hash migration to an authoritative cross-component credential model;
+- global game-login enforcement of Platform MFA/email verification;
+- account management beyond Identity-owned credential/security operations;
 - character creation/delete/rename;
 - cluster-wide online character list route/UI despite its read contract now being approved;
 - live multichannel availability integration;
-- admin/RBAC/audit UI;
+- Admin/RBAC/audit UI and administrator identity classification;
 - Canary/shared-data write paths;
 - login-server integration code owned by Oteryn Platform;
 - production Cloudflare/deployment configuration;
@@ -162,9 +206,9 @@ Objective:
 ## High-priority unknowns and blockers
 
 - exact deployed production authentication topology and login-server image digest;
-- password hash compatibility/migration rollout;
-- password reset/change and global revocation behavior;
-- MFA/email-verification enforcement across every login path;
+- shared password hash compatibility/migration rollout;
+- password reset/change and global game-credential revocation behavior;
+- MFA/email-verification enforcement across every game-login path;
 - tournament-coin schema/code conflict;
 - maximum production wall-clock skew for exact lease freshness SLA;
 - final production hosting/network topology;
@@ -178,7 +222,7 @@ Cloudflare / Edge
        v
 Oteryn Platform (Laravel 13 / PHP 8.5 modular monolith)
        |
-       +--> platform-owned DB data
+       +--> Platform-owned Identity + application data
        |
        +--> explicit read/auth contracts
                     |

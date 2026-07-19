@@ -13,10 +13,10 @@ At architecture bootstrap, all product modules are `PLANNED` or `DISCOVERY`.
 
 | Module | Status | Owns | Must not own |
 |---|---|---|---|
-| Identity | DISCOVERY | Web authentication policy, credentials lifecycle, sessions, MFA, verification, recovery | Payments, game runtime, arbitrary character mutations |
+| Identity | AVAILABLE | Web authentication policy, credentials lifecycle, sessions, MFA, verification, recovery | Payments, game runtime, arbitrary character mutations |
 | Accounts | DISCOVERY | Account profile/settings and account-level business operations | Password verification logic, game runtime |
 | Characters | DISCOVERY | Authorized web-triggered character lifecycle operations allowed by contract | Direct undocumented writes to Canary tables |
-| PublicGameData | DISCOVERY | Read models/queries for characters, guilds, highscores, online/status | Privileged mutations |
+| PublicGameData | AVAILABLE | Read models/queries for characters, guilds, highscores, online/status | Privileged mutations |
 | CMS | PLANNED | News, pages, public managed content | Identity policy, game state |
 | Admin | PLANNED | Admin UI, privileged use cases, RBAC integration | Bypassing domain/application invariants |
 | Audit | PLANNED | Security/admin audit events and query surface | Secrets, raw credentials, business logic decisions |
@@ -39,12 +39,22 @@ At architecture bootstrap, all product modules are `PLANNED` or `DISCOVERY`.
 - authentication rate limiting;
 - security-sensitive identity audit events.
 
+### Current available boundary
+
+The available Phase 3 implementation is the Oteryn Platform **web Identity** authority. It provides registration, framework-hashed Platform credentials, login/logout, revocable web sessions, password recovery/change, rate limiting, security-event recording and complete opt-in web MFA.
+
+Platform Identity credentials are deliberately separate from Canary reusable credentials. No Phase 3 flow writes shared Canary passwords or claims to revoke native Canary/login-server game credentials. The future authoritative game-login migration remains governed by `docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md`.
+
+Current product policy does not require email verification for Phase 3, so no email-verification gate is enabled. A future requirement must be introduced as an explicit policy change and, if intended to gate game login, integrated across every supported authentication path.
+
 ### Invariants
 
 - one authoritative web identity policy;
 - credentials never stored reversibly;
-- security-sensitive changes may revoke existing sessions;
+- security-sensitive changes may revoke existing Platform web sessions;
 - administrator MFA is mandatory before production readiness;
+- future privileged/Admin routes must combine authentication, explicit Admin/RBAC authorization and the reusable `mfa.confirmed` gate;
+- the MFA gate never determines administrator status or grants authorization by itself;
 - compatibility with game login remains contract-driven.
 
 ## Accounts
@@ -90,6 +100,8 @@ Potential operations include create, rename, delete/soft-delete and other web ac
 
 Prefer dedicated query/read-model services. Cache may be introduced after correctness is established. Staleness expectations must be explicit for each view.
 
+The module is available on main for the implemented read-only surfaces. The cluster-wide online-character route remains the next bounded Phase 4 extension under its approved read contract.
+
 ## CMS
 
 ### Responsibilities
@@ -122,7 +134,7 @@ Prefer dedicated query/read-model services. Cache may be introduced after correc
 - no implicit "admin can do everything" shortcut;
 - privileged actions audited;
 - no direct arbitrary PHP/code/plugin execution feature;
-- admin access protected by MFA and preferably Cloudflare Access in production.
+- admin access protected by explicit authorization plus the Phase 3 confirmed-MFA gate, and preferably Cloudflare Access in production.
 
 ## Audit
 
