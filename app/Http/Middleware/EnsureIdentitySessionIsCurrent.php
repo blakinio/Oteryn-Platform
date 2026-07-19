@@ -23,7 +23,7 @@ final class EnsureIdentitySessionIsCurrent
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $identity = Auth::guard('web')->user();
+        $identity = Auth::user();
 
         if ($identity === null) {
             return $next($request);
