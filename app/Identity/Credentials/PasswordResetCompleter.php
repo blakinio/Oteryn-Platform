@@ -15,7 +15,7 @@ final class PasswordResetCompleter
     ) {}
 
     /**
-     * @param  array{email: string, token: string, password: string, password_confirmation: string}  $input
+     * @param  array{email: string, token: string, password: string}  $input
      */
     public function complete(array $input): string
     {
