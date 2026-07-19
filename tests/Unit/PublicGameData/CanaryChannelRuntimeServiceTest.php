@@ -145,7 +145,7 @@ final class CanaryChannelRuntimeServiceTest extends TestCase
         self::assertNull($snapshot->forChannel(2));
     }
 
-    private function commandExpectation(Connection&MockInterface $connection): Expectation
+    private function commandExpectation(MockInterface $connection): Expectation
     {
         /** @var Expectation */
         $expectation = $connection->shouldReceive('command');
