@@ -1,0 +1,46 @@
+name: Static Analysis Diagnostics
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  capture-findings:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies from lockfile
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Capture static-analysis findings
+        shell: bash
+        run: |
+          set +e
+          composer analyse > phpstan.log 2>&1
+          status=$?
+          cat phpstan.log
+          printf '%s\n' "$status" > phpstan.exit
+          exit 0
+
+      - name: Upload static-analysis findings
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpstan-findings
+          path: |
+            phpstan.log
+            phpstan.exit
+          if-no-files-found: error
+          retention-days: 1
