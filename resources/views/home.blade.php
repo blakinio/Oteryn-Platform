@@ -1,29 +1,42 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name') }}</title>
-    <style>
-        :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-        body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #111827; color: #f9fafb; }
-        main { width: min(42rem, calc(100% - 3rem)); padding: 3rem; border: 1px solid #374151; border-radius: 1rem; background: #1f2937; }
-        .eyebrow { margin: 0 0 .75rem; font-size: .75rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #93c5fd; }
-        h1 { margin: 0 0 1rem; font-size: clamp(2rem, 6vw, 3.5rem); line-height: 1.05; }
-        p { line-height: 1.7; color: #d1d5db; }
-        nav { display: flex; gap: 1rem; margin-top: 1.5rem; }
-        a, code { color: #bfdbfe; }
-    </style>
-</head>
-<body>
-<main>
-    <p class="eyebrow">Oteryn Platform</p>
-    <h1>Laravel 13 foundation is online.</h1>
-    <p>The initial read-only public game-data surfaces are available. Infrastructure monitoring can use <code>GET /health</code>.</p>
-    <nav aria-label="Public game data">
-        <a href="{{ route('game.highscores.index') }}">Highscores</a>
-        <a href="{{ route('game.servers.index') }}">Servers</a>
-    </nav>
-</main>
-</body>
-</html>
+@extends('game.layout')
+
+@section('title', 'Home')
+
+@section('content')
+    <h1>Oteryn Platform</h1>
+    <p class="muted">Laravel 13 foundation is online. Browse the implemented read-only game-data surfaces without requiring shared Canary write access.</p>
+
+    <section class="card" aria-labelledby="character-search-heading">
+        <h2 id="character-search-heading">Find a character</h2>
+        <p class="muted">Search by exact character name.</p>
+
+        <form method="GET" action="{{ route('game.characters.search') }}">
+            <div class="search-row">
+                <label for="character-name">Character name</label>
+                <input
+                    id="character-name"
+                    name="name"
+                    type="search"
+                    value="{{ old('name') }}"
+                    maxlength="255"
+                    required
+                >
+                <button type="submit">Search</button>
+            </div>
+
+            @error('name')
+                <p class="notice">{{ $message }}</p>
+            @enderror
+        </form>
+    </section>
+
+    <section class="card" aria-labelledby="public-data-heading">
+        <h2 id="public-data-heading">Public game data</h2>
+        <p>
+            <a href="{{ route('game.online.index') }}">Online characters</a>,
+            <a href="{{ route('game.highscores.index') }}">level highscores</a>, and
+            <a href="{{ route('game.servers.index') }}">configured servers</a>
+            are available through the current read-only public surface.
+        </p>
+    </section>
+@endsection

@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-online-list-read-model` — bounded Phase 4 PublicGameData cluster-wide online-character read model; branch `task/OTERYN-20260719-online-list-read-model`; draft PR #18; checkpoint status `validating`. Scope is limited to `cluster_sessions` + public `players` fields through the dedicated query-only Canary boundary, mandatory `ONLINE`/unexpired/deletion filters, explicit dependency-failure semantics, sanitized public output, and synchronized expansion of the enforced Canary DB SELECT allowlist to `cluster_sessions`. Delivery head `1a584d862af1802d5d0cd9d1604f1f5a7a1f93d2` passed CI #280 and Agent Governance #201; a fresh exact-head pass is required after the final ready checkpoint before merge.
+- `OTERYN-20260719-public-site-shell-and-search` — bounded Phase 4 public-web shell/navigation and exact-name character search; branch `task/OTERYN-20260719-public-site-shell-and-search`; draft PR #19; checkpoint status `ready`. Scope reuses the existing Blade game-data layout as the shared public shell, exposes Home/Online/Highscores/Servers navigation, adds a validated GET character-search redirect to the existing profile route, and adds focused tests/documentation without new Canary reads, caching, live runtime-status claims or shared-data writes. Delivery head `e936dc94e176f23525d799df23d6714bca042d3a` passed CI #300 and Agent Governance #221; a fresh exact-head pass is required after the final ready checkpoint before merge.
 
 ## Recommended next task
 
-Derive the next bounded Phase 4 task from the current roadmap and project state only after this online-list task is merged and archived.
+Complete and merge the current public shell/search slice first. After merge, derive the next bounded Phase 4 task from live roadmap/project state; do not pre-authorize CMS/news implementation or live runtime availability integration from this index.
 
 ## Other queued work
 
@@ -18,6 +18,7 @@ Derive the next bounded Phase 4 task from the current roadmap and project state 
 
 ## Recently completed
 
+- `OTERYN-20260719-online-list-read-model` — cluster-wide read-only online-character list merged through PR #18 as `c66a8c1b352c757d1beb15f1ec838eb2d3ce17d5`; task record archived unchanged by exact blob identity when the current public-site task started.
 - `OTERYN-20260719-phase3-identity-closure` — Phase 3 Identity foundation closure merged through PR #17 as `6aeaf961aafbfa8e991d1b11bd9f1e9fe578d5a5`; task record archived unchanged when the next real Phase 4 task started.
 - `OTERYN-20260719-platform-web-mfa` — Phase 3 T3.4c complete Platform web MFA lifecycle merged through PR #16 as `b1947b2e918b689bac636942ce244492227158bb`; archived task record under `docs/agents/tasks/archive/`.
 - `OTERYN-20260719-mfa-totp-provider-resolution` — Phase 3 T3.4b real Composer resolution for maintained `pragmarx/google2fa:^9.0` merged through PR #15 as `d4cc4189cbc99f47b4cec69ce198bd5ded43d719`; task record archived under `docs/agents/tasks/archive/`.
