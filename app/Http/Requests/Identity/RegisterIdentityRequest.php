@@ -3,9 +3,9 @@
 namespace App\Http\Requests\Identity;
 
 use App\Identity\Support\CanonicalEmail;
+use App\Identity\Support\IdentityPasswordPolicy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Password;
 
 final class RegisterIdentityRequest extends FormRequest
 {
@@ -43,11 +43,7 @@ final class RegisterIdentityRequest extends FormRequest
                 'string',
                 'max:1024',
                 'confirmed',
-                Password::min(12)
-                    ->letters()
-                    ->mixedCase()
-                    ->numbers()
-                    ->symbols(),
+                IdentityPasswordPolicy::rule(),
             ],
         ];
     }
