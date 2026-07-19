@@ -10,6 +10,7 @@ use App\Accounts\Models\IdentityCanaryAccount;
 use App\Audit\SecurityEventRecorder;
 use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -172,7 +173,7 @@ final class ProvisionCanaryAccountTest extends TestCase
 
     private function eventCount(int $identityId, string $eventType): int
     {
-        return (int) \DB::table('identity_security_events')
+        return (int) DB::table('identity_security_events')
             ->where('identity_id', $identityId)
             ->where('event_type', $eventType)
             ->count();
