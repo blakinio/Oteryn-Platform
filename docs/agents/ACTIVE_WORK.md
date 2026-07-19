@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase5-character-creation-policy-revalidation` — PR #35 revalidates the remaining character-create gate after ownership binding was implemented. No character write is authorized in this task.
+None.
 
 ## Proven implementation result
 
@@ -16,11 +16,13 @@ The existing `canary` / `oteryn_readonly` connection remains unchanged.
 
 ## Current character-create gate
 
-Current revalidation against Canary `37b41a29c8743d4c976eb7fcb82d684594722aa4` confirms that ownership is no longer the blocker, but the repository still does not prove the required Oteryn product policy for:
+Character-create policy revalidation merged through PR #35 as `35ca943d6051ff27f215b813d51a5ae557cbac40` against Canary `37b41a29c8743d4c976eb7fcb82d684594722aa4`.
+
+Ownership is no longer the blocker. The remaining gate is an explicit Oteryn product decision for:
 
 - character-name normalization, allowed characters/capitalization and reserved names;
 - starter-state inputs and persisted state, including vocation, sex/pronoun, town/position, stats, outfit, skills, items and storage/quest/tutorial initialization;
-- maximum characters per account and limit/race semantics.
+- maximum characters per account and concurrent-limit semantics.
 
 Current Canary schema/load behavior and global login hooks are compatibility evidence only. They do not define a generic product starter kit or authoritative web character-name policy.
 
@@ -30,7 +32,7 @@ Until those product decisions exist, the exact dependent initialization write se
 
 ## Recommended next dependency
 
-After PR #35 is merged, create an explicit Oteryn product-policy decision task/ADR for:
+Create an explicit Oteryn product-policy decision task/ADR for:
 
 1. canonical character-name policy and reserved names;
 2. canonical starter-state policy and creation-time choices;
@@ -58,6 +60,7 @@ Separately, the future authoritative game-login integration remains recorded in 
 
 ## Recently completed
 
+- `OTERYN-20260720-phase5-character-creation-policy-revalidation` — revalidated character creation after ownership binding implementation, merged through PR #35 as `35ca943d6051ff27f215b813d51a5ae557cbac40`; ownership authorization is resolved and the remaining blockers are explicit product naming/starter/character-limit decisions plus the dependent write/grant surface derived from them. The task record is archived unchanged by post-merge housekeeping.
 - `OTERYN-20260720-phase5-platform-account-provisioning-implementation` — implemented and validated Platform-originated Canary account provisioning plus immutable 1:1 ownership binding, merged through PR #33 as `d5c319448737ee5badd8ab73967535a5ec9b67d1`; final ready-head CI #477 and Agent Governance #398 passed. The task record is archived unchanged with blob `2217873d3a777bdb3285861822578898fae74930` by post-merge housekeeping.
 - `OTERYN-20260720-phase5-platform-account-provisioning-contract` — approved the bounded provisioning/binding operation contract, merged through PR #31 as `dd60e29eee2ecf6f2053fcf09c4d7d6606c28c76`.
 - `OTERYN-20260719-phase5-ownership-binding-dependency-gate` — selected the greenfield authoritative Platform account model and immutable `1 Platform Identity <-> 1 Canary accounts.id` ownership direction, merged through PR #29 as `bb007f5dbe30711b1c951b621506c2cca6834a07`.
