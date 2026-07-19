@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-phase5-identity-canary-account-binding` — bounded Phase 5 discovery for durable Platform Identity → Canary `accounts.id` ownership; branch `task/OTERYN-20260719-phase5-identity-canary-account-binding`; draft PR #27; checkpoint status `validating`. Current evidence does **not** approve a binding implementation: email is non-unique, direct shared-password verification would create another credential authority, normal external login creates a reusable 24-hour game session and is SHA-1-only, and no purpose-built side-effect-free account-control claim API is proven. `docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md` records the exact blocker and target claim properties.
+- `OTERYN-20260719-phase5-identity-canary-account-binding` — bounded Phase 5 discovery for durable Platform Identity → Canary `accounts.id` ownership; branch `task/OTERYN-20260719-phase5-identity-canary-account-binding`; draft PR #27; checkpoint status `ready`. Current evidence does **not** approve a binding implementation: email is non-unique, direct shared-password verification would create another credential authority, normal external login creates a reusable 24-hour game session and is SHA-1-only, and no purpose-built side-effect-free account-control claim API is proven. `docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md` records the exact blocker and target claim properties.
 
 ## Recommended next task
 
