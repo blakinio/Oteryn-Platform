@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "contract_name": "oteryn-checkpoint-handoff",
+  "shared_checkpoint_contract": {
+    "version": 1,
+    "reference": {
+      "repository": "blakinio/canary",
+      "observed_at_canary_commit": "c1c0d10ed1e758cb72728be5fe22458cd9d9e61a",
+      "checkpoint_version": 1
+    },
+    "required_fields": [
+      "checkpoint_version",
+      "updated_at",
+      "head",
+      "branch",
+      "pr",
+      "status",
+      "context_routes",
+      "owned_paths",
+      "proven",
+      "derived",
+      "unknown",
+      "conflicts",
+      "first_failure",
+      "rejected_hypotheses",
+      "changed_paths",
+      "validation",
+      "blockers",
+      "next_action"
+    ],
+    "allowed_statuses": [
+      "investigating",
+      "implementing",
+      "validating",
+      "blocked",
+      "ready"
+    ],
+    "allowed_validation_results": [
+      "PASS",
+      "FAIL",
+      "BLOCKED",
+      "NOT_RUN"
+    ],
+    "evidence_state_fields": {
+      "PROVEN": "proven",
+      "DERIVED": "derived",
+      "UNKNOWN": "unknown",
+      "CONFLICT": "conflicts"
+    },
+    "rules": [
+      "Every substantial active task has exactly one Context checkpoint section with one fenced YAML block.",
+      "checkpoint_version matches shared_checkpoint_contract.version.",
+      "All required_fields exist at the top level.",
+      "next_action appears exactly once at the top level and is a non-empty concrete scalar rather than a placeholder.",
+      "Validation result values come from allowed_validation_results.",
+      "A normalized exact fact cannot appear in more than one evidence-state list."
+    ]
+  },
+  "repository_specific_scope": [
+    "Repository allowlists and write permissions.",
+    "Oteryn Platform context routes and architecture/document routing.",
+    "Delivery, merge, security, Laravel, database, and cross-repository policies outside the shared checkpoint/handoff structure."
+  ],
+  "upgrade_required_when": [
+    "Canary changes the shared checkpoint version, required checkpoint fields, status values, validation result values, evidence-state semantics, next_action cardinality, or evidence-state conflict rule.",
+    "Oteryn Platform intentionally changes any shared checkpoint/handoff rule incompatibly with the declared reference version."
+  ],
+  "upgrade_process": [
+    "Inspect the current Canary checkpoint/handoff contract read-only.",
+    "Decide whether Oteryn Platform adopts the new shared version or records an intentional divergence.",
+    "Update this marker, CONTEXT_HANDOFF.md, TASK_TEMPLATE.md, checkpoint.py, and validator tests together.",
+    "Keep repository-specific governance independent; do not mechanically synchronize complete AGENTS.md or routing content."
+  ]
+}

@@ -6,6 +6,18 @@ Chat history is disposable. Git state, the active task record, the live PR and d
 
 A continuation agent must be able to resume without reading the previous conversation.
 
+## Governance contract version
+
+The machine-readable marker for the checkpoint/handoff contract is `docs/agents/GOVERNANCE_CONTRACT.json`.
+
+Current shared checkpoint contract: **version 1**.
+
+The shared contract covers only the checkpoint/handoff structure: required checkpoint fields, supported status values, evidence-state fields (`PROVEN`, `DERIVED`, `UNKNOWN`, `CONFLICT`), supported validation results, one top-level concrete `next_action`, and the basic rule that the same normalized fact cannot occupy multiple evidence-state lists.
+
+`blakinio/canary` is a read-only compatibility reference for this shared contract. Oteryn Platform repository allowlists, delivery policy, architecture routing, Laravel/database/security rules and other repository-specific governance remain independent and must not be mechanically synchronized with Canary.
+
+An upgrade is required when either repository changes a shared checkpoint/handoff rule incompatibly or increments the shared checkpoint contract version. In that case, inspect Canary read-only, decide whether Oteryn adopts the new shared version or intentionally diverges, and update `GOVERNANCE_CONTRACT.json`, this document, `TASK_TEMPLATE.md`, `tools/agents/checkpoint.py` and its tests together.
+
 ## When to checkpoint
 
 Update the active task record when:
@@ -30,7 +42,7 @@ Update the active task record when:
 
 ## Checkpoint schema
 
-Every substantial active task must contain:
+Every substantial active task must contain a checkpoint whose `checkpoint_version` matches `shared_checkpoint_contract.version` in `docs/agents/GOVERNANCE_CONTRACT.json`:
 
 ```yaml
 checkpoint_version: 1
@@ -68,6 +80,26 @@ next_action: <one concrete next step>
 ```
 
 Omit irrelevant historical detail. Preserve what a new agent needs to continue correctly.
+
+Validate one checkpoint locally with:
+
+```sh
+python tools/agents/checkpoint.py docs/agents/tasks/active/<task>.md --require-checkpoint
+```
+
+Validate all active task records with:
+
+```sh
+python tools/agents/checkpoint.py --tasks docs/agents/tasks/active --require-checkpoint
+```
+
+Run validator tests with:
+
+```sh
+python tools/agents/test_checkpoint.py
+```
+
+The validator checks deterministic structure only. It does **not** verify that `head`, branch, PR state, CI status, evidence references or repository state are currently true; agents must still perform live Git/PR/CI verification.
 
 ## Evidence states
 

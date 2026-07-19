@@ -25,6 +25,8 @@ cross_repository_tasks:
 
 ## Context checkpoint
 
+`checkpoint_version` must match `shared_checkpoint_contract.version` in `docs/agents/GOVERNANCE_CONTRACT.json`. Validate the completed checkpoint with `python tools/agents/checkpoint.py <task-path> --require-checkpoint`.
+
 ```yaml
 checkpoint_version: 1
 updated_at: YYYY-MM-DDTHH:MM:SSZ
@@ -57,4 +59,4 @@ next_action: <one concrete next step>
 
 ## Notes
 
-Keep this section concise. Durable continuation state belongs in the checkpoint above. Do not paste secrets, full logs or full diffs.
+Keep this section concise. Durable continuation state belongs in the checkpoint above. Do not paste secrets, full logs or full diffs. Structural checkpoint validation does not replace live Git, PR or CI verification.
