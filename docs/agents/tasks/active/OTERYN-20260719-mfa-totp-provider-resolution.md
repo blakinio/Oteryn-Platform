@@ -13,7 +13,7 @@ The selected dependency is `pragmarx/google2fa:^9.0`. Full Laravel Fortify adopt
 - [x] Run real Composer dependency resolution against the current repository state for `pragmarx/google2fa:^9.0`.
 - [x] Commit `composer.json` and the Composer-generated `composer.lock` only after successful dependency resolution; never hand-edit the lockfile.
 - [x] Confirm the resolved dependency graph installs from lockfile in CI.
-- [x] Run Composer validation, lockfile install, Pint, PHPStan/Larastan level 10 and the full test suite on the generated dependency head.
+- [x] Run Composer validation, lockfile install, Pint, PHPStan/Larastan level 10 and the full test suite on the exact validated head.
 - [x] Do not add application MFA generation/verification code, public routes, controllers, views, login challenge/enforcement, recovery-code consumption or Admin/RBAC semantics in this task.
 - [x] Do not modify Canary/login-server repositories, shared credentials, game sessions or game-login policy.
 - [x] Remove the ephemeral Composer-resolution workflow before readiness so no workflow change is merged to `main`.
@@ -69,11 +69,11 @@ Normal repository CI subsequently validated the metadata, installed dependencies
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-19T13:32:00+02:00
-head: cfcbc94bdbac251b34091076358f3434acc7786f
+updated_at: 2026-07-19T13:38:00+02:00
+head: 0cb969f2417abaaf34d5cd11816343cd6ee83210
 branch: task/OTERYN-20260719-mfa-totp-provider-resolution
 pr: 15
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - auth-identity
@@ -94,6 +94,7 @@ proven:
   - Composer generated a direct requirement pragmarx/google2fa ^9.0 and locked pragmarx/google2fa v9.0.0 plus paragonie/constant_time_encoding v3.1.3.
   - The ephemeral resolver workflow was deleted from the task branch after successful resolution and is absent from the intended final merge diff.
   - Normal CI run 29685009921 passed Composer validation, lockfile installation, Pint, PHPStan/Larastan and the full test suite on dependency head cfcbc94bdbac251b34091076358f3434acc7786f.
+  - Documentation validation head 0cb969f2417abaaf34d5cd11816343cd6ee83210 passed CI run 29685148194 and Agent Governance run 29685148193.
   - No application MFA flow, public auth route, Admin/RBAC semantic, Canary/login-server write or global game-login MFA claim was added.
   - Trust boundary affected by the final task output is dependency metadata only; no authentication request path, secret state transition or session policy changes.
   - Canary/login-server schema or session compatibility changes: none.
@@ -131,13 +132,13 @@ validation:
     evidence: ephemeral GitHub Actions resolver run 29684799693 completed successfully and committed Composer-generated composer.json/composer.lock only
   - command: composer validate --strict; composer install --no-interaction --prefer-dist --no-progress; composer format:check; composer analyse; composer test
     result: PASS
-    evidence: normal CI run 29685009921 passed all required steps on dependency head cfcbc94bdbac251b34091076358f3434acc7786f
+    evidence: normal CI run 29685148194 passed all required steps on documentation validation head 0cb969f2417abaaf34d5cd11816343cd6ee83210; dependency head cfcbc94bdbac251b34091076358f3434acc7786f also passed CI run 29685009921
   - command: python tools/agents/test_checkpoint.py; python tools/agents/checkpoint.py --tasks docs/agents/tasks/active --require-checkpoint
-    result: FAIL
-    evidence: Agent Governance run 29685009894 rejected the previous checkpoint because validation result PENDING is outside the governance contract; this checkpoint replaces it with supported results
+    result: PASS
+    evidence: Agent Governance run 29685148193 passed on documentation validation head 0cb969f2417abaaf34d5cd11816343cd6ee83210 after replacing unsupported validation result PENDING
 blockers:
   - none for T3.4b dependency-resolution scope
-next_action: Re-run normal CI and Agent Governance on the final documentation checkpoint head, then perform the full PR #15 merge gate and squash-merge if both checks pass.
+next_action: Revalidate CI and Agent Governance on the final ready checkpoint head, inspect PR #15 divergence, final diff, reviews/comments/threads and mergeability, then squash-merge only if the full merge gate remains satisfied.
 ```
 
 ## Notes
