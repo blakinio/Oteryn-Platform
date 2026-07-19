@@ -4,21 +4,21 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260719-public-news-read-model` — bounded Phase 4 Platform-owned CMS public-news read model; branch `task/OTERYN-20260719-public-news-read-model`; draft PR #20; checkpoint status `ready`. Scope is limited to Platform-owned `news_posts` persistence, published-only public list/detail reads, deterministic pagination/order, escaped plain-text rendering and focused tests. No authoring, Admin/RBAC, uploads, rich HTML, Canary access or shared-data writes are authorized. Delivery head `02913cab0121fc7165ef0a02efd945c0e64c3093` passed CI #317 and Agent Governance #238; a fresh exact-head pass is required after the final ready checkpoint before merge.
+- `OTERYN-20260719-channel-runtime-availability-discovery` — bounded Phase 4 discovery for fresh per-channel runtime availability/player-count transport from Canary to Oteryn Platform; branch `task/OTERYN-20260719-channel-runtime-availability-discovery`; draft PR pending; checkpoint status `investigating`. Scope is evidence/contract only: verify current Canary Redis runtime registry, SQL diagnostic mirror, any purpose-built endpoint and the Platform dependency/config boundary, then approve the smallest safe transport or record the exact blocker. No runtime integration code or cross-repository writes are authorized.
 
 ## Recommended next task
 
-Complete and merge the current public-news read slice first. After merge, re-evaluate remaining Phase 4 work against live roadmap/project state, especially the separate unresolved fresh multichannel runtime availability concern.
+Complete the current runtime-availability transport discovery first. Only after the transport/freshness/failure contract is proven may a bounded implementation task be approved.
 
 ## Other queued work
 
 - Authoritative cross-component credential/game-login migration remains a later separately coordinated programme under `AUTH_GAME_LOGIN_CONTRACT.md`; Phase 3 completion does not authorize shared Canary credential writes.
 - Admin/RBAC identity classification and permissions remain Phase 6. Future privileged routes must combine explicit authorization with the Phase 3 `mfa.confirmed` gate rather than an `is_admin` shortcut.
-- Fresh per-channel runtime availability/count transport remains separate from the online-character identity read model.
 
 ## Recently completed
 
-- `OTERYN-20260719-public-site-shell-and-search` — shared public Blade shell/navigation and exact-name character search merged through PR #19 as `fc50b92208de67a4630d994a8ad3923f2e1fa07e`; task record archived unchanged by exact blob identity when the current public-news task started.
+- `OTERYN-20260719-public-news-read-model` — Platform-owned published-only public news list/detail merged through PR #20 as `3031f299d15a3761d6c332d6138a46629b59d009`; task record archived unchanged by exact blob identity when the current runtime-availability discovery started.
+- `OTERYN-20260719-public-site-shell-and-search` — shared public Blade shell/navigation and exact-name character search merged through PR #19 as `fc50b92208de67a4630d994a8ad3923f2e1fa07e`; task record archived unchanged by exact blob identity when the public-news task started.
 - `OTERYN-20260719-online-list-read-model` — cluster-wide read-only online-character list merged through PR #18 as `c66a8c1b352c757d1beb15f1ec838eb2d3ce17d5`; task record archived unchanged by exact blob identity when the public-site task started.
 - `OTERYN-20260719-phase3-identity-closure` — Phase 3 Identity foundation closure merged through PR #17 as `6aeaf961aafbfa8e991d1b11bd9f1e9fe578d5a5`; task record archived unchanged when the next real Phase 4 task started.
 - `OTERYN-20260719-platform-web-mfa` — Phase 3 T3.4c complete Platform web MFA lifecycle merged through PR #16 as `b1947b2e918b689bac636942ce244492227158bb`; archived task record under `docs/agents/tasks/archive/`.
