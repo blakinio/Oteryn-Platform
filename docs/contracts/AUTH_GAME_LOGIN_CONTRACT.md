@@ -11,7 +11,7 @@ This document separates:
 3. source/documentation disagreements marked `CONFLICT`;
 4. a **recommended target contract** that is design direction, not implemented behavior.
 
-Do not implement credential migration, MFA enforcement, password reset integration or a new game-login token path until a separately approved implementation task satisfies the rollout gates in this document.
+Do not implement shared credential migration, global game-login MFA/email enforcement or a new game-login token path until a separately approved implementation task satisfies the rollout gates in this document. Platform-local web Identity controls may be implemented without changing that global-auth boundary, but they must not be represented as Canary/login-server enforcement.
 
 ## Evidence baseline
 
@@ -19,7 +19,7 @@ Do not implement credential migration, MFA enforcement, password reset integrati
 
 - Repository: `blakinio/Oteryn-Platform`
 - Base revision at discovery start: `f968681732ec3e0688ff29426108b49dce79af16`
-- Current state: Laravel foundation exists; real Identity/Auth is not implemented.
+- Current state: Platform-owned web Identity is implemented for registration, framework-hashed credentials, login/logout, revocable web sessions, password recovery/change and opt-in web MFA. It remains separate from Canary/login-server reusable credentials and is not yet the authoritative game-login credential verifier.
 
 ### Canary
 
@@ -67,7 +67,7 @@ The inspected source supports/coexists with:
 
 A security rule implemented only in Oteryn Platform can currently be bypassed by another exposed credential-validation path unless every alternative path is disabled, network-restricted or changed to consult the same authoritative policy.
 
-This is especially relevant to future:
+This is especially relevant to any future claim of global enforcement for:
 
 - MFA;
 - email verification gates;
@@ -481,11 +481,11 @@ No MFA/TOTP or email-verification gate is present in the inspected:
 - Canary `ProtocolGame` password/session flow;
 - current upstream external login-server authentication flow.
 
-No real Oteryn Platform Identity implementation exists yet.
+Oteryn Platform now has a Platform-owned web Identity implementation with password recovery/change, revocable web sessions and opt-in MFA. These controls govern Platform web authentication only and do not change the inspected Canary or external login-server paths listed above.
 
-### Deployment/product status — UNKNOWN
+### Platform policy status — PARTIALLY PROVEN / GLOBAL GAME POLICY UNKNOWN
 
-A separately deployed website/admin component could implement its own email verification or MFA behavior, but no evidence was provided that such a policy gates every game-login path.
+Oteryn Platform web Identity now implements opt-in MFA for identities that enroll. Current Phase 3 product policy does not require email verification, so no Platform email-verification gate is enabled. No evidence proves that Platform MFA or any future email-verification policy gates every native Canary or external login-server authentication path.
 
 ### Security consequence — DERIVED
 
@@ -493,17 +493,16 @@ Platform-only MFA or email verification would not become a global game-login req
 
 ## Password change and password reset
 
-### Current end-to-end behavior — UNKNOWN
+### Current global end-to-end behavior — PARTIALLY PROVEN / GAME REVOCATION UNKNOWN
 
-The inspected Canary and upstream login-server sources prove password verification/session issuance, but do not prove the currently deployed website's password-change/reset implementation.
+Oteryn Platform web Identity implements password change and password reset and revokes Platform web sessions according to its `web_session_generation` policy. The inspected Canary and upstream login-server paths remain separate reusable-credential/session authorities.
 
-No evidence proves that password change/reset currently:
+No evidence proves that Platform password change/reset currently:
 
-- deletes `account_sessions`;
-- invalidates pending LoginSessionManager tokens;
+- deletes Canary/login-server `account_sessions`;
+- invalidates pending Canary LoginSessionManager tokens;
 - disconnects active game sessions;
-- rotates all web sessions;
-- enforces email verification/MFA recovery policy.
+- enforces Platform email-verification or MFA policy across every game-login path.
 
 ### Proven non-coupling
 
@@ -561,7 +560,7 @@ LoginSessionManager token issuance fails closed if CSPRNG seeding/generation fai
 
 Canary cluster runtime can fail closed for new sessions when it cannot safely verify cluster session state.
 
-### Platform outage — CURRENTLY NOT AUTHORITATIVE
+### Platform outage — CURRENTLY NOT AUTHORITATIVE FOR GAME AUTHENTICATION
 
 Because Oteryn Platform is not yet in the game authentication path, its outage does not currently prevent native Canary or external login-server authentication.
 
@@ -628,9 +627,9 @@ Native Canary excludes deleted players from account player lists; current upstre
 
 | Event | Platform web sessions | Pending 60s Canary one-time tokens | DB `account_sessions` | Active game session | Current evidence |
 |---|---|---|---|---|---|
-| Password change | NOT_IMPLEMENTED/UNKNOWN | Not proven revoked | Not proven revoked | Not proven disconnected | UNKNOWN |
-| Password reset | NOT_IMPLEMENTED/UNKNOWN | Not proven revoked | Not proven revoked | Not proven disconnected | UNKNOWN |
-| MFA reset | NOT_IMPLEMENTED | No current MFA binding | No current MFA binding | No current MFA binding | PROVEN/DERIVED |
+| Password change | Revoked by Platform `web_session_generation` policy | Not proven revoked | Not proven revoked | Not proven disconnected | PROVEN for Platform web / game revocation UNKNOWN |
+| Password reset | Revoked by Platform `web_session_generation` policy | Not proven revoked | Not proven revoked | Not proven disconnected | PROVEN for Platform web / game revocation UNKNOWN |
+| MFA reset | Revoked by Platform `web_session_generation` policy | No current game MFA binding | No current game MFA binding | No current game MFA binding | PROVEN for Platform web / DERIVED for game non-binding |
 | Account banned | N/A current Platform | Not proven revoked | Not proven revoked | New world entry rejected; existing-session effect unknown | PARTIALLY PROVEN |
 | Email changed | NOT_IMPLEMENTED/UNKNOWN | Token binds account ID, not email | Session binds account ID | No proven effect | PARTIALLY PROVEN |
 | Normal game logout | N/A | Consumed login token already gone; other tokens unaffected | Not proven deleted | Connection/player session ends | PARTIALLY PROVEN |
