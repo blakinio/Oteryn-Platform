@@ -5,6 +5,8 @@ namespace App\Http\Controllers\PublicGameData;
 use App\PublicGameData\CanaryGameDataRepository;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 
 final class PublicGameDataController
@@ -15,6 +17,17 @@ final class PublicGameDataController
     {
         return view('game.highscores', [
             'players' => $this->gameData->levelHighscores(),
+        ]);
+    }
+
+    public function characterSearch(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+        ]);
+
+        return redirect()->route('game.characters.show', [
+            'name' => $validated['name'],
         ]);
     }
 
