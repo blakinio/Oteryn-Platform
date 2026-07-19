@@ -34,16 +34,15 @@ final class RegistrationTest extends TestCase
         $response->assertRedirect(route('identity.register.create'));
 
         $identity = Identity::query()->firstOrFail();
-        $passwordHash = $identity->getAttribute('password');
+        $passwordHash = $identity->password;
 
-        self::assertSame('person@example.com', $identity->getAttribute('email'));
-        self::assertIsString($passwordHash);
+        self::assertSame('person@example.com', $identity->email);
         self::assertNotSame($password, $passwordHash);
         self::assertTrue(Hash::check($password, $passwordHash));
         self::assertSame('argon2id', password_get_info($passwordHash)['algoName']);
 
         $this->assertDatabaseHas('identity_security_events', [
-            'identity_id' => $identity->getKey(),
+            'identity_id' => $identity->id,
             'event_type' => SecurityEventRecorder::IDENTITY_REGISTERED,
         ]);
     }
