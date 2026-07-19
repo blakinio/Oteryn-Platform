@@ -69,6 +69,18 @@ class PublicGameDataTest extends TestCase
             $table->boolean('maintenance')->default(false);
             $table->text('maintenance_message')->nullable();
         });
+
+        Schema::connection('canary')->create('cluster_sessions', function (Blueprint $table): void {
+            $table->integer('player_id')->primary();
+            $table->unsignedInteger('account_id');
+            $table->integer('channel_id');
+            $table->string('instance_id');
+            $table->string('session_id');
+            $table->unsignedBigInteger('fencing_token');
+            $table->string('status');
+            $table->bigInteger('last_heartbeat');
+            $table->bigInteger('expires_at');
+        });
     }
 
     public function test_level_highscores_are_paginated_and_exclude_deleted_characters_on_a_read_only_connection(): void
@@ -226,6 +238,131 @@ class PublicGameDataTest extends TestCase
             ->assertSee('Scheduled maintenance')
             ->assertDontSee('Hidden Channel')
             ->assertSee('live player availability is intentionally not shown', false);
+    }
+
+    public function test_online_list_includes_fresh_online_lease_and_exposes_only_public_allowlist(): void
+    {
+        $readTime = $this->currentEpochMs();
+        $this->insertChannel(7, 'Canary Prime');
+        $this->insertPlayer(10, 'Fresh Hero', deletion: 0);
+        $this->insertClusterSession(
+            playerId: 10,
+            channelId: 7,
+            status: 'ONLINE',
+            expiresAt: $readTime + 60_000,
+        );
+        $this->makeCanaryConnectionReadOnly();
+
+        $this->get(route('game.online.index'))
+            ->assertOk()
+            ->assertSee('Fresh Hero')
+            ->assertSee('Canary Prime')
+            ->assertSee('Level:')
+            ->assertSee('Vocation:')
+            ->assertSee('ID 7')
+            ->assertDontSee('777777')
+            ->assertDontSee('sensitive-instance')
+            ->assertDontSee('sensitive-session')
+            ->assertDontSee('999999')
+            ->assertDontSee((string) ($readTime + 60_000));
+    }
+
+    public function test_online_list_excludes_expired_lease(): void
+    {
+        $readTime = $this->currentEpochMs();
+        $this->insertChannel(1, 'Main');
+        $this->insertPlayer(1, 'Expired Hero', deletion: 0);
+        $this->insertClusterSession(playerId: 1, channelId: 1, status: 'ONLINE', expiresAt: $readTime - 1);
+        $this->makeCanaryConnectionReadOnly();
+
+        $this->get(route('game.online.index'))
+            ->assertOk()
+            ->assertDontSee('Expired Hero')
+            ->assertSee('No characters are currently online.');
+    }
+
+    public function test_online_list_excludes_non_online_status(): void
+    {
+        $readTime = $this->currentEpochMs();
+        $this->insertChannel(1, 'Main');
+        $this->insertPlayer(1, 'Offline Hero', deletion: 0);
+        $this->insertClusterSession(playerId: 1, channelId: 1, status: 'OFFLINE', expiresAt: $readTime + 60_000);
+        $this->makeCanaryConnectionReadOnly();
+
+        $this->get(route('game.online.index'))
+            ->assertOk()
+            ->assertDontSee('Offline Hero')
+            ->assertSee('No characters are currently online.');
+    }
+
+    public function test_online_list_excludes_deleted_player(): void
+    {
+        $readTime = $this->currentEpochMs();
+        $this->insertChannel(1, 'Main');
+        $this->insertPlayer(1, 'Deleted Online Hero', deletion: 1);
+        $this->insertClusterSession(playerId: 1, channelId: 1, status: 'ONLINE', expiresAt: $readTime + 60_000);
+        $this->makeCanaryConnectionReadOnly();
+
+        $this->get(route('game.online.index'))
+            ->assertOk()
+            ->assertDontSee('Deleted Online Hero')
+            ->assertSee('No characters are currently online.');
+    }
+
+    public function test_online_list_returns_service_unavailable_when_canary_query_fails_instead_of_empty_list(): void
+    {
+        Schema::connection('canary')->drop('cluster_sessions');
+        $this->makeCanaryConnectionReadOnly();
+
+        $this->get(route('game.online.index'))
+            ->assertStatus(503)
+            ->assertDontSee('No characters are currently online.');
+    }
+
+    private function insertChannel(int $id, string $name): void
+    {
+        DB::connection('canary')->table('channels')->insert([
+            'id' => $id,
+            'name' => $name,
+            'pvp_type' => 'pvp',
+            'max_players' => 1000,
+            'enabled' => 1,
+            'sort_order' => $id,
+            'maintenance' => 0,
+            'maintenance_message' => null,
+        ]);
+    }
+
+    private function insertPlayer(int $id, string $name, int $deletion): void
+    {
+        DB::connection('canary')->table('players')->insert([
+            'id' => $id,
+            'name' => $name,
+            'account_id' => 123456,
+            'level' => 120,
+            'vocation' => 4,
+            'deletion' => $deletion,
+        ]);
+    }
+
+    private function insertClusterSession(int $playerId, int $channelId, string $status, int $expiresAt): void
+    {
+        DB::connection('canary')->table('cluster_sessions')->insert([
+            'player_id' => $playerId,
+            'account_id' => 777777,
+            'channel_id' => $channelId,
+            'instance_id' => 'sensitive-instance',
+            'session_id' => 'sensitive-session',
+            'fencing_token' => 999999,
+            'status' => $status,
+            'last_heartbeat' => $expiresAt - 10_000,
+            'expires_at' => $expiresAt,
+        ]);
+    }
+
+    private function currentEpochMs(): int
+    {
+        return (int) floor(microtime(true) * 1000);
     }
 
     private function makeCanaryConnectionReadOnly(): void
