@@ -750,9 +750,10 @@ The current Oteryn Platform code on this contract revision reads exactly these C
 - `guilds`;
 - `guild_membership`;
 - `guild_ranks`;
-- `channels`.
+- `channels`;
+- `cluster_sessions`.
 
-The provisioning artifact under `database/provisioning/canary-readonly.sql.template` and the application verifier must grant/accept exactly this implemented table surface. Contract approval for a future read does not justify pre-granting an unused table. In particular, `cluster_sessions` is approved above for the future bounded online-list adapter but is **not** part of the current database credential allowlist until application code actually implements that read.
+The provisioning artifact under `database/provisioning/canary-readonly.sql.template` and the application verifier must grant/accept exactly this implemented table surface. `cluster_sessions` is now part of the current database credential allowlist because the bounded online-list adapter implements that approved read. Contract approval for any future read still does not justify pre-granting an unused table.
 
 Whenever a change adds another Canary table to the implemented read surface, that same reviewed change must update:
 
