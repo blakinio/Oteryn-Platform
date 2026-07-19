@@ -36,7 +36,7 @@ final class SessionController
         IdentityWebSessionManager $sessions,
         SecurityEventRecorder $securityEvents,
     ): RedirectResponse {
-        $identity = Auth::guard('web')->user();
+        $identity = Auth::user();
 
         $sessions->invalidate($request);
 
