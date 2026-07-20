@@ -9,10 +9,8 @@ use App\CanaryIntegration\CanaryDatabasePrivilegeVerifier;
 use App\CanaryIntegration\CanaryProvisioningDatabasePrivilegeVerifier;
 use App\Identity\Models\Identity;
 use App\Identity\Support\CanonicalEmail;
-use DomainException;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
-use InvalidArgumentException;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -154,7 +152,7 @@ Artisan::command('admin:bootstrap {email}', function () {
 
     try {
         app(AdminRoleManager::class)->bootstrapFirstPlatformAdmin($identity->id);
-    } catch (DomainException|InvalidArgumentException $exception) {
+    } catch (\DomainException|\InvalidArgumentException $exception) {
         $this->error($exception->getMessage());
 
         return 1;
