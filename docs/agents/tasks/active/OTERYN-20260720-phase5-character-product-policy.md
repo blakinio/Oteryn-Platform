@@ -16,7 +16,7 @@ Select and durably record the missing Oteryn greenfield product policy required 
 - [x] Define concurrent-limit semantics required by the successor operation contract.
 - [x] Record the durable product decision as an ADR and update `CHARACTER_CREATION_CONTRACT.md`.
 - [x] Do not modify Canary/login-server repositories and do not implement character creation in this policy task.
-- [ ] Run exact-head CI and Agent Governance before merge.
+- [x] Run exact-head CI and Agent Governance before merge.
 
 ## Ownership
 
@@ -38,7 +38,7 @@ dependencies:
   - docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md
   - docs/contracts/CHARACTER_CREATION_CONTRACT.md
 blockers:
-  - none for this policy task
+  - none for merge
 cross_repository_tasks:
   - blakinio/canary remains read-only; no Canary modification is part of this task
 ```
@@ -47,11 +47,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T08:39:00+02:00
-head: 39c4186007eca1ad26ef36e24c82a7c16708a6e1
+updated_at: 2026-07-20T08:43:00+02:00
+head: e5c711561388691bb2e0e2e44b42f3c6f5842588
 branch: task/OTERYN-20260720-phase5-character-product-policy
 pr: 37
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -70,9 +70,11 @@ proven:
   - Current Canary vocation configuration proves base vocation IDs 1 Sorcerer, 2 Druid, 3 Paladin, 4 Knight and 9 Monk, while promoted vocations are separate IDs 5-8 and 10.
   - Current Canary players schema/load path accepts an empty non-null conditions stream; migration 55 demonstrates a level-8 load-shaped row with experience 4200, health 185, mana 90, cap 470 and town_id 8.
   - Current PlayerLogin compatibility behavior uses looktype 136 for sex 0 and looktype 128 for sex 1 with colors head 114, body 120, legs 132 and feet 115.
-  - ADR 0005 now selects deterministic ASCII canonical names, explicit reserved names, base vocation choices 1/2/3/4/9, sex 0/1, pronoun 0, starter profile v1, no starter dependent writes, and a maximum of 10 active characters per account.
+  - ADR 0005 selects deterministic ASCII canonical names, explicit reserved names, base vocation choices 1/2/3/4/9, sex 0/1, pronoun 0, starter profile v1, no starter dependent writes and maximum 10 active characters per account.
   - ADR 0005 requires same-account create concurrency to serialize by locking the exact Canary accounts row before counting active players and inserting.
-  - CHARACTER_CREATION_CONTRACT now records product policy as resolved and leaves only operation-contract/idempotency/least-privilege/integration proof before implementation.
+  - CHARACTER_CREATION_CONTRACT records product policy as resolved and leaves only operation-contract/idempotency/least-privilege/integration proof before implementation.
+  - Delivery head e5c711561388691bb2e0e2e44b42f3c6f5842588 passed CI run 29722284712 (#493), including formatting, PHPStan and full tests, and Agent Governance run 29722284656 (#414).
+  - No blakinio/canary or opentibiabr/login-server repository was modified.
 derived:
   - The successor character-create operation can likely remain Platform-driven with a single bounded players insert if exact current schema defaults and loadability tests confirm the selected starter profile.
   - A third dedicated canary_character_create connection is required; existing canary and canary_provisioning boundaries remain unchanged.
@@ -101,9 +103,15 @@ validation:
   - command: product-policy evidence review
     result: PASS
     evidence: selected policy stays within current proven Canary vocation/player/load compatibility and explicitly requires successor loadability validation rather than assuming external behavior
+  - command: delivery CI run 29722284712 (#493)
+    result: PASS
+    evidence: exact delivery head e5c711561388691bb2e0e2e44b42f3c6f5842588 passed formatting, PHPStan and full tests
+  - command: delivery Agent Governance run 29722284656 (#414)
+    result: PASS
+    evidence: exact delivery head e5c711561388691bb2e0e2e44b42f3c6f5842588 completed successfully
 blockers:
-  - none pending repository validation
-next_action: Update ACTIVE_WORK with the selected policy and successor operation-contract dependency, then validate PR #37 exact head with CI and Agent Governance.
+  - none for merge; final exact-head revalidation required after this checkpoint update
+next_action: Revalidate CI and Agent Governance on the final checkpoint head, inspect PR #37 divergence/review state, then squash-merge if clean.
 ```
 
 ## Notes
