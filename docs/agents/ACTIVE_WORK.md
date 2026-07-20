@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase7-production-topology-discovery` — PR #48 — `task/OTERYN-20260720-phase7-production-topology-discovery`
+- `OTERYN-20260720-phase7-production-config-guardrails` — PR #49 — `task/OTERYN-20260720-phase7-production-config-guardrails`
 
 ## Current project phase
 
@@ -12,31 +12,37 @@ Convenience index only. The individual active task record, live PR and Git state
 
 **Phase 7 — Production hardening and operations: IN PROGRESS**
 
+## Completed Phase 7 discovery baseline
+
+PR #48 merged as `676a77590e3ec93bcad0247b3065d203ac209c40` and established `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md`.
+
+The repository proves supported configuration surfaces and a logical target architecture, but actual Cloudflare/origin/database/Redis/session/cache/queue/mail/logging/backup/deployment state remains `UNKNOWN` until non-secret deployment evidence proves it.
+
 ## Current Phase 7 slice
 
-PR #48 establishes the production-topology evidence baseline before any provider-specific hardening or production-readiness claim.
+PR #49 adds provider-independent production configuration guardrails without choosing a hosting provider.
 
-Repository-proven facts include:
+The verifier checks only invariant production safety requirements:
 
-- provider-neutral logical target architecture with Cloudflare/edge, origin/reverse proxy and Laravel web tier;
-- Laravel `/health` route;
-- CI-only GitHub Actions workflow with no deployment step;
-- Platform SQLite/MySQL configuration support;
-- separate Canary read-only/provisioning/character-create SQL configuration surfaces;
-- dedicated Canary runtime Redis configuration surface;
-- environment-driven sessions with local file default;
-- Platform cache stores currently limited to array/file/null;
-- queue currently limited to synchronous execution;
-- SMTP/log/array mail transports;
-- single-file/stderr logging options.
+- `APP_ENV=production`;
+- debug disabled;
+- application encryption key configured;
+- HTTPS, non-localhost/loopback `APP_URL`;
+- Secure and HttpOnly session cookies;
+- delivery-capable default mail transport;
+- valid non-test sender address.
 
-The repository does **not** prove the actual production provider, Cloudflare policy, origin ingress restrictions, database/Redis endpoints, session/cache backend, queue/worker model, mail provider, monitoring sink, backup/restore implementation or deployment/rollback mechanism.
+The verifier intentionally does **not** require MySQL, Redis sessions/cache, asynchronous queues, a particular logging sink or Cloudflare policy because the topology evidence does not prove those are universal requirements.
 
-The evidence baseline is documented in `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` and explicitly forbids treating local `.env.example` defaults as production evidence.
+Command:
+
+`php artisan production:verify-configuration`
+
+It returns non-zero on any violation and does not print secret values.
 
 ## Phase 7 dependency order
 
-1. provider-independent runtime production-safety guardrails;
+1. provider-independent runtime production-safety guardrails — **IN PROGRESS**;
 2. actual edge/origin/database exposure review when deployment evidence exists;
 3. backup/restore contract and operational test;
 4. logging/monitoring/correlation;
@@ -46,25 +52,22 @@ The evidence baseline is documented in `docs/operations/PRODUCTION_TOPOLOGY_EVID
 
 ## Production enablement note
 
-Repository phase progress is not proof of production deployment.
+Repository Phase 7 progress is not proof of production deployment.
 
-Cloudflare/WAF/Access, private origin/database paths, backups, centralized monitoring and real production mail remain `UNKNOWN` until non-secret deployment evidence proves them.
+Cloudflare/WAF/Access, private origin/database paths, backups, centralized monitoring and actual production endpoints remain `UNKNOWN` until external non-secret evidence proves them.
 
 ## Remaining cross-repository dependency
 
-The authoritative Platform game-login bridge remains separate from Phase 7 production topology discovery.
-
-A future explicitly authorized cross-repository task must provide exact-account Platform authorization with short-lived cryptographically protected exchange material, explicit audience/expiry, replay-resistant consumption/session semantics and deterministic revocation/failure behavior.
+The authoritative Platform game-login bridge remains separate from current Phase 7 work and requires explicit authorization before external repository writes.
 
 ## Recommended next work
 
-After PR #48 merges, implement the smallest provider-independent production runtime verifier that fails closed on unsafe invariant configuration without assuming a hosting provider.
+Finish PR #49 with exact-head CI. After merge, continue with repository-owned dependency/security scanning and security-header/CSP work if actual deployment evidence is still unavailable; edge/origin/database exposure review remains evidence-blocked.
 
 ## Recently completed
 
+- `OTERYN-20260720-phase7-production-topology-discovery` — PR #48 / `676a77590e3ec93bcad0247b3065d203ac209c40`.
 - `OTERYN-20260720-phase6-closure` — PR #46 / `f25abd8799718ac99acce050ac55018d04fff2de`.
-- `OTERYN-20260720-phase6-admin-cms-audit` — PR #45 / `be25d6ec3e0512bb9615329f99f16fff294d8b1d`.
-- `OTERYN-20260720-phase6-admin-rbac-foundation` — PR #44 / `170d52393e543c8033ebd896f42fb43f3fccdf42`.
 
 ## Coordination rule
 
