@@ -42,7 +42,7 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T20:00:00Z
+updated_at: 2026-07-20T20:05:00Z
 head: b6878c4775eda542738c78ea99fd5d2e19d2b35f
 branch: task/OTERYN-20260720-phase7-production-evidence-collection
 pr: none
@@ -98,8 +98,8 @@ validation:
     result: PASS
     evidence: post-merge housekeeping and active-task establishment passed required checks before squash merge as b6878c4775eda542738c78ea99fd5d2e19d2b35f.
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTERYN-20260720-phase7-production-evidence-collection.md --require-checkpoint
-    result: NOT_RUN
-    evidence: must be run against this final active-task checkpoint before compact handoff generation.
+    result: PASS
+    evidence: validated 1 task checkpoint against governance contract v1 before compact resume generation.
 blockers:
   - sanitized actual-production evidence is required before substantive environment-dependent Phase 7 work can continue
 next_action: Obtain sanitized evidence for the actual production application/edge/origin/database/Redis/mail/logging/backup/deployment topology, then execute the edge/origin/database exposure review and dated backup-restore operational test required by the Phase 7 exit gate.
