@@ -103,7 +103,14 @@ final class AdminAuthorizationTest extends TestCase
     private function assignRole(Identity $identity, string $roleKey): void
     {
         $roleId = DB::table('admin_roles')->where('key', $roleKey)->value('id');
-        self::assertNotNull($roleId);
+
+        if (! is_int($roleId) && ! is_string($roleId)) {
+            self::fail('Expected an integer-compatible administrator role id.');
+        }
+
+        if (! is_numeric($roleId)) {
+            self::fail('Expected a numeric administrator role id.');
+        }
 
         DB::table('identity_admin_roles')->insert([
             'identity_id' => $identity->id,
@@ -114,6 +121,6 @@ final class AdminAuthorizationTest extends TestCase
     private function actingAsCurrent(Identity $identity): void
     {
         $this->actingAs($identity, 'web')
-            ->withSession([WebSessionState::GENERATION_KEY => (int) $identity->web_session_generation]);
+            ->withSession([WebSessionState::GENERATION_KEY => $identity->web_session_generation]);
     }
 }
