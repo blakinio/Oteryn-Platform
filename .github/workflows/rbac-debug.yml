@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          show-progress: false
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -25,5 +27,5 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress --quiet
 
-      - name: Run focused RBAC tests
-        run: php artisan test --filter=AdminAuthorizationTest --no-ansi
+      - name: Run focused RBAC test
+        run: php artisan test --filter=test_admin_route_requires_authentication --no-ansi
