@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase5-character-product-policy` — selects the missing durable Oteryn product policy for canonical character names/reserved names, one exact greenfield starter profile and per-account character-limit concurrency semantics. Scope is policy/ADR/contract only; no character shared write is implemented in this task.
+- `OTERYN-20260720-phase5-character-product-policy` — PR #37 selects the durable greenfield character creation product policy. Scope is ADR/contract only; no character shared write is implemented in this task.
 
 ## Proven implementation result
 
@@ -14,29 +14,37 @@ The original missing Identity-to-exact-Canary-account authorization blocker is r
 
 The existing `canary` / `oteryn_readonly` connection remains unchanged.
 
-## Current character-create gate
+## Character product policy selected on PR #37
 
-Character-create policy revalidation merged through PR #35 as `35ca943d6051ff27f215b813d51a5ae557cbac40` against Canary `37b41a29c8743d4c976eb7fcb82d684594722aa4`.
+ADR 0005 and the updated character contract select:
 
-Ownership is no longer the blocker. The active task is now converting the remaining explicit product-policy UNKNOWNs into durable Oteryn decisions without inferring them from SQL defaults or incidental login hooks.
+- deterministic ASCII-only canonical names: 1-3 words, each 2-15 letters, canonical total length 3-29, title-cased after trimming/collapsing spaces;
+- explicit reserved role/system words plus protected Oteryn/Canary brand prefixes;
+- creation-time base vocations only: Sorcerer `1`, Druid `2`, Paladin `3`, Knight `4`, Monk `9`;
+- creation-time sex `0` or `1`; pronoun is not a first-version input and persists as `0`;
+- starter profile v1: level 8, experience 4200, health 185, mana 90, capacity 470, soul 100, town `8`, `(0,0,0)` temple fallback, sex-compatible default look, skills 10/0 and no tutorial state;
+- no starter items, storage, quests, spells, depot/inbox/reward/guild/session/runtime dependent writes in v1;
+- maximum 10 active (`deletion = 0`) characters per account;
+- same-account create transactions must serialize on the exact Canary account row before counting active characters.
 
-`CHARACTER CREATION: BLOCKED` until the product-policy ADR is merged and a successor operation contract proves the exact transaction/write/grant surface.
+`CHARACTER CREATION: BLOCKED` until the successor operation contract proves the exact insert fields, idempotency/ambiguous-commit recovery, account lock/count queries, dedicated least-privilege grants and real MariaDB behavior.
 
-## Planned product-policy decisions
+## Recommended next dependency after PR #37
 
-The active task will define:
+Create a bounded character-create operation-contract task that proves against current Canary:
 
-1. deterministic ASCII canonical character-name rules plus reserved-role/system names;
-2. one exact starter profile using only current Canary-compatible values, base vocation choices and no inferred starter inventory/storage/quest writes;
-3. a hard per-account active-character limit plus same-account concurrency serialization semantics.
+1. the exact `players` insert column set needed for starter profile v1;
+2. loadability of `town_id = 8` plus `(0,0,0)` for every allowed base vocation/sex combination;
+3. exact account-row lock and active-character count transaction;
+4. duplicate-name and same-account retry/idempotency behavior;
+5. exact `canary_character_create` SELECT/INSERT grants and fail-closed privilege verifier;
+6. required real MariaDB integration tests for limits, name races, privilege denial and starter-row shape.
 
-After those decisions merge, the next task is a bounded character-create operation contract defining the exact Canary transaction, idempotency/recovery semantics and dedicated least-privilege `canary_character_create` credential.
+Only after that contract is approved should the shared write be implemented.
 
 ## Cross-repository follow-up
 
-No Canary repository change is currently proven necessary merely to authorize or persist a character row.
-
-If the selected starter policy requires mandatory game-side initialization that cannot be represented safely as one bounded transactional database write, record and authorize a separate `blakinio/canary`/datapack task before implementation. That task must define the exact initialization owner/hook, idempotent invocation, retry/transaction semantics, rollout order and loadability integration tests.
+No Canary repository change is currently proven necessary for the selected starter policy. If operation-contract loadability/integration validation disproves a selected invariant, record the exact required `blakinio/canary` or datapack change for separate authorization rather than changing external code implicitly.
 
 Separately, the future authoritative game-login integration remains recorded in `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`:
 
@@ -50,11 +58,10 @@ Separately, the future authoritative game-login integration remains recorded in 
 
 ## Recently completed
 
-- `OTERYN-20260720-phase5-character-creation-policy-revalidation` — revalidated character creation after ownership binding implementation, merged through PR #35 as `35ca943d6051ff27f215b813d51a5ae557cbac40`; ownership authorization is resolved and the remaining blockers are explicit product naming/starter/character-limit decisions plus the dependent write/grant surface derived from them. The task record is archived unchanged by post-merge housekeeping.
-- `OTERYN-20260720-phase5-platform-account-provisioning-implementation` — implemented and validated Platform-originated Canary account provisioning plus immutable 1:1 ownership binding, merged through PR #33 as `d5c319448737ee5badd8ab73967535a5ec9b67d1`; final ready-head CI #477 and Agent Governance #398 passed. The task record is archived unchanged with blob `2217873d3a777bdb3285861822578898fae74930` by post-merge housekeeping.
+- `OTERYN-20260720-phase5-character-creation-policy-revalidation` — revalidated character creation after ownership binding implementation, merged through PR #35 as `35ca943d6051ff27f215b813d51a5ae557cbac40`; ownership authorization is resolved.
+- `OTERYN-20260720-phase5-platform-account-provisioning-implementation` — implemented and validated Platform-originated Canary account provisioning plus immutable 1:1 ownership binding, merged through PR #33 as `d5c319448737ee5badd8ab73967535a5ec9b67d1`; final ready-head CI #477 and Agent Governance #398 passed.
 - `OTERYN-20260720-phase5-platform-account-provisioning-contract` — approved the bounded provisioning/binding operation contract, merged through PR #31 as `dd60e29eee2ecf6f2053fcf09c4d7d6606c28c76`.
 - `OTERYN-20260719-phase5-ownership-binding-dependency-gate` — selected the greenfield authoritative Platform account model and immutable `1 Platform Identity <-> 1 Canary accounts.id` ownership direction, merged through PR #29 as `bb007f5dbe30711b1c951b621506c2cca6834a07`.
-- `OTERYN-20260719-phase5-character-creation-contract` — initial character-create discovery merged through PR #26 as `ab78d6ac3bc674deb0868195563b61a753d95f98`; ownership is now resolved, while product naming/starter/limit policy is being selected by the active task.
 
 ## Coordination rule
 
