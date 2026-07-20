@@ -52,21 +52,16 @@ test('@smoke protected administrator access denies an unauthenticated browser', 
 
 test('@smoke browser state-changing request without a CSRF token fails closed', async ({ page }) => {
   await page.goto('/register');
-  const status = await page.evaluate(async () => {
-    const response = await fetch('/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        email: 'csrf-probe@example.test',
-        password: 'AcceptancePassword!234',
-        password_confirmation: 'AcceptancePassword!234',
-      }),
-      redirect: 'manual',
-    });
-    return response.status;
+  const response = await page.request.post('/register', {
+    form: {
+      email: 'csrf-probe@example.test',
+      password: 'AcceptancePassword!234',
+      password_confirmation: 'AcceptancePassword!234',
+    },
+    maxRedirects: 0,
   });
 
-  expect(status).toBe(419);
+  expect(response.status()).toBe(419);
 });
 
 test('@smoke representative public layout has no small-screen horizontal overflow', async ({ page }) => {
