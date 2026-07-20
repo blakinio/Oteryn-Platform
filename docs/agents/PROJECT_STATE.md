@@ -35,64 +35,62 @@ Platform web authentication remains separate from the still-unimplemented author
 
 PR #48 merged as `676a77590e3ec93bcad0247b3065d203ac209c40`.
 
-`docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` distinguishes repository-proven configuration capabilities from actual deployed production state.
-
-The repository does **not** currently prove actual Cloudflare/DNS/WAF/Access policy, origin ingress restrictions, production database/Redis endpoints, session/cache backend, queue/worker model, mail provider, centralized monitoring, backup/restore implementation or deployment/rollback mechanism.
-
-Local `.env.example` defaults are not production evidence.
+`docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` distinguishes repository-proven configuration capabilities from actual deployed production state. Local `.env.example` defaults are not production evidence.
 
 ### Provider-independent production configuration guardrails
 
 PR #49 merged as `0f876d4f2209399a85cafcff1623d8e6c810b914`.
 
-Command:
+`php artisan production:verify-configuration` fails closed for unsafe provider-independent production settings: non-production environment, debug enabled, missing APP_KEY, non-HTTPS/local APP_URL, insecure session cookie settings and non-delivery/test mail configuration.
 
-`php artisan production:verify-configuration`
+The verifier does not expose secret values and intentionally does not require a specific database/cache/queue/logging/Cloudflare provider.
 
-It fails closed when repository-defined invariant production configuration is unsafe:
+### Dependency security scanning
 
-- environment is not `production`;
-- debug is enabled;
-- application encryption key is missing;
-- `APP_URL` is not HTTPS or uses localhost/loopback;
-- Secure or HttpOnly session cookies are disabled;
-- default mail transport is non-delivery (`array`/`log`) for implemented password-recovery flows;
-- sender address is invalid or uses a reserved test domain.
+PR #50 merged as `3973774727c35aea22d0a646f479a0ff079042cc`.
 
-Violation output does not print application keys or other secret values.
+Required CI now runs:
 
-The verifier intentionally does not require a specific database engine, Redis session/cache backend, asynchronous queue, logging provider or Cloudflare policy because those remain topology-dependent.
+`composer audit --no-interaction`
 
-## Current Phase 7 slice — dependency security scanning
+The existing Composer validation/install, Pint, PHPStan and test gates remain required. Dependabot is configured for bounded weekly Composer and GitHub Actions update PRs.
 
-`OTERYN-20260720-phase7-dependency-security-scanning` — PR #50.
+The validated lockfile passed the advisory scan at merge time.
 
-The current branch adds:
+## Current Phase 7 slice — browser security headers and CSP
 
-- required CI step `composer audit --no-interaction` after dependency installation from the committed lockfile;
-- preserved Composer validation, Pint, PHPStan and full test gates;
-- bounded weekly Dependabot updates for Composer;
-- bounded weekly Dependabot updates for GitHub Actions.
+`OTERYN-20260720-phase7-security-headers-csp` — PR #54.
 
-CI #687 proved the current locked Composer dependency set passes the new advisory audit.
+Current branch implementation:
 
-Dependabot update automation complements but does not replace the required fail-closed advisory gate.
+- moves first-party inline public CSS to same-origin `public/css/app.css`;
+- loads that stylesheet from public/game and administrator layouts;
+- applies browser security headers to Laravel `web` responses;
+- enforces CSP with same-origin default/script/style/connect/font sources, self/data image sources, `form-action 'self'`, `base-uri 'none'`, `frame-ancestors 'none'` and `object-src 'none'`;
+- does not grant `unsafe-eval` or inline-script execution;
+- adds `X-Content-Type-Options: nosniff`;
+- adds `X-Frame-Options: DENY`;
+- adds `Referrer-Policy: strict-origin-when-cross-origin`;
+- adds restrictive camera/geolocation/microphone/payment/USB `Permissions-Policy`;
+- covers public and authentication responses with regression tests.
 
-No dependency version is changed directly by this task.
+HSTS is intentionally not hard-coded because deployed TLS termination, proxy and hostname/subdomain policy remain unproven.
 
-## Phase 7 blocked deployment-dependent work
+## Phase 7 deployed-state unknowns
 
-The following work cannot be truthfully completed from repository evidence alone:
+The repository does not currently prove:
 
-- Cloudflare/WAF/rate-limit production configuration validation;
-- direct-origin bypass validation and ingress firewall review;
-- production database and runtime Redis network-isolation validation;
-- backup/restore operational validation;
-- deployed centralized logging/metrics/alerting validation;
-- production mail-delivery validation;
-- deployment/rollback operational validation.
-
-These require non-secret evidence from the actual deployed environment.
+- actual Cloudflare/DNS/WAF/Access configuration;
+- actual TLS termination and safe HSTS policy;
+- actual origin provider, reverse proxy or ingress firewall restrictions;
+- actual Platform production database engine/endpoint/network isolation;
+- actual production session/cache backend;
+- actual queue/worker model;
+- actual mail provider/delivery status;
+- actual centralized log/metrics/alerting sink;
+- actual Canary SQL production network paths/credential provisioning status;
+- actual runtime Redis endpoint/ACL provisioning status;
+- actual backup/restore, deployment or rollback mechanism.
 
 ## Implemented Identity boundary
 
@@ -117,8 +115,6 @@ Every current administrator web capability requires:
 `auth` + `mfa.confirmed` + `admin.permission:<exact-permission>`
 
 No wildcard administrator authorization path exists.
-
-Phase 6 CMS authoring is plain text with escaped public output. Rich HTML, media uploads and arbitrary plugin/code upload are not implemented.
 
 ## Implemented public/read-only boundary
 
@@ -151,24 +147,22 @@ Deferred and not authorized:
 
 Platform-originated users still require a separately authorized authoritative game-login bridge before game login can use Platform credential authority.
 
-Required future properties include exact-account binding, short-lived cryptographically protected exchange material, explicit audience/expiry, replay-resistant consumption/session semantics and deterministic revocation/failure behavior.
-
 Expected external scope remains primarily `opentibiabr/login-server`; `blakinio/canary` changes require separate explicit authorization if needed by the selected protocol.
 
 No Canary/login-server repository was modified by Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-dependency-security-scanning` — PR #50.
+`OTERYN-20260720-phase7-security-headers-csp` — PR #54.
 
 ## Recommended next work
 
-Finish PR #50 with exact-head validation. If actual deployment evidence remains unavailable, continue with repository-owned security headers/CSP hardening rather than inventing provider-specific infrastructure state.
+Finish PR #54 with exact-head validation. If actual deployment evidence remains unavailable, continue with provider-neutral request correlation and structured logging primitives while explicitly leaving the deployed logging/metrics/alerting sink `UNKNOWN`.
 
 ## High-priority remaining unknowns
 
 - authoritative Platform game-login assertion/session protocol and rollout;
-- deployed production edge/origin/network topology;
+- deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
 - production database, mail, session/cache and queue topology;
 - backup/restore/deployment/rollback mechanisms;
