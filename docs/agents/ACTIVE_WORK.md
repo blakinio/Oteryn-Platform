@@ -4,13 +4,13 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED — `task/OTERYN-20260720-phase7-production-evidence-collection`
+- `OTERYN-20260720-phase7-production-evidence-collection` — IN PROGRESS — PR #63 — `task/OTERYN-20260720-phase7-production-evidence-collection`
 
 ## Current project phase
 
 **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 
-**Phase 7 — Production hardening and operations: IN PROGRESS / EXTERNAL-EVIDENCE BLOCKED FOR COMPLETION**
+**Phase 7 — Production hardening and operations: IN PROGRESS / FINAL PRODUCTION EVIDENCE REQUIRED FOR COMPLETION**
 
 ## Completed Phase 7 repository-owned slices
 
@@ -21,19 +21,27 @@ Convenience index only. The individual active task record, live PR and Git state
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded structured request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 continuation handover.
 
-## Current blocker
+## Current Phase 7 validation slice
 
-The repository cannot prove the actual production environment. The active task therefore waits for sanitized, non-secret evidence covering the deployed application/edge/origin/database/Redis/mail/logging/backup/deployment topology.
+PR #63 adds a controlled production-like validation workflow intended to generate repeatable non-secret `STAGING_PROVEN` evidence for the staging-verifiable gates that do not require final production access.
 
-The required next environment-dependent work is:
+The workflow is scoped to exact-SHA validation of:
 
-1. edge/TLS/origin/database exposure review against real deployment evidence;
-2. effective Canary SQL and runtime Redis boundary verification where enabled;
-3. deployment/rollback validation;
-4. dated operational backup-restore test with measured recovery result;
-5. remaining critical production E2E gates against exact deployed SHAs.
+1. clean deployment, migrations, rollback and redeploy in the controlled release model;
+2. production configuration guardrails;
+3. effective MariaDB least-privilege principals and fail-closed privilege drift;
+4. runtime Redis ACL/read boundary and failure semantics;
+5. SMTP delivery through a real test SMTP service and mail-unavailable behavior;
+6. full regression coverage and running security/header/correlation checks;
+7. measured backup/restore with integrity and restored-environment smoke validation.
 
-Until that evidence exists, do not mark Phase 7 COMPLETE or invent provider-specific deployment claims.
+Staging evidence must not be promoted to proof of final production state.
+
+## Final production-only completion evidence
+
+Phase 7 still requires direct evidence for facts that the controlled environment cannot prove, including final production DNS/edge/Cloudflare/TLS/origin/firewall state, actual production DB/Redis effective grants and network restrictions, production backup schedule and restore, production logging/monitoring sink, production mail provider/delivery monitoring, exact deployed production SHA(s) and final production smoke/E2E checks.
+
+Until those facts are proven or eligible risks are explicitly owner-accepted, do not mark Phase 7 COMPLETE.
 
 ## Repository-verifiable preflight commands
 
@@ -44,7 +52,7 @@ php artisan canary:verify-provisioning-db-privileges
 php artisan canary:verify-character-create-db-privileges
 ```
 
-These commands prove only their documented boundaries.
+These commands prove only their documented boundaries and the environment in which they are executed.
 
 ## Remaining cross-repository dependency
 
