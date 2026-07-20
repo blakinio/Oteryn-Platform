@@ -14,7 +14,7 @@ Close Phase 5 against live `main` after PR #41 by proving the roadmap exit gate,
 - [x] Record deletion/rename as optional future operations requiring separate contracts.
 - [x] Record the authoritative Platform game-login bridge as a separate cross-repository follow-up.
 - [x] Archive the completed PR #41 task.
-- [ ] Pass final exact-head CI and Agent Governance and merge closure PR.
+- [ ] Merge PR #42 only after exact final-head CI and Agent Governance remain green.
 - [ ] Complete post-merge housekeeping with zero active tasks and durable handover.
 
 ## Ownership
@@ -46,7 +46,7 @@ dependencies:
   - PR #39 character-create operation contract
   - PR #41 character-create implementation
 blockers:
-  - none for closure merge after final exact-head validation
+  - none for closure merge after exact final-head validation
 cross_repository_tasks:
   - blakinio/canary remains read-only
   - opentibiabr/login-server remains read-only
@@ -57,11 +57,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T11:15:00+02:00
-head: b9bf24f740ec6e7f783103507581c939ce4ef9eb
+updated_at: 2026-07-20T11:25:00+02:00
+head: 2b79b3da64fa870ce1255f30527cf9ac98f0c077
 branch: task/OTERYN-20260720-phase5-closure
-pr: none
-status: validating
+pr: 42
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -87,14 +87,15 @@ proven:
   - main at closure start is 9839822b8e445c0e9828e73d2d7767bb237e587f from PR #41.
   - No open Oteryn Platform PR existed before closure delivery.
   - Phase 5 exit gate requires contracts for every shared write, tested authorization/concurrency invariants and no undocumented raw Canary writes.
-  - config/database.php keeps generic canary read-only and defines exactly two Phase 5 mutation connections: canary_provisioning and canary_character_create.
-  - PR #33 implements/tests the contracted greenfield account provisioning and immutable binding boundary.
-  - PR #41 implements/tests the contracted character-create boundary with real MariaDB privilege and race coverage.
+  - Generic canary remains read-only and exactly two Phase 5 mutation connections exist: canary_provisioning and canary_character_create.
+  - PR #33 implements/tests the greenfield account provisioning and immutable binding boundary.
+  - PR #41 implements/tests the character-create boundary with real MariaDB privilege and race coverage.
   - No third Phase 5 Canary mutation connection or approved raw write surface is configured or claimed.
   - Character deletion/rename are not implemented and remain forbidden until separately contracted.
   - Existing-account import/claim is outside the greenfield ownership model.
   - The completed PR #41 task is archived and removed from active tasks on the closure branch.
-  - Roadmap, project state, module catalog, active work and Phase 5 contracts are synchronized with delivered state.
+  - Roadmap marks Phase 5 COMPLETE and project state, module catalog, active work and Phase 5 contracts are synchronized with delivered state.
+  - Closure delivery head 2b79b3da64fa870ce1255f30527cf9ac98f0c077 passed CI #570 and Agent Governance #491.
 derived:
   - Phase 5 satisfies its exit gate without deletion/rename because those optional operations are not claimed as delivered shared writes.
   - The authoritative Platform game-login bridge is a separate authentication/session integration programme, not an undocumented Phase 5 shared write.
@@ -121,21 +122,24 @@ changed_paths:
   - docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md
   - docs/contracts/CANARY_DATA_CONTRACT.md
 validation:
-  - command: closure preflight
+  - command: closure preflight and shared-write inventory review
     result: PASS
-    evidence: PR #41 merged to main and live open-PR search was empty before closure delivery
-  - command: shared-write inventory revalidation
-    result: PASS
-    evidence: generic canary remains read-only; only canary_provisioning and canary_character_create are Phase 5 mutation boundaries
+    evidence: only the two contracted mutation boundaries are present and generic canary remains read-only
   - command: operation-contract evidence review
     result: PASS
-    evidence: PR #33 and PR #41 authorization, failure/idempotency and real MariaDB concurrency/privilege evidence cover both writes
+    evidence: PR #33 and PR #41 cover authorization, failure/idempotency, least privilege and real MariaDB concurrency requirements
   - command: Phase 5 exit-gate review
     result: PASS
     evidence: every delivered shared write is contracted/tested and no additional undocumented Canary write is approved or claimed
+  - command: closure CI #570
+    result: PASS
+    evidence: closure delivery head 2b79b3da64fa870ce1255f30527cf9ac98f0c077 passed full repository CI
+  - command: closure Agent Governance #491
+    result: PASS
+    evidence: closure delivery head 2b79b3da64fa870ce1255f30527cf9ac98f0c077 passed checkpoint validation
 blockers:
-  - none for closure merge after final CI and Agent Governance
-next_action: Open the closure PR, run exact-head CI and Agent Governance, verify divergence/review state, then squash-merge only if clean.
+  - none for merge after exact final-head revalidation
+next_action: Revalidate CI and Agent Governance on this final checkpoint commit, verify divergence/review state, then squash-merge PR #42 if clean.
 ```
 
 ## Notes
