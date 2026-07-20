@@ -4,13 +4,25 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-None.
+- `OTERYN-20260720-phase6-admin-rbac-foundation` — PR #44 — `task/OTERYN-20260720-phase6-admin-rbac-foundation`
 
 ## Current project phase
 
 **Phase 5 — Account and character management: COMPLETE**
 
-**Phase 6 — CMS, Admin, RBAC and Audit: NEXT / PLANNED**
+**Phase 6 — CMS, Admin, RBAC and Audit: IN PROGRESS**
+
+## Current Phase 6 slice
+
+The active security-first slice establishes:
+
+- durable explicit administrator roles and permissions;
+- no administrator assignment by default;
+- deny-by-default server-side permission checks;
+- mandatory privileged route composition using `auth` + `mfa.confirmed` + explicit `admin.permission:*`;
+- the first protected `/admin` route.
+
+Privileged CMS mutations, role-assignment management, admin audit query surfaces and Cloudflare Access deployment documentation remain successor Phase 6 work until separately implemented and validated.
 
 ## Proven Phase 5 implementation state
 
@@ -29,12 +41,6 @@ The only approved Phase 5 Canary mutation connections are:
 
 Both have explicit operation contracts, reviewed least-privilege grant templates, fail-closed effective-grant verifiers and real MariaDB integration evidence.
 
-Phase 5 exit gate is satisfied:
-
-- every delivered shared write is explicitly contracted;
-- authorization, partial-failure/idempotency and concurrency invariants are tested;
-- no additional undocumented raw Canary write is approved or claimed.
-
 ## Deferred lifecycle operations
 
 Not implemented or authorized:
@@ -49,7 +55,7 @@ Each requires a new explicit operation contract before any shared write.
 
 ## Remaining cross-repository dependency
 
-The authoritative Platform game-login bridge remains separate from completed Phase 5.
+The authoritative Platform game-login bridge remains separate from completed Phase 5 and current Phase 6.
 
 A future explicitly authorized cross-repository task must provide exact-account Platform authorization with:
 
@@ -74,7 +80,7 @@ Before enabling Phase 5 writes in an environment:
 
 ## Recommended next work
 
-Start Phase 6 with the smallest bounded Admin/RBAC foundation task derived from live repository state. The first Phase 6 slice should establish deny-by-default administrator identity/role authorization and compose it with the existing `auth` + `mfa.confirmed` security gates before privileged CMS/account actions are introduced.
+After PR #44 satisfies its final merge gate, implement the next bounded Phase 6 slice: audited administrator role assignment plus privileged news/page management, all behind explicit permissions and confirmed MFA.
 
 The authoritative game-login bridge may be scheduled independently as a high-priority cross-repository programme once external-repository modification is explicitly authorized.
 
@@ -83,8 +89,6 @@ The authoritative game-login bridge may be scheduled independently as a high-pri
 - `OTERYN-20260720-phase5-closure` — PR #42 / `3732b29b06addecbd07423ef655489a35001247c`; task archived by post-merge housekeeping.
 - `OTERYN-20260720-phase5-character-create-implementation` — PR #41 / `9839822b8e445c0e9828e73d2d7767bb237e587f`.
 - `OTERYN-20260720-phase5-character-create-operation-contract` — PR #39 / `660f1790101842772b3bd5b18926b9dc9fc394a7`.
-- `OTERYN-20260720-phase5-character-product-policy` — PR #37 / `c5b8719de51deec6cea6d9270e55416fba1d6472`.
-- `OTERYN-20260720-phase5-platform-account-provisioning-implementation` — PR #33 / `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
 
 ## Coordination rule
 

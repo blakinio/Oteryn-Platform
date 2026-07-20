@@ -14,7 +14,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 3 — Identity foundation: COMPLETE**
 - **Phase 4 — Public website and read-only game data: COMPLETE**
 - **Phase 5 — Account and character management: COMPLETE**
-- **Phase 6 — CMS, Admin, RBAC and Audit: NEXT / PLANNED**
+- **Phase 6 — CMS, Admin, RBAC and Audit: IN PROGRESS**
 
 ## Current architecture state
 
@@ -35,10 +35,24 @@ Existing Canary accounts are not imported or claimed.
 - password recovery/change with Platform session revocation;
 - opt-in TOTP MFA and single-use recovery codes;
 - security event recording;
-- reusable `mfa.confirmed` gate for future privileged routes;
-- administrator classification and RBAC remain Phase 6 work.
+- reusable `mfa.confirmed` gate for privileged routes;
+- Phase 6 now adds explicit administrator RBAC authorization as a separate gate from MFA.
 
 Platform web authentication does not imply that current native Canary/external login-server paths already enforce Platform credential policy.
+
+## Implemented Phase 6 authorization foundation
+
+The active Phase 6 RBAC foundation on PR #44 establishes durable explicit roles and permissions with no administrator assigned by default.
+
+Current role definitions grant only enumerated permissions. No wildcard or implicit unrestricted-admin bypass exists.
+
+Privileged routes compose three independent server-side gates:
+
+`auth` + `mfa.confirmed` + `admin.permission:<explicit-permission>`
+
+Unknown permissions, missing assignments and ambiguous authorization fail closed. The first protected surface is `/admin` with explicit `admin.access`.
+
+Privileged CMS mutation, role-assignment management, administrator audit query surfaces and Cloudflare Access deployment documentation remain successor Phase 6 work until merged and validated.
 
 ## Implemented public/read-only boundary
 
@@ -131,15 +145,15 @@ Expected external work:
 - `opentibiabr/login-server`: Platform-authorized exact-account exchange and game-session creation semantics;
 - `blakinio/canary`: only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
 
-No Canary/login-server repository was modified during Phase 5.
+No Canary/login-server repository was modified during Phase 5 or the current Phase 6 work.
 
 ## Current active task
 
-None.
+`OTERYN-20260720-phase6-admin-rbac-foundation` — PR #44.
 
 ## Recommended next work
 
-Begin Phase 6 with the smallest bounded Admin/RBAC foundation task derived from live repository state. Establish deny-by-default administrator identity/role authorization and compose it with existing `auth` + `mfa.confirmed` before adding privileged CMS/account actions.
+Complete PR #44, then immediately add audited administrator role assignment and privileged news/page management behind the established explicit permission + confirmed-MFA boundary.
 
 The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled when external-repository modification is explicitly authorized.
 
@@ -161,6 +175,7 @@ Cloudflare / Edge
 Oteryn Platform
        |
        +--> Platform-owned Identity + application/provisioning data
+       +--> explicit Admin RBAC + confirmed MFA (Phase 6 in progress)
        +--> read-only Canary SQL / runtime Redis
        +--> canary_provisioning (operation-specific least privilege)
        +--> canary_character_create (operation-specific least privilege)
