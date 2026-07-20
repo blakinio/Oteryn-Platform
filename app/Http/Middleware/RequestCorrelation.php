@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,10 +24,12 @@ final class RequestCorrelation
         $response = $next($request);
         $response->headers->set('X-Request-ID', $requestId);
 
+        $route = $request->route();
+
         Log::info('http.request.completed', [
             'request_id' => $requestId,
             'method' => $request->getMethod(),
-            'route' => $request->route()?->getName(),
+            'route' => $route instanceof Route ? $route->getName() : null,
             'status' => $response->getStatusCode(),
             'duration_ms' => round((hrtime(true) - $startedAt) / 1_000_000, 3),
         ]);
