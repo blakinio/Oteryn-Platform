@@ -2,34 +2,11 @@
 
 ## Status
 
-`APPROVED IMPLEMENTATION SHAPE — SHARED WRITE NOT YET IMPLEMENTED`
+`IMPLEMENTED — GREENFIELD ACCOUNT PROVISIONING AND IMMUTABLE BINDING`
 
 This contract defines the only approved Phase 5 operation for creating a Canary account for a greenfield Oteryn Platform Identity and establishing the immutable `1 Platform Identity <-> 1 Canary accounts.id` ownership binding selected by ADR 0004.
 
-It does not implement the write. It defines the exact invariants that the next implementation task must satisfy.
-
-## Evidence baseline
-
-### Oteryn Platform
-
-- Repository: `blakinio/Oteryn-Platform`
-- Base revision at task start: `3b22f13ded681abf8c01b8e4fa816fdc616c7c15`
-- Platform Identity registration currently commits only Platform-owned Identity and security-audit state in one Platform database transaction.
-- No durable Canary account binding or account-provisioning state exists yet.
-- The existing `canary` SQL connection remains the database-enforced read-only PublicGameData boundary and must not be broadened.
-
-### Canary
-
-- Repository: `blakinio/canary`
-- Current inspected main: `2c448205d864f6388b8be932ecbb1a9e6dcaffe0`
-- The two commits after the previous ownership-contract pin modify only OAM market documentation/task history and do not modify account schema/authentication paths.
-- Access mode during this task: read-only.
-
-### External login-server
-
-- Repository: `opentibiabr/login-server`
-- Current inspected main: `2612930de4d97123a397f8f2cd0d5f784094af40`
-- Access mode during this task: read-only.
+The implementation is delivered through PR #33. Existing Canary accounts are not imported or claimed.
 
 ## Product ownership prerequisite
 
@@ -37,158 +14,131 @@ ADR 0004 is authoritative:
 
 `1 Platform Identity <-> 1 Canary accounts.id`
 
-Supported accounts are greenfield and originate only from Oteryn Platform. Existing Canary accounts are not imported or claimed. Self-service unlink, rebind and transfer are forbidden. Normal recovery restores the same Platform Identity and therefore the same immutable Canary account binding.
+Rules:
 
-## Current Canary account-create surface — PROVEN
+- supported accounts are greenfield and originate only from Oteryn Platform;
+- self-service unlink, rebind and transfer are forbidden;
+- normal recovery restores the same Platform Identity and therefore the same immutable Canary account binding;
+- all later user-scoped Canary authorization is derived from the ready Platform-owned binding.
 
-The current `accounts` table requires:
+## Canary account-create surface
 
-- auto-generated `id` primary key;
-- unique `name` up to 32 characters;
-- required `password` up to 255 characters;
-- `email`, default empty string;
-- all other inspected account fields have defaults.
+The operation writes only:
 
-The product account-create operation SHALL explicitly write only:
+- `accounts.name`;
+- `accounts.password`;
+- `accounts.email`;
+- `accounts.creation`.
 
-- `name`;
-- `password`;
-- `email`;
-- `creation`.
+All other account columns use current Canary defaults unless a later separately approved lifecycle/profile contract changes them.
 
-All other account columns SHALL use the current Canary schema defaults unless a later explicit account-profile/lifecycle contract changes them.
+Current Canary account insertion triggers creation of three default non-customizable VIP groups. Those trigger writes are Canary-owned side effects of the account transaction; Oteryn Platform does not receive direct `account_vipgroups` write privileges.
 
-### Account insert side effect
-
-Current Canary schema has `oncreate_accounts`, an `AFTER INSERT` trigger that inserts the default non-customizable VIP groups:
-
-- `Enemies`;
-- `Friends`;
-- `Trading Partner`.
-
-Those trigger writes are part of the Canary-owned account-create transaction. Oteryn Platform SHALL NOT duplicate them with direct writes to `account_vipgroups`.
-
-If the trigger fails, the Canary account-create transaction must fail and the Platform provisioning state remains not-ready.
+If the trigger fails, the Canary transaction fails and the Platform binding remains not-ready.
 
 ## Internal Canary account name
 
-The Canary `accounts.name` value for Platform-originated accounts is an internal immutable provisioning identifier, not user ownership evidence and not the Platform login name.
+The Canary `accounts.name` for Platform-originated accounts is an internal immutable provisioning identifier, not a user login name or ownership signal.
 
-Approved format:
+Format:
 
 `op` + 30 lowercase hexadecimal characters generated from 15 cryptographically secure random bytes.
 
 Properties:
 
-- exact length: 32 characters;
-- 120 bits of randomness;
-- persisted in Platform-owned provisioning state before any Canary write;
-- immutable after provisioning;
-- never accepted from browser/client input;
-- reserved by product contract for Oteryn Platform provisioning;
-- used as the deterministic recovery/idempotency key for a partially completed provisioning saga.
+- exact length 32;
+- generated server-side before any Canary write;
+- persisted in Platform-owned provisioning state;
+- globally unique by Platform constraint and Canary `accounts.name` uniqueness;
+- immutable;
+- never accepted from browser input;
+- used as the deterministic forward-recovery key after partial failure.
 
-The database unique constraint on `accounts.name` remains the final collision guard.
+## Canary password compatibility strategy
 
-## Canary `accounts.password` strategy
+The current Canary schema requires `accounts.password`, but Oteryn Platform is the user credential authority and future game login must not depend on a reusable Canary password known by the user.
 
-### Decision: non-user sink credential
+For each new Platform-originated Canary account the implementation:
 
-The current Canary schema requires `accounts.password`, while the accepted architecture makes Oteryn Platform the user credential authority and future game login must not rely on a reusable Canary password.
+1. generates a high-entropy random temporary sink secret;
+2. derives the current legacy-compatible digest representation;
+3. inserts only the derived value into `accounts.password`;
+4. never returns, persists or logs the sink plaintext;
+5. erases the temporary material from process memory after use;
+6. never reads `accounts.password` back.
 
-Until the separately authorized Platform-authorized game-login bridge is implemented, every Platform-originated Canary account SHALL receive a non-user sink credential:
+This compatibility value is not the Platform Identity password and is not a user authentication mechanism.
 
-1. generate at least 32 cryptographically secure random bytes;
-2. encode them as a temporary plaintext secret in process memory;
-3. compute the lowercase hexadecimal SHA-1 digest required by the current external login-server/native SHA-1 fallback representation;
-4. insert only that digest into `accounts.password`;
-5. never return, persist, audit or log the temporary plaintext secret;
-6. discard the plaintext immediately after the insert attempt.
-
-The sink secret is not the Platform Identity password and is never disclosed to the user. Oteryn Platform does not verify it and does not read `accounts.password` back.
-
-### Security consequence
-
-Current native Canary and external login-server password paths can authenticate a Platform-originated account only with knowledge of the random sink plaintext. Because the plaintext is generated with at least 256 bits of entropy and is deliberately never persisted or exposed, those legacy password paths do not provide a usable alternate user authentication path.
-
-SHA-1 is used here only as a compatibility representation for an unreachable random sink secret, not as the password hashing policy for user credentials. Platform Identity credentials remain framework-hashed and authoritative.
-
-Any code path that accidentally logs or returns the sink plaintext is a security defect and must fail review.
+The existence of this sink credential does **not** mean the future authoritative game-login bridge is implemented.
 
 ## Platform-owned provisioning/binding state
 
-The next implementation SHALL add one Platform-owned durable provisioning/binding record per Identity. The logical state must contain at least:
+`identity_canary_accounts` provides durable state containing the logical equivalents of:
 
-- `identity_id` — unique and non-null; deletion restricted until an explicit account-deletion lifecycle exists;
-- `canary_account_id` — nullable while pending, unique when present;
-- `provisioning_name` — unique immutable 32-character internal Canary account name generated before the external write;
-- `canary_creation_epoch` — immutable Unix timestamp chosen before the external write and written to `accounts.creation`;
-- readiness state derivable as `canary_account_id IS NOT NULL` or an equivalent explicit state with the same invariant;
-- `ready_at` or equivalent completion timestamp;
-- normal timestamps required for operations/audit support.
+- unique `identity_id`;
+- nullable unique `canary_account_id` while provisioning is pending;
+- unique immutable `provisioning_name`;
+- immutable `canary_creation_epoch`;
+- pending / ready / conflict state;
+- readiness/completion timestamp;
+- bounded failure metadata and normal timestamps.
 
-The record MUST be created in the Platform database before the first Canary insert attempt.
+The Platform record exists before the first Canary insert attempt.
 
-Database constraints MUST enforce:
+Database constraints enforce:
 
 - at most one provisioning/binding record per Platform Identity;
 - at most one Platform binding for a Canary `accounts.id`;
-- globally unique `provisioning_name`.
+- globally unique provisioning name.
 
-A Platform Identity with no non-null bound `canary_account_id` is **not game-account-ready** and MUST fail closed for every user-scoped Canary operation.
+A non-ready Identity fails closed for user-scoped Canary operations.
 
-## Provisioning saga
+## Provisioning saga — IMPLEMENTED
 
-Platform and Canary persistence are separate database boundaries. The implementation MUST NOT pretend that one Laravel local transaction atomically spans both databases.
-
-Approved saga:
+Platform and Canary persistence are separate database boundaries. The implementation does not pretend one local transaction spans both databases.
 
 ### Step 1 — durable Platform intent
 
-Inside one Platform database transaction:
+Inside Platform persistence:
 
-1. create or lock the Platform Identity provisioning/binding record;
-2. if no record exists, generate and persist `provisioning_name` and `canary_creation_epoch`;
-3. commit the pending provisioning intent before any Canary write.
+1. create or lock the Identity provisioning/binding record;
+2. generate/persist immutable provisioning name and creation marker when absent;
+3. commit pending intent before any Canary write.
 
-Registration may create the Identity and pending provisioning intent in the same Platform transaction.
+Registration may create the Identity and pending intent in the same Platform transaction.
 
 ### Step 2 — Canary transaction
 
-Using the dedicated provisioning connection:
+Using only `canary_provisioning`:
 
-1. begin a Canary database transaction;
-2. attempt to insert `accounts(name, password, email, creation)` using:
-   - persisted `provisioning_name`;
-   - one newly generated sink-credential SHA-1 digest;
-   - `email = ''`;
-   - persisted `canary_creation_epoch`;
-3. allow the Canary `oncreate_accounts` trigger to create default VIP groups;
-4. select `id`, `name` and `creation` for the exact persisted `provisioning_name`;
-5. require exact `name` and `creation` match;
-6. commit only if the account row and trigger side effects succeed.
+1. begin Canary transaction;
+2. attempt `accounts(name, password, email, creation)` insert with persisted provisioning identity and a newly generated sink credential digest;
+3. allow Canary account-create trigger side effects;
+4. select only `id`, `name`, `creation` for the exact provisioning name;
+5. require exact name and creation-marker match;
+6. commit only when account row and trigger side effects succeed.
 
-The operation SHALL NOT read `accounts.password`.
+The operation does not read `accounts.password`.
 
 ### Step 3 — durable Platform binding
 
-Inside a new Platform database transaction:
+Inside Platform persistence:
 
-1. lock the Identity provisioning/binding row;
-2. if `canary_account_id` is null, set it to the recovered/created Canary account ID and mark ready;
-3. if it already equals that same Canary account ID, treat the retry as idempotent success;
-4. if it contains a different ID, fail closed as an ownership conflict;
-5. emit the successful provisioning audit event.
+1. lock the provisioning/binding row;
+2. null `canary_account_id` -> store exact recovered/created ID and mark ready;
+3. same existing ID -> idempotent success;
+4. different existing ID -> hard ownership conflict;
+5. emit successful provisioning security/audit state according to Platform recorder conventions.
 
 ## Retry and partial-failure semantics
 
 ### Canary unavailable before insert
 
-- no Canary account exists;
+- no Canary account is assumed to exist;
 - Platform record remains pending;
-- retry reuses the same `provisioning_name` and `canary_creation_epoch`.
+- retry reuses the same provisioning name and creation marker.
 
-### Canary insert or trigger fails
+### Insert or trigger failure
 
 - Canary transaction rolls back;
 - Platform record remains pending;
@@ -196,136 +146,113 @@ Inside a new Platform database transaction:
 
 ### Canary commit succeeds, Platform finalization fails
 
-- do not delete the Canary account as automatic compensation;
-- retry uses the persisted random `provisioning_name` to find the account;
-- require the stored `creation` value to equal the persisted `canary_creation_epoch`;
-- finalize the same binding.
+- no destructive automatic Canary deletion is attempted;
+- retry selects by the persisted provisioning name;
+- recovered `creation` must match the persisted creation marker;
+- the exact same binding is finalized.
 
-This forward-recovery rule avoids destructive compensation after Canary-owned trigger side effects have committed.
+### Duplicate provisioning name
 
-### Duplicate `accounts.name`
+A duplicate is not automatically a new create. Existing row recovery requires exact provisioning-name and creation-marker match.
 
-For the persisted provisioning name, a duplicate on retry is not automatically treated as a second account-create request. The worker must select the existing row by exact name and require matching `creation` before recovering its ID.
+Mismatch enters fail-closed conflict state. The implementation must not silently generate a replacement name after an ambiguous committed external state.
 
-If `creation` does not match, provisioning enters a hard conflict state and no binding is created. Operators must investigate; the implementation must not silently generate a new name after an ambiguous committed external state.
+### Concurrent workers
 
-### Concurrent workers for one Identity
+For one Identity:
 
-- the Platform unique `identity_id` constraint and row locking serialize ownership finalization;
-- both workers reuse the same persisted provisioning name;
-- Canary unique `accounts.name` prevents two rows for the same provisioning intent;
-- finalization with the same recovered Canary ID is idempotent;
+- Platform uniqueness/locking serializes ownership finalization;
+- workers reuse the same persisted provisioning identity;
+- Canary uniqueness prevents duplicate account rows for one intent;
+- finalization to the same ID is idempotent;
 - a different ID is a hard conflict.
 
-### Two Identities
+For different Identities:
 
-Two different Platform Identities receive independently generated provisioning names. The unique `canary_account_id` binding constraint prevents one Canary account from being authorized by both identities.
+- provisioning names are independently random;
+- unique bound `canary_account_id` prevents one Canary account from authorizing two Platform Identities.
 
-## Dedicated least-privilege Canary connection
+## Dedicated least-privilege connection — IMPLEMENTED
 
-The existing `canary` / `oteryn_readonly` connection remains unchanged.
+Connection:
 
-The next implementation SHALL introduce a separate connection, conceptually `canary_provisioning`, with a separate secret and database principal.
+`canary_provisioning`
 
-Required privilege surface is limited to the account-provisioning operation. Target grants:
+The generic `canary` / `oteryn_readonly` connection remains unchanged.
+
+Approved privileges are limited to:
 
 - column-level `INSERT` on `accounts(name, password, email, creation)`;
 - column-level `SELECT` on `accounts(id, name, creation)`.
 
-No grant is approved for:
+Not approved:
 
-- `UPDATE` or `DELETE` on `accounts`;
+- account UPDATE or DELETE;
 - reading `accounts.password`;
-- `account_sessions`;
-- `players` writes;
-- guild, bans, coins or other Canary tables;
-- direct `account_vipgroups` writes;
-- schema migration/DDL;
-- GRANT OPTION or administrative privileges.
+- session tables;
+- player writes;
+- direct VIP-group writes;
+- guild/ban/coin writes;
+- DDL;
+- `GRANT OPTION` or administrative privileges.
 
-The deployment privilege verifier must fail closed if effective privileges exceed or do not satisfy the approved provisioning surface.
+A reviewed SQL provisioning template defines the exact deployment grants. Production credentials are not stored in Git.
 
-The current Canary trigger is expected to own its `account_vipgroups` side effects. Deployment/integration validation must prove that an account insert performed by the dedicated principal successfully executes the trigger without granting direct Platform application writes to `account_vipgroups`.
+A fail-closed effective-grant verifier rejects missing required or excessive privileges.
 
-## Authorization rule
+Real MariaDB integration coverage proves that the restricted principal can perform the approved account insert/recovery and Canary trigger side effects without receiving direct VIP-group write privileges, while password reads and broader mutations remain denied.
 
-Only an authenticated Platform Identity may initiate or observe provisioning for its own Identity record.
+## Authorization
 
-The operation never accepts a target Canary `accounts.id` from the browser. The `accounts.id` is discovered only from the Canary row created/recovered using the server-generated persisted provisioning name.
+Only an authenticated Platform Identity may initiate provisioning for its own Identity record.
 
-Once ready, all future user-scoped Canary operations authorize against the Platform-owned immutable binding, never against email, account name or browser-supplied identifiers.
+The operation never accepts a target Canary `accounts.id` or provisioning name from the browser.
 
-## Audit
+The created/recovered `accounts.id` is discovered only from the exact server-generated persisted provisioning identity and becomes authoritative only after durable Platform binding finalization.
 
-Required security events, names may follow existing recorder conventions:
+## Validation evidence
 
-- provisioning requested/pending;
-- provisioning completed with Identity ID and Canary account ID references;
-- provisioning failed with a bounded non-secret failure code;
-- provisioning hard conflict.
+PR #33 validation covers:
 
-Never audit/log:
+- client non-control of account ID and provisioning identity;
+- successful provisioning and ready binding;
+- dependency-unavailable pending state;
+- retry and forward recovery;
+- idempotent completed state;
+- hard recovery conflict;
+- binding uniqueness;
+- effective-grant policy;
+- real MariaDB restricted-principal execution;
+- account-create trigger side effects;
+- denial of `accounts.password` reads;
+- duplicate-free recovery after committed Canary state.
 
-- Platform plaintext passwords;
-- Platform password hashes;
-- sink plaintext secrets;
-- sink SHA-1 values;
-- reusable game session material.
+The immutable binding contract records the final delivered evidence and ownership policy.
 
-## Required implementation tests
+## Deployment gate
 
-The implementation task must cover at minimum:
+Before enabling account provisioning in an environment:
 
-1. one Identity creates one pending provisioning record;
-2. successful Canary insert produces one exact binding;
-3. retry after successful finalization is idempotent;
-4. two concurrent attempts for one Identity cannot create two authorized accounts;
-5. unique constraints prevent two Identities from binding one Canary account;
-6. Canary connection failure leaves pending state and no ready binding;
-7. trigger/insert failure leaves pending state;
-8. Canary commit followed by Platform finalization failure recovers the same account by provisioning name and creation epoch;
-9. mismatched recovered `creation` fails closed;
-10. user/client cannot choose `accounts.id`, provisioning name or sink credential;
-11. existing read-only Canary connection still cannot write;
-12. provisioning credential cannot read `accounts.password` or write unrelated tables;
-13. logs/audit do not contain sink plaintext/hash or Platform credentials.
+1. provision the dedicated `canary_provisioning` principal out-of-band from the reviewed SQL template;
+2. supply credentials through approved secret management;
+3. run the provisioning privilege verifier;
+4. fail closed if grants are missing or broader than approved;
+5. revalidate if deployed Canary schema/trigger behavior differs materially from the evidence baseline.
 
-Exact MySQL/MariaDB integration coverage is required for the grant boundary and trigger behavior; a mocked or SQLite-only test is insufficient for those database privilege/trigger assertions.
+## Game-login follow-up
 
-## Cross-repository follow-up history
+Provisioning a Canary account is not the same as enabling authoritative Platform-backed game login.
 
-No Canary/login-server repository modification is required to create the account and immutable ownership binding under this contract.
+A separately authorized cross-repository task must provide short-lived exact-account Platform authorization with explicit expiry, audience, replay/session-consumption and revocation semantics and no user dependence on the sink credential.
 
-A separate future game-login integration task **is required before Platform-originated users can log into the game through the authoritative Platform credential model**.
+Expected primary external scope is `opentibiabr/login-server`. `blakinio/canary` changes are required only if the final protocol needs direct assertion verification or stronger replay/revocation/fencing behavior.
 
-### Required `opentibiabr/login-server` direction
-
-A separately authorized task should add a Platform-authorized login/session exchange that:
-
-- accepts a cryptographically authenticated, short-lived Platform assertion rather than a Canary reusable password;
-- binds the assertion to one exact Canary `accounts.id` and intended login audience;
-- validates expiry and replay/idempotency semantics;
-- loads the account/character list by the asserted account ID;
-- creates only the game-session material required by the approved login contract;
-- never requires or exposes the sink credential;
-- does not fall back to email-only ownership inference.
-
-The exact session TTL, replay/single-use semantics and revocation behavior must be defined before implementation.
-
-### Potential `blakinio/canary` follow-up
-
-Current Canary can already load DB-backed `account_sessions` for game authentication, so this provisioning contract does not prove that a Canary code change is required for the first Platform-authorized login bridge.
-
-If the final login contract requires single-use session consumption, stronger revocation, Platform-signed assertion verification directly in Canary, or fencing/removing alternate login endpoints, those are explicit future `blakinio/canary` changes and require a separately authorized cross-repository task. The task must update `AUTH_GAME_LOGIN_CONTRACT.md` and define rollout/backward-compatibility before modifying Canary.
+No Canary/login-server repository was modified by Phase 5.
 
 ## Decision
 
-`PLATFORM-ORIGINATED CANARY ACCOUNT PROVISIONING CONTRACT: APPROVED FOR IMPLEMENTATION.`
+`PLATFORM-ORIGINATED CANARY ACCOUNT PROVISIONING: IMPLEMENTED`
 
-The ownership/cardinality question is resolved and the account-create operation now has an explicit least-privilege, idempotent, forward-recoverable contract that does not make Canary passwords user credentials.
+`IMMUTABLE GREENFIELD PLATFORM IDENTITY -> CANARY accounts.id BINDING: IMPLEMENTED`
 
-The next task may implement Platform-owned provisioning/binding persistence and the dedicated Canary account-create write path exactly within this contract.
-
-Character creation remains blocked until that implementation is complete and tested, and remains independently subject to the character-name/starter-state blockers in `CHARACTER_CREATION_CONTRACT.md`.
-
-`CHARACTER CREATION: BLOCKED`
+The operation is production-enableable only after the environment-specific least-privilege principal is provisioned and verified.
