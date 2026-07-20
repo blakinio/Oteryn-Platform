@@ -76,35 +76,42 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
         self::assertSame('Alice Moon', $recovered->canonicalName);
 
         $row = $this->rootRow('SELECT * FROM `'.self::DATABASE.'`.`players` WHERE `id` = '.$created->playerId);
-        self::assertSame('Alice Moon', $row['name']);
-        self::assertSame(1001, (int) $row['account_id']);
-        self::assertSame(8, (int) $row['level']);
-        self::assertSame(9, (int) $row['vocation']);
-        self::assertSame(185, (int) $row['health']);
-        self::assertSame(185, (int) $row['healthmax']);
-        self::assertSame(4200, (int) $row['experience']);
-        self::assertSame(90, (int) $row['mana']);
-        self::assertSame(90, (int) $row['manamax']);
-        self::assertSame(100, (int) $row['soul']);
-        self::assertSame(470, (int) $row['cap']);
-        self::assertSame(8, (int) $row['town_id']);
-        self::assertSame(0, (int) $row['posx']);
-        self::assertSame(0, (int) $row['posy']);
-        self::assertSame(0, (int) $row['posz']);
-        self::assertSame('', (string) $row['conditions']);
-        self::assertSame(1, (int) $row['sex']);
-        self::assertSame(0, (int) $row['pronoun']);
-        self::assertSame(128, (int) $row['looktype']);
-        self::assertSame(10, (int) $row['skill_fist']);
-        self::assertSame(0, (int) $row['skill_fist_tries']);
-        self::assertSame(0, (int) $row['deletion']);
-        self::assertSame(1, (int) $row['save']);
-        self::assertSame(0, (int) $row['balance']);
-        self::assertSame(2520, (int) $row['stamina']);
-        self::assertSame(43200, (int) $row['offlinetraining_time']);
-        self::assertSame(-1, (int) $row['offlinetraining_skill']);
-        self::assertSame(1, (int) $row['isreward']);
-        self::assertSame(100, (int) $row['forge_dust_level']);
+        self::assertSame('Alice Moon', $this->rowString($row, 'name'));
+        self::assertSame('', $this->rowString($row, 'conditions'));
+
+        $expectedIntegers = [
+            'account_id' => 1001,
+            'level' => 8,
+            'vocation' => 9,
+            'health' => 185,
+            'healthmax' => 185,
+            'experience' => 4200,
+            'mana' => 90,
+            'manamax' => 90,
+            'soul' => 100,
+            'cap' => 470,
+            'town_id' => 8,
+            'posx' => 0,
+            'posy' => 0,
+            'posz' => 0,
+            'sex' => 1,
+            'pronoun' => 0,
+            'looktype' => 128,
+            'skill_fist' => 10,
+            'skill_fist_tries' => 0,
+            'deletion' => 0,
+            'save' => 1,
+            'balance' => 0,
+            'stamina' => 2520,
+            'offlinetraining_time' => 43200,
+            'offlinetraining_skill' => -1,
+            'isreward' => 1,
+            'forge_dust_level' => 100,
+        ];
+
+        foreach ($expectedIntegers as $column => $expected) {
+            self::assertSame($expected, $this->rowInt($row, $column), $column);
+        }
 
         $this->assertCharacterPrincipalDenied(fn () => DB::connection(CanaryCharacterCreator::CONNECTION)
             ->table('accounts')->select('password')->where('id', 1001)->first());
@@ -118,12 +125,11 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
             ->table('player_items')->insert(['player_id' => $created->playerId]));
     }
 
-    public function test_missing_account_soft_deleted_name_and_active_limit_fail_closed(): void
+    public function test_missing_account_fails_closed(): void
     {
-        $creator = new CanaryCharacterCreator;
-
         $this->expectException(CharacterAccountMissing::class);
-        $creator->create(9999, 'Missing Account', 1, 0);
+
+        (new CanaryCharacterCreator)->create(9999, 'Missing Account', 1, 0);
     }
 
     public function test_deleted_rows_do_not_count_but_still_reserve_their_name(): void
@@ -411,7 +417,9 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
         touch($barrier);
 
         foreach ($pids as $pid) {
-            pcntl_waitpid($pid, $status);
+            $status = 0;
+            $waitedPid = pcntl_waitpid($pid, $status);
+            self::assertSame($pid, $waitedPid);
             self::assertTrue(pcntl_wifexited($status));
             self::assertSame(0, pcntl_wexitstatus($status));
         }
@@ -439,13 +447,16 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
         }
     }
 
+    /**
+     * @param  callable(): mixed  $operation
+     */
     private function assertCharacterPrincipalDenied(callable $operation): void
     {
         try {
             $operation();
             self::fail('The dedicated character-create principal unexpectedly exceeded its approved privileges.');
         } catch (QueryException) {
-            self::assertTrue(true);
+            return;
         }
     }
 
@@ -470,6 +481,34 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
     }
 
     /**
+     * @param  array<string, mixed>  $row
+     */
+    private function rowInt(array $row, string $key): int
+    {
+        $value = $row[$key] ?? null;
+
+        if (! is_int($value) && ! is_string($value)) {
+            self::fail("MariaDB row column {$key} was not integer-compatible.");
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function rowString(array $row, string $key): string
+    {
+        $value = $row[$key] ?? null;
+
+        if (! is_string($value)) {
+            self::fail("MariaDB row column {$key} was not a string.");
+        }
+
+        return $value;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function rootRow(string $query): array
@@ -490,7 +529,17 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
             self::fail('MariaDB integration row was unavailable.');
         }
 
-        return $row;
+        $normalized = [];
+
+        foreach ($row as $key => $value) {
+            if (! is_string($key)) {
+                self::fail('MariaDB integration row contained a non-string key.');
+            }
+
+            $normalized[$key] = $value;
+        }
+
+        return $normalized;
     }
 
     private function rootValue(string $query): mixed
