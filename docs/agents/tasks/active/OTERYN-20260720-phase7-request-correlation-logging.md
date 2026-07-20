@@ -17,6 +17,7 @@ Add provider-neutral request correlation and structured logging primitives witho
 
 ```yaml
 owned_paths:
+  - .github/workflows/phase7-correlation-debug.yml
   - app/Http/Middleware/RequestCorrelation.php
   - bootstrap/app.php
   - config/logging.php
@@ -33,7 +34,7 @@ modules:
 dependencies:
   - PR #54 / eb358a245f35fda1865f13e329c07ef0f4850d2f
 blockers:
-  - none for provider-neutral application primitives
+  - PHPStan failure on the current request-correlation implementation requires exact diagnostic evidence
 cross_repository_tasks:
   - none
 ```
@@ -42,17 +43,18 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T12:38:00Z
-head: eb358a245f35fda1865f13e329c07ef0f4850d2f
+updated_at: 2026-07-20T12:52:00Z
+head: 1dd975a5d2ac092c77893debbc7f82c113fb628c
 branch: task/OTERYN-20260720-phase7-request-correlation-logging
-pr: none
-status: implementing
+pr: 55
+status: debugging
 context_routes:
   - security
   - testing
   - architecture
   - agent-governance
 owned_paths:
+  - .github/workflows/phase7-correlation-debug.yml
   - app/Http/Middleware/RequestCorrelation.php
   - bootstrap/app.php
   - config/logging.php
@@ -64,30 +66,45 @@ owned_paths:
   - docs/architecture/SECURITY_ARCHITECTURE.md
   - docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md
 proven:
-  - config/logging.php currently provides single-file and stderr channels but no dedicated JSON stderr channel.
-  - Actual centralized production logging, metrics and alerting sinks remain UNKNOWN from repository evidence.
-  - Security architecture forbids credentials, tokens and unnecessary personal data in logs.
+  - RequestCorrelation generates a new server-owned UUID per request and does not copy inbound X-Request-ID.
+  - Normal responses receive X-Request-ID and request completion logging is intentionally bounded to request_id, method, route, status and duration_ms.
+  - config/logging.php now exposes an optional stderr_json Monolog channel while preserving the existing default logging choice.
+  - Agent Governance #631 and #632 passed on implementation/debug heads.
+  - CI #711 and #712 both passed Composer advisory audit and Pint but failed at PHPStan before tests.
+  - Narrowing the Mockery log-spy callback from typed string/array to mixed/runtime checks did not resolve the PHPStan failure, so further guessing is rejected.
 derived:
-  - Server-generated request IDs avoid trusting/spoofing browser-supplied correlation identifiers.
-  - Logging route name, method, status and duration is sufficient for a first provider-neutral request-completion event without storing request bodies, query strings or credentials.
-  - A JSON stderr channel is deployable across many hosting/container platforms while remaining optional until actual topology is proven.
-unknown: []
+  - Exact static-analysis output is required before the next implementation change.
+  - A temporary narrow diagnostic workflow is justified and must be removed before merge.
+unknown:
+  - exact PHPStan error text and affected line
 conflicts: []
 first_failure:
-  marker: none
-  evidence: implementation not yet validated
+  marker: CI #711/#712 Run static analysis
+  evidence: Composer audit and Pint passed; PHPStan failed; full CI logs are truncated before the diagnostic lines in the connector output
 rejected_hypotheses:
   - Trust inbound X-Request-ID as authoritative correlation: rejected because it is untrusted browser input and can enable spoofed log correlation.
   - Hard-code a specific observability vendor: rejected because actual production logging/metrics topology remains UNKNOWN.
   - Log full URLs, query strings or request bodies: rejected because they can contain credentials, tokens or unnecessary personal data.
+  - The only PHPStan issue was the typed Mockery callback: rejected because CI #712 still failed PHPStan after runtime narrowing.
 changed_paths:
+  - app/Http/Middleware/RequestCorrelation.php
+  - bootstrap/app.php
+  - config/logging.php
+  - tests/Feature/Operations/RequestCorrelationTest.php
   - docs/agents/tasks/archive/OTERYN-20260720-phase7-security-headers-csp.md
   - docs/agents/tasks/active/OTERYN-20260720-phase7-request-correlation-logging.md
 validation:
-  - command: GitHub Actions on draft PR head
+  - command: CI #711 and #712
+    result: FAIL
+    evidence: PHPStan only; Composer advisory audit and Pint passed; tests were skipped after static-analysis failure.
+  - command: temporary focused PHPStan diagnostic workflow
     result: NOT_RUN
-    evidence: implementation not yet pushed
+    evidence: workflow will capture exact composer analyse output as an artifact and be removed before merge.
 blockers:
-  - none
-next_action: Open the draft PR and implement server-generated request correlation, bounded completion logging and an optional JSON stderr channel.
+  - exact PHPStan diagnostic pending
+next_action: Run the temporary focused static-analysis diagnostic workflow, read the artifact, fix the exact reported issue, then remove the workflow and rerun full CI.
 ```
+
+## Notes
+
+The temporary diagnostic workflow is task-owned only for root-cause isolation and must not remain in the merged PR.
