@@ -168,6 +168,20 @@ Audit security-relevant events such as:
 - session revocation actions;
 - future payment/ledger administrative actions.
 
+Phase 7 application-side request correlation uses a fresh server-generated UUID for every Laravel-handled request. The application does not trust a browser-supplied `X-Request-ID` as authoritative correlation evidence.
+
+Normal responses expose the generated identifier as `X-Request-ID`. Request completion logging is deliberately bounded to:
+
+- request ID;
+- HTTP method;
+- route name when available;
+- response status;
+- bounded request duration.
+
+The request-completion event does not include full URLs, query strings, request bodies, request headers or credential values. This keeps correlation useful while reducing accidental token/personal-data leakage.
+
+An optional JSON-to-stderr channel exists for deployment environments that collect process stderr. It is not proof that a centralized production log, metrics or alerting sink is deployed, and it does not change the default local logging channel.
+
 Never record:
 
 - raw passwords;
@@ -247,4 +261,5 @@ A production release must not be called security-ready until at least:
 - critical dependencies pass the required vulnerability advisory scan;
 - backups/restore procedure exists and is operationally tested;
 - security-sensitive audit events are available;
+- request correlation is available and deployed logging/alerting handling is verified against the actual production sink;
 - known critical/high security findings are resolved or explicitly accepted by the owner.
