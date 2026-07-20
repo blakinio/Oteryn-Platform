@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureConfirmedMfa;
 use App\Http\Middleware\EnsureIdentitySessionIsCurrent;
+use App\Http\Middleware\RequestCorrelation;
 use App\Http\Middleware\RequireAdminPermission;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/health',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->append(RequestCorrelation::class);
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/');
         $middleware->appendToGroup('web', EnsureIdentitySessionIsCurrent::class);
