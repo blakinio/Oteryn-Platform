@@ -186,7 +186,7 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
 
         sort($results);
         self::assertSame(['created', 'name_conflict'], $results);
-        self::assertSame(1, $this->rootCount("SELECT COUNT(*) FROM `".self::DATABASE."`.`players` WHERE `name` = 'Global Race'"));
+        self::assertSame(1, $this->rootCount('SELECT COUNT(*) FROM `'.self::DATABASE."`.`players` WHERE `name` = 'Global Race'"));
     }
 
     public function test_previously_committed_same_account_character_is_forward_recovered_without_update_privilege(): void
@@ -198,7 +198,7 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
 
         self::assertFalse($result->created);
         self::assertSame($existingId, $result->playerId);
-        self::assertSame(1, $this->rootCount("SELECT COUNT(*) FROM `".self::DATABASE."`.`players` WHERE `name` = 'Committed Hero'"));
+        self::assertSame(1, $this->rootCount('SELECT COUNT(*) FROM `'.self::DATABASE."`.`players` WHERE `name` = 'Committed Hero'"));
     }
 
     private function resetDatabase(): void
