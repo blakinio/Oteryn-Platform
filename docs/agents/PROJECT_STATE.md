@@ -15,7 +15,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 4 — Public website and read-only game data: COMPLETE**
 - **Phase 5 — Account and character management: COMPLETE**
 - **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
-- **Phase 7 — Production hardening and operations: IN PROGRESS / EXTERNAL-EVIDENCE BLOCKED FOR COMPLETION**
+- **Phase 7 — Production hardening and operations: IN PROGRESS / FINAL PRODUCTION EVIDENCE REQUIRED FOR COMPLETION**
 
 ## Current architecture state
 
@@ -40,25 +40,48 @@ Platform web authentication remains separate from the still-unimplemented author
 
 PR #56 passed CI #735 and Agent Governance #655 on exact PR head `b03a2de6836ff7769b0911f847fb5b8dc0fe8572` before squash merge.
 
-## Phase 7 completion blockers
+## Phase 7 controlled production-like validation in progress
 
-Actual environment evidence is still required for:
+PR #63 / `task/OTERYN-20260720-phase7-production-evidence-collection` is implementing a repeatable exact-SHA production-like validation workflow.
 
-- production DNS/Cloudflare/WAF/Access/TLS/HSTS posture;
+Its evidence model is explicit:
+
+- `STAGING_PROVEN` — directly proven by the controlled production-like workflow;
+- `PRODUCTION_PROVEN` — reserved for direct evidence from the final production environment;
+- `UNKNOWN` — not yet established.
+
+The controlled workflow is intended to validate, without claiming final production state:
+
+- clean deployment, migrations, rollback and redeploy;
+- production configuration guardrails;
+- effective MariaDB least-privilege principals for generic read-only, provisioning and character creation;
+- fail-closed excessive/insufficient database privileges;
+- runtime Redis ACL/key/command boundary and failure semantics;
+- SMTP delivery through a real test SMTP service and mail failure handling;
+- full critical regression suite on the exact validation SHA;
+- running health/security-header/cookie/request-correlation/sensitive-error checks;
+- measured database backup/restore with integrity and restored-environment smoke validation.
+
+## Phase 7 final production-only completion evidence
+
+Controlled staging cannot prove the final production:
+
+- DNS/Cloudflare/WAF/Access/TLS/HSTS posture;
 - direct-origin exposure and ingress firewall rules;
-- Platform DB engine/endpoint/network isolation/HA;
-- effective Canary SQL production endpoints/network paths and credential provisioning;
+- Platform DB engine/endpoint/network isolation/HA and actual effective grants;
+- Canary SQL production endpoints/network paths and actual credential provisioning/effective grants;
 - runtime Redis endpoint/ACL/network/TLS state;
 - effective session/cache scaling model;
 - queue/worker model;
 - mail provider/domain/delivery monitoring;
 - centralized logs/metrics/alerts/retention/on-call routing;
-- deployment/migration/rollback mechanism;
-- backup technology/policy and a dated successful operational restore test.
+- real deployment/migration/rollback mechanism;
+- production backup schedule/technology and a dated production restore result;
+- exact deployed production SHA(s) and final critical production smoke/E2E checks.
 
 The authoritative Platform game-login bridge remains unresolved if Platform-originated game login is part of launch scope.
 
-Therefore Phase 7 must remain incomplete until these evidence gates are satisfied or explicitly risk-accepted where policy permits.
+Therefore Phase 7 must remain incomplete until the remaining final-production evidence gates are satisfied or explicitly risk-accepted where policy permits.
 
 ## Repository-verifiable operations gates
 
@@ -73,7 +96,7 @@ php artisan canary:verify-character-create-db-privileges
 
 Required CI includes strict Composer validation/install, Composer advisory audit, Pint, PHPStan and full tests.
 
-Passing these proves only their documented repository/application boundaries.
+Passing these proves only their documented boundaries and the environment in which they are executed.
 
 ## Implemented Identity/admin/shared-write boundary
 
@@ -106,13 +129,13 @@ No Canary/login-server repository was modified by Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED pending sanitized actual-production evidence.
+`OTERYN-20260720-phase7-production-evidence-collection` — IN PROGRESS — draft PR #63.
 
 ## Recommended next work
 
-Obtain sanitized evidence for the actual production application/edge/origin/database/Redis/mail/logging/backup/deployment topology, then run the edge/origin/database exposure review and dated backup-restore operational test required by the Phase 7 exit gate.
+Finish exact-head validation of PR #63, record only non-secret `STAGING_PROVEN` results from the controlled workflow, close any workflow defects, and reduce the remaining Phase 7 checklist to the final production-only verification pass.
 
-Until that evidence is available, do not mark Phase 7 COMPLETE or invent provider-specific deployment claims.
+Do not mark Phase 7 COMPLETE from staging evidence alone.
 
 ## High-priority remaining unknowns
 
@@ -120,7 +143,7 @@ Until that evidence is available, do not mark Phase 7 COMPLETE or invent provide
 - deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
 - production database, mail, session/cache and queue topology;
-- backup/restore/deployment/rollback mechanisms;
+- production backup/restore/deployment/rollback mechanisms;
 - centralized production logging/metrics/alerting;
 - exact production Cloudflare Access/admin-hostname choice, if adopted;
 - current Canary tournament-coin schema/code naming conflict.
