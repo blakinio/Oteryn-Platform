@@ -21,8 +21,12 @@ export default defineConfig({
     viewport: { width: 1440, height: 1000 },
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
-    trace: 'retain-on-failure',
-    screenshot: 'only-on-failure',
+    // Raw Playwright traces and automatic failure screenshots can capture session
+    // cookies, reset URLs, TOTP enrollment secrets or recovery codes. Secret-bearing
+    // full flows therefore use sanitized diagnostics rather than raw trace artifacts.
+    // The non-secret smoke suite opts into raw trace/screenshot evidence explicitly.
+    trace: 'off',
+    screenshot: 'off',
     video: 'off',
   },
   expect: {
