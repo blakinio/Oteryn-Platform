@@ -7,7 +7,6 @@ use App\Characters\Contracts\CanaryCharacterCreationGateway;
 use App\Characters\Data\CharacterCreationResult;
 use App\Characters\Exceptions\CharacterNameConflict;
 use App\Identity\Models\Identity;
-use App\Identity\Sessions\WebSessionState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -39,7 +38,7 @@ final class CharacterCreationTest extends TestCase
     public function test_authenticated_form_is_available_and_contains_only_product_inputs(): void
     {
         $identity = $this->identityWithBinding(1001, IdentityCanaryAccount::STATUS_READY);
-        $this->actingAsCurrentIdentity($identity);
+        $this->loginAsCurrentIdentity($identity);
 
         $response = $this->get('/account/characters/create');
 
@@ -55,7 +54,7 @@ final class CharacterCreationTest extends TestCase
     public function test_ready_binding_drives_account_authorization_and_client_cannot_override_starter_state(): void
     {
         $identity = $this->identityWithBinding(1002, IdentityCanaryAccount::STATUS_READY);
-        $this->actingAsCurrentIdentity($identity);
+        $this->loginAsCurrentIdentity($identity);
         $this->gateway->nextResult = new CharacterCreationResult(7001, 'Alice Moon', true);
 
         $response = $this->post('/account/characters', [
@@ -84,7 +83,7 @@ final class CharacterCreationTest extends TestCase
     public function test_pending_binding_fails_closed_before_gateway_invocation(): void
     {
         $identity = $this->identityWithBinding(null, IdentityCanaryAccount::STATUS_PENDING);
-        $this->actingAsCurrentIdentity($identity);
+        $this->loginAsCurrentIdentity($identity);
 
         $response = $this->post('/account/characters', [
             'name' => 'Alice Moon',
@@ -99,7 +98,7 @@ final class CharacterCreationTest extends TestCase
     public function test_invalid_name_fails_before_gateway_invocation(): void
     {
         $identity = $this->identityWithBinding(1003, IdentityCanaryAccount::STATUS_READY);
-        $this->actingAsCurrentIdentity($identity);
+        $this->loginAsCurrentIdentity($identity);
 
         $response = $this->post('/account/characters', [
             'name' => 'OterynSupport',
@@ -114,7 +113,7 @@ final class CharacterCreationTest extends TestCase
     public function test_invalid_vocation_is_rejected_by_request_validation(): void
     {
         $identity = $this->identityWithBinding(1004, IdentityCanaryAccount::STATUS_READY);
-        $this->actingAsCurrentIdentity($identity);
+        $this->loginAsCurrentIdentity($identity);
 
         $this->post('/account/characters', [
             'name' => 'Alice Moon',
@@ -128,7 +127,7 @@ final class CharacterCreationTest extends TestCase
     public function test_name_conflict_is_returned_as_bounded_validation_error(): void
     {
         $identity = $this->identityWithBinding(1005, IdentityCanaryAccount::STATUS_READY);
-        $this->actingAsCurrentIdentity($identity);
+        $this->loginAsCurrentIdentity($identity);
         $this->gateway->throwNameConflict = true;
 
         $this->post('/account/characters', [
@@ -141,7 +140,7 @@ final class CharacterCreationTest extends TestCase
     public function test_existing_idempotent_result_is_reported_without_claiming_a_new_create(): void
     {
         $identity = $this->identityWithBinding(1006, IdentityCanaryAccount::STATUS_READY);
-        $this->actingAsCurrentIdentity($identity);
+        $this->loginAsCurrentIdentity($identity);
         $this->gateway->nextResult = new CharacterCreationResult(7002, 'Alice Moon', false);
 
         $this->post('/account/characters', [
@@ -170,12 +169,14 @@ final class CharacterCreationTest extends TestCase
         return $identity;
     }
 
-    private function actingAsCurrentIdentity(Identity $identity): void
+    private function loginAsCurrentIdentity(Identity $identity): void
     {
-        $this->actingAs($identity, 'web');
-        $this->withSession([
-            WebSessionState::GENERATION_KEY => $identity->web_session_generation,
-        ]);
+        $this->post('/login', [
+            'email' => $identity->email,
+            'password' => 'Correct-Horse-9!Battery',
+        ])->assertRedirect(route('home'));
+
+        $this->assertAuthenticatedAs($identity, 'web');
     }
 }
 
