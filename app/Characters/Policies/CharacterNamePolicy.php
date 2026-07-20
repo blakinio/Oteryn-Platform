@@ -44,7 +44,7 @@ final class CharacterNamePolicy
 
         $words = explode(' ', $normalized);
 
-        if (count($words) < 1 || count($words) > 3) {
+        if (count($words) > 3) {
             throw new CharacterNameInvalid('Use between one and three words.');
         }
 
