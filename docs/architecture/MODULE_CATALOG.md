@@ -16,7 +16,7 @@ This catalog defines module responsibilities and dependency boundaries.
 | Characters | AVAILABLE | Contract-approved web-triggered character operations; currently create | Direct undocumented Canary writes; uncontracted rename/delete |
 | PublicGameData | AVAILABLE | Read models/queries for characters, guilds, highscores, online/status | Privileged mutations |
 | CMS | AVAILABLE | Public news/content read boundary | Identity policy, game state, privileged authoring without Phase 6 controls |
-| Admin | PLANNED | Admin UI, privileged use cases, RBAC integration | Bypassing domain/application invariants |
+| Admin | IMPLEMENTING | Admin UI, privileged use cases, RBAC integration | Bypassing domain/application invariants |
 | Audit | PLANNED | Security/admin audit query surface and privileged-action audit | Secrets, raw credentials, business-rule authorization decisions |
 | Integration | AVAILABLE | Implemented Canary read/write adapters, schema translation, contract enforcement; future login bridge remains separate | Product policy that belongs in domain modules |
 | Notifications | PLANNED | Email and asynchronous user notifications | Core auth decisions, payment settlement |
@@ -47,7 +47,7 @@ Phase 5 makes Platform Identity the ownership authority for supported greenfield
 - one authoritative Platform Identity policy for supported product users;
 - user credentials never stored reversibly;
 - security-sensitive changes may revoke Platform web sessions;
-- future privileged/Admin routes combine authentication, explicit Phase 6 authorization and `mfa.confirmed`;
+- privileged/Admin routes combine authentication, explicit Phase 6 authorization and `mfa.confirmed`;
 - MFA never grants authorization by itself;
 - game-login compatibility/migration remains contract-driven.
 
@@ -161,6 +161,19 @@ News/page authoring, rich HTML, media uploads and privileged CMS mutation remain
 - security-sensitive account actions approved by product policy;
 - CMS administration;
 - operational visibility safe for the assigned role.
+
+### Current implementation boundary
+
+Phase 6 PR #44 establishes the first Admin foundation:
+
+- durable explicit role, permission, role-permission and identity-role assignment persistence;
+- no administrator assignment by default;
+- explicit current permissions with no wildcard authorization shortcut;
+- reusable deny-by-default `admin.permission` middleware;
+- mandatory composition of `auth`, `mfa.confirmed` and an explicit permission on privileged routes;
+- first protected `/admin` surface.
+
+Role-assignment management, privileged CMS authoring and administrator audit query surfaces remain successor Phase 6 work until separately merged and validated.
 
 ### Invariants
 
