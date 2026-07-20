@@ -106,7 +106,7 @@ Delivered:
 - shared public Blade layout/navigation for Home, News, Online, Highscores and Servers;
 - homepage exact-name character search routed to the existing bounded character profile read path;
 - configured server/channel metadata plus fresh per-channel runtime availability/count projection through the dedicated read-only `canary_runtime` Redis boundary;
-- Platform-owned published-only public news list/detail with deterministic ordering, pagination and escaped plain-text rendering;
+- Platform-owned published-only public news list/detail with deterministic pagination and escaped plain-text rendering;
 - read-only active character profiles;
 - read-only level highscores with deterministic ordering and pagination;
 - read-only guild detail plus joined paginated membership reads without per-member N+1 queries;
@@ -199,7 +199,14 @@ Exit gate — satisfied by closure revalidation:
 
 ## Phase 7 — Production hardening and operations
 
-**Status: PLANNED / NEXT**
+**Status: IN PROGRESS**
+
+Current discovery baseline:
+
+- PR #48 separates repository-proven runtime/deployment capabilities from actual deployed production facts;
+- actual provider, Cloudflare/WAF/Access state, origin ingress restrictions, production DB/Redis endpoints, session/cache backend, queue/worker model, mail provider, monitoring sink, backups and deployment/rollback mechanism remain `UNKNOWN` until non-secret external deployment evidence proves them;
+- local `.env.example` defaults are explicitly not production evidence;
+- `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` defines the evidence required to promote each boundary from `UNKNOWN` to `PROVEN` and the dependency order for hardening tasks.
 
 Deliverables:
 
@@ -213,6 +220,16 @@ Deliverables:
 - queue/cache/mail production setup where used;
 - runbooks for incident/recovery;
 - end-to-end regression suite for critical account/game-login flows.
+
+Dependency order after discovery:
+
+1. provider-independent runtime production-safety guardrails;
+2. edge/origin/database exposure review when actual deployment evidence exists;
+3. backup/restore contract and operational test;
+4. logging/monitoring and request correlation;
+5. dependency/security scanning and security headers/CSP review;
+6. queue/cache/mail production setup only where evidence proves need;
+7. critical E2E verification against exact deployed versions.
 
 Exit gate:
 
