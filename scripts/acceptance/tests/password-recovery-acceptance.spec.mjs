@@ -62,12 +62,25 @@ async function waitForExactResetLink(email, timeoutMs = 20_000) {
   throw new Error('Password reset message did not expose a valid reset URL for the requested identity.');
 }
 
+test.setTimeout(120_000);
+
 test.beforeEach(async ({ page }) => {
   page.__acceptanceDiagnostics = installDiagnostics(page);
 });
 
 test.afterEach(async ({ page }, testInfo) => {
   await attachDiagnostics(testInfo, page.__acceptanceDiagnostics);
+
+  if (testInfo.status !== testInfo.expectedStatus && !page.isClosed()) {
+    const screenshot = await page.screenshot({
+      fullPage: true,
+      mask: [page.locator('input'), page.locator('textarea'), page.locator('code')],
+    });
+    await testInfo.attach('sanitized-failure-screenshot', {
+      body: screenshot,
+      contentType: 'image/png',
+    });
+  }
 });
 
 test('Flow 3b — password recovery uses real SMTP, revokes old sessions and rejects token replay', async ({ browser, page }) => {
@@ -100,8 +113,9 @@ test('Flow 3b — password recovery uses real SMTP, revokes old sessions and rej
     await resetPage.getByRole('button', { name: 'Reset password' }).click();
     await expect(resetPage.getByRole('status')).toContainText('Your password has been reset. Sign in again.');
 
-    await page.goto('/mfa');
-    await expect(page).toHaveURL(/\/login$/u);
+    const invalidatedSessionResponse = await page.goto('/mfa');
+    expect(invalidatedSessionResponse?.status()).toBe(403);
+    await expect(page.getByRole('heading', { name: '403' })).toBeVisible();
 
     await resetPage.getByLabel('Email').fill(email);
     await resetPage.getByLabel('Password').fill(originalPassword);
