@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  bootstrap:
+  formatting:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,15 +24,15 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: Install dependencies without scripts
-        run: composer install --no-interaction --prefer-dist --no-progress --quiet --no-scripts
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress --quiet
 
-      - name: Capture Laravel package discovery
-        id: discovery
+      - name: Capture Pint output
+        id: pint
         shell: bash
         run: |
           set +e
-          php artisan package:discover --no-ansi > phase6-debug.log 2>&1
+          vendor/bin/pint --test --no-ansi > phase6-debug.log 2>&1
           status=$?
           echo "exit_status=${status}" >> "$GITHUB_OUTPUT"
           exit 0
@@ -40,9 +40,9 @@ jobs:
       - name: Upload diagnostic log
         uses: actions/upload-artifact@v4
         with:
-          name: phase6-bootstrap-debug
+          name: phase6-pint-debug
           path: phase6-debug.log
 
-      - name: Fail when discovery failed
-        if: steps.discovery.outputs.exit_status != '0'
+      - name: Fail when Pint failed
+        if: steps.pint.outputs.exit_status != '0'
         run: exit 1
