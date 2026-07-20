@@ -31,6 +31,7 @@ modules:
   - PlatformOperations
 dependencies:
   - PR #56 / ae659089bb288dd467f5e2f163ffb7d731e35cec
+  - PR #62 / b6878c4775eda542738c78ea99fd5d2e19d2b35f
 blockers:
   - sanitized evidence from the actual production environment is not available through the current repository/tool context
 cross_repository_tasks:
@@ -41,8 +42,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T19:55:00Z
-head: ae659089bb288dd467f5e2f163ffb7d731e35cec
+updated_at: 2026-07-20T20:00:00Z
+head: b6878c4775eda542738c78ea99fd5d2e19d2b35f
 branch: task/OTERYN-20260720-phase7-production-evidence-collection
 pr: none
 status: blocked
@@ -61,6 +62,7 @@ owned_paths:
   - docs/agents/tasks/active/OTERYN-20260720-phase7-production-evidence-collection.md
 proven:
   - Phase 7 repository-owned hardening through PR #56 is merged on main; PR #56 merged as ae659089bb288dd467f5e2f163ffb7d731e35cec after CI #735 and Agent Governance #655 passed on its exact PR head.
+  - Post-merge housekeeping PR #62 merged as b6878c4775eda542738c78ea99fd5d2e19d2b35f after CI #749 and Agent Governance #669 passed; it archived the completed readiness task and established this blocked continuation task on main.
   - Repository controls now include production configuration verification, Composer advisory scanning, browser CSP/security headers, server-generated request correlation, readiness checklist and incident/recovery runbook.
   - The repository does not prove actual production Cloudflare/TLS/origin ingress, Platform DB topology, Canary SQL endpoint provisioning, runtime Redis ACL/network state, session/cache/queue choices, mail delivery, centralized observability, deployment/rollback or backup/restore operation.
   - Trust boundary affected by this task is the real production environment and its external service/network integrations; no production configuration is changed by the current blocked task.
@@ -85,13 +87,19 @@ rejected_hypotheses:
 changed_paths:
   - docs/agents/tasks/archive/OTERYN-20260720-phase7-production-readiness-runbooks.md
   - docs/agents/tasks/active/OTERYN-20260720-phase7-production-evidence-collection.md
+  - docs/agents/ACTIVE_WORK.md
+  - docs/agents/PROJECT_STATE.md
+  - docs/agents/handovers/OTERYN-20260720-phase7-handover.md
 validation:
   - command: PR #56 CI #735 and Agent Governance #655
     result: PASS
     evidence: readiness/runbook task passed required checks before squash merge as ae659089bb288dd467f5e2f163ffb7d731e35cec.
-  - command: active checkpoint validation after post-merge housekeeping
+  - command: PR #62 CI #749 and Agent Governance #669
+    result: PASS
+    evidence: post-merge housekeeping and active-task establishment passed required checks before squash merge as b6878c4775eda542738c78ea99fd5d2e19d2b35f.
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTERYN-20260720-phase7-production-evidence-collection.md --require-checkpoint
     result: NOT_RUN
-    evidence: must be run before compact handoff generation.
+    evidence: must be run against this final active-task checkpoint before compact handoff generation.
 blockers:
   - sanitized actual-production evidence is required before substantive environment-dependent Phase 7 work can continue
 next_action: Obtain sanitized evidence for the actual production application/edge/origin/database/Redis/mail/logging/backup/deployment topology, then execute the edge/origin/database exposure review and dated backup-restore operational test required by the Phase 7 exit gate.
