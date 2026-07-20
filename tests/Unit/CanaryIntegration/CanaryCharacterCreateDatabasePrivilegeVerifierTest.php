@@ -42,7 +42,7 @@ final class CanaryCharacterCreateDatabasePrivilegeVerifierTest extends TestCase
         $grants = $this->validGrants();
         $grants[2] = str_replace('`skill_fishing_tries`', '', $grants[2]);
 
-        $violations = (new CanaryCharacterCreateDatabasePrivilegeVerifier)->verify('canary', $grants);
+        $violations = (new CanaryCharacterCreateDatabasePrivilegeVerifier)->verify('canary', array_values($grants));
 
         self::assertContains('Missing approved INSERT privilege for players.skill_fishing_tries.', $violations);
     }
