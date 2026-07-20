@@ -49,6 +49,17 @@ DB::table('news_posts')->insert([
     ],
 ]);
 
+for ($index = 3; $index <= 30; $index++) {
+    DB::table('news_posts')->insert([
+        'slug' => sprintf('pagination-probe-%02d', $index),
+        'title' => sprintf('Pagination acceptance post %02d', $index),
+        'body' => 'Deterministic acceptance content used only to force real public and administrator pagination rendering.',
+        'published_at' => $now->copy()->subMinutes($index),
+        'created_at' => $now,
+        'updated_at' => $now->copy()->subMinutes($index),
+    ]);
+}
+
 DB::table('managed_pages')->delete();
 DB::table('managed_pages')->insert([
     'slug' => 'about-oteryn',
