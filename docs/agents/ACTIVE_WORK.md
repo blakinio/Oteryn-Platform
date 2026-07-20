@@ -4,14 +4,22 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260721-phase7-go-live-gate-separation` — IN PROGRESS — `task/OTERYN-20260721-phase7-go-live-gate-separation`
-- `OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED ON FINAL PRODUCTION-ONLY EVIDENCE — staging-validation PR #63 MERGED as `61f72ddda5c253f26c7d59aa7b6fce3506f120dc`
+- `OTERYN-20260721-phase7-go-live-gate-separation` — IN PROGRESS — draft PR #65 — `task/OTERYN-20260721-phase7-go-live-gate-separation`
+- `OTERYN-20260720-phase7-production-evidence-collection` — STAGING SCOPE COMPLETE THROUGH MERGED PR #63 — pending archive by PR #65
 
 ## Current project phase
 
 **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 
-**Phase 7 — Production hardening and operations: IN PROGRESS / COMPLETION SEMANTICS UNDER BOUNDED ARCHITECTURE REVIEW**
+**Phase 7 — Production hardening and operations: COMPLETE**
+
+## Operational release state
+
+- **Production Readiness: STAGING_PROVEN**
+- **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
+- **Production Verification: REQUIRED BEFORE GO-LIVE**
+
+ADR 0007 separates Phase 7 engineering/hardening completion from final production go-live verification. No production-specific `UNKNOWN` is promoted by this status change.
 
 ## Completed Phase 7 repository-owned slices
 
@@ -25,9 +33,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Production-like Phase 7 validation
 
-PR #63 implemented and successfully executed the controlled production-like validation workflow before squash merge.
-
-Final PR-head evidence snapshot:
+Final PR #63 head evidence:
 
 - validation SHA: `7842f78ec4ac2d07d3800ffe8bde9809b055822d`;
 - rollback SHA: `b6878c4775eda542738c78ea99fd5d2e19d2b35f`;
@@ -37,17 +43,15 @@ Final PR-head evidence snapshot:
 - measured controlled restore: `105 ms`, `13/13` tables, `11/11` migrations, validation-SHA probe matched;
 - classification: `STAGING_PROVEN` only.
 
-The controlled validation closes the currently staging-verifiable deployment/rollback, configuration, DB privilege, Redis ACL, SMTP, critical-flow regression, security-smoke and backup/restore work. Detailed durable evidence and limitations are recorded in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`; the final PR body records the exact-head run #9 artifact and digest.
+The controlled validation closes the staging-verifiable deployment/rollback, configuration, DB privilege, Redis ACL, SMTP, critical-flow regression, security-smoke and backup/restore engineering work.
 
 Staging evidence must not be promoted to proof of final production state or production RTO/RPO.
 
-## Current architecture review
+## Production Go-Live Gate
 
-The current ROADMAP makes `production readiness checklist complete` a Phase 7 exit gate, while the checklist itself requires actual deployed-production evidence. The bounded task `OTERYN-20260721-phase7-go-live-gate-separation` is deciding whether Phase 7 engineering completion should be separated durably from a fail-closed Production Go-Live Gate. Until that decision is merged, do not change Phase 7 completion status or weaken the production checklist.
+The authoritative fail-closed gate remains `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
 
-## Final production-only completion evidence
-
-The current production-only pass is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md` and includes:
+It still requires direct production evidence for:
 
 1. exact deployed production SHA(s) and relevant Canary/login-server versions;
 2. production DNS/edge/Cloudflare/TLS/origin/firewall state;
@@ -60,7 +64,13 @@ The current production-only pass is maintained in `docs/operations/PRODUCTION_LI
 9. production backup schedule/policy and dated production restore result;
 10. final production critical smoke/E2E checks against the exact deployed SHA.
 
-None of those items becomes `PRODUCTION_PROVEN` from staging evidence.
+These facts remain `UNKNOWN` until directly proven. The gate cannot become `PASS` from `REPO-PROVEN` or `STAGING_PROVEN` evidence alone.
+
+## Current bounded governance task
+
+PR #65 records ADR 0007 and aligns ROADMAP, operations evidence and project status with the separation between Phase 7 engineering completion and final production go-live verification.
+
+Until PR #65 is merged, treat the branch decision as proposed repository state and continue to enforce the existing production gate fail closed.
 
 ## Repository-verifiable preflight commands
 
@@ -75,7 +85,7 @@ These commands prove only their documented boundaries and the environment in whi
 
 ## Remaining cross-repository dependency
 
-The authoritative Platform game-login bridge remains separate and requires explicit authorization before external repository writes if it is part of launch scope.
+The authoritative Platform game-login bridge remains separate and requires explicit authorization before external repository writes if it is part of launch scope. If required for launch, the Production Go-Live Gate remains blocked until it is resolved and proven.
 
 ## Coordination rule
 
