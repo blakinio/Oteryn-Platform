@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  character-mariadb-diagnostic:
+  full-test-diagnostic:
     runs-on: ubuntu-latest
     services:
       mariadb:
@@ -32,6 +32,9 @@ jobs:
           --health-timeout=5s
           --health-retries=20
     env:
+      CANARY_PROVISIONING_INTEGRATION_HOST: 127.0.0.1
+      CANARY_PROVISIONING_INTEGRATION_PORT: 3306
+      CANARY_PROVISIONING_INTEGRATION_ROOT_PASSWORD: oteryn-ci-root-password
       CANARY_CHARACTER_CREATE_INTEGRATION_HOST: 127.0.0.1
       CANARY_CHARACTER_CREATE_INTEGRATION_PORT: 3306
       CANARY_CHARACTER_CREATE_INTEGRATION_ROOT_PASSWORD: oteryn-ci-root-password
@@ -50,24 +53,24 @@ jobs:
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Run targeted character MariaDB tests
-        id: targeted
+      - name: Run full tests and capture output
+        id: full_tests
         continue-on-error: true
         run: |
           set +e
-          php artisan test tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php > character-mariadb-test.log 2>&1
+          composer test > full-test.log 2>&1
           status=$?
           echo "exit_code=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload character MariaDB diagnostic log
+      - name: Upload full test diagnostic log
         uses: actions/upload-artifact@v4
         with:
-          name: character-mariadb-test-log
-          path: character-mariadb-test.log
+          name: full-test-log
+          path: full-test.log
 
-      - name: Fail when targeted character MariaDB tests fail
-        if: steps.targeted.outputs.exit_code != '0'
+      - name: Fail when full tests fail
+        if: steps.full_tests.outputs.exit_code != '0'
         run: exit 1
 
   test:
