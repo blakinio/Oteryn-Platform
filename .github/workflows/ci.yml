@@ -33,7 +33,24 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress
 
       - name: Run character feature tests
-        run: php artisan test tests/Feature/Characters/CharacterCreationTest.php
+        id: targeted
+        continue-on-error: true
+        run: |
+          set +e
+          php artisan test tests/Feature/Characters/CharacterCreationTest.php > character-feature-test.log 2>&1
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload character feature diagnostic log
+        uses: actions/upload-artifact@v4
+        with:
+          name: character-feature-test-log
+          path: character-feature-test.log
+
+      - name: Fail when targeted character feature tests fail
+        if: steps.targeted.outputs.exit_code != '0'
+        run: exit 1
 
   test:
     runs-on: ubuntu-latest
