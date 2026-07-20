@@ -16,8 +16,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  character-feature-diagnostic:
+  full-test-diagnostic:
     runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: oteryn-ci-root-password
+          MARIADB_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      CANARY_PROVISIONING_INTEGRATION_HOST: 127.0.0.1
+      CANARY_PROVISIONING_INTEGRATION_PORT: 3306
+      CANARY_PROVISIONING_INTEGRATION_ROOT_PASSWORD: oteryn-ci-root-password
+      CANARY_CHARACTER_CREATE_INTEGRATION_HOST: 127.0.0.1
+      CANARY_CHARACTER_CREATE_INTEGRATION_PORT: 3306
+      CANARY_CHARACTER_CREATE_INTEGRATION_ROOT_PASSWORD: oteryn-ci-root-password
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -27,30 +47,20 @@ jobs:
         with:
           php-version: '8.5'
           coverage: none
+          extensions: pdo_mysql, pcntl
           tools: composer:v2
 
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Run character feature tests
-        id: targeted
-        continue-on-error: true
-        run: |
-          set +e
-          php artisan test tests/Feature/Characters/CharacterCreationTest.php > character-feature-test.log 2>&1
-          status=$?
-          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
-          exit 0
+      - name: Capture full test output
+        run: composer test > full-test.log 2>&1 || true
 
-      - name: Upload character feature diagnostic log
+      - name: Upload full test diagnostic log
         uses: actions/upload-artifact@v4
         with:
-          name: character-feature-test-log
-          path: character-feature-test.log
-
-      - name: Fail when targeted character feature tests fail
-        if: steps.targeted.outputs.exit_code != '0'
-        run: exit 1
+          name: phase5-full-test-log
+          path: full-test.log
 
   test:
     runs-on: ubuntu-latest
