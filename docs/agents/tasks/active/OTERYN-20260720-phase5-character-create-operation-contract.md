@@ -19,7 +19,7 @@ Define the exact implementation-ready operation contract for Oteryn Platform cha
 - [x] Define real MariaDB integration tests required before implementation merge.
 - [x] Record any proven required Canary/datapack change precisely; do not modify external repositories without separate authorization.
 - [x] Update `CHARACTER_CREATION_CONTRACT.md` to implementation-ready only if every critical invariant is proven.
-- [ ] Run exact-head CI and Agent Governance before merge.
+- [x] Run exact-head CI and Agent Governance before merge.
 
 ## Ownership
 
@@ -42,7 +42,7 @@ dependencies:
   - docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md
   - docs/contracts/CHARACTER_CREATION_CONTRACT.md
 blockers:
-  - none for bounded contract work
+  - none for merge
 cross_repository_tasks:
   - blakinio/canary remains read-only; no Canary change is currently proven necessary for the approved v1 operation
 ```
@@ -51,11 +51,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T08:56:00+02:00
-head: b05f1b41be8607cdc6ddd38ea3019dbb1c95c607
+updated_at: 2026-07-20T09:03:00+02:00
+head: 5e80980a4d42d3078235e3c6255d508d3e57a4ab
 branch: task/OTERYN-20260720-phase5-character-create-operation-contract
 pr: 39
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -76,8 +76,8 @@ proven:
   - Current players schema has one required starter-relevant no-default field, conditions; selected classic skills have exact defaults 10/0 and omitted unrelated state has explicit current defaults or nullable semantics.
   - Current schema has unique players.name and players.account_id foreign key; no generic players insert trigger was proven.
   - Current player load accepts empty conditions streams and uses temple-position fallback for persisted position 0,0,0.
-  - CHARACTER_CREATION_CONTRACT now approves one exact 42-column players INSERT and no dependent-row writes.
-  - The exact transaction locks `accounts.id`, classifies exact canonical-name state, recovers same-account active names idempotently before quota evaluation, counts deletion=0 players, enforces limit 10, then inserts and returns generated player ID.
+  - CHARACTER_CREATION_CONTRACT approves one exact 42-column players INSERT and no dependent-row writes.
+  - The exact transaction locks accounts.id, classifies exact canonical-name state, recovers same-account active names idempotently before quota evaluation, counts deletion=0 players, enforces limit 10, then inserts and returns generated player ID.
   - V1 natural operation identity is `(authorized accounts.id, canonical players.name)`; repeated same-account active-name requests are read-only idempotent success and never update vocation, sex, ownership or gameplay state.
   - Different-account same name and same-account deleted same name are deterministic name conflicts.
   - Ambiguous commit recovery reruns the same operation and recovers only a same-account active canonical-name row; no destructive compensation or UPDATE privilege is required.
@@ -86,11 +86,12 @@ proven:
   - Approved INSERT grants are only the exact starter-row columns listed in the contract; UPDATE, DELETE, table-level SELECT, unrelated tables, sessions, credentials, DDL and GRANT OPTION are forbidden.
   - Real MariaDB integration coverage is mandatory for column-level grants, FOR UPDATE, active-limit races, global name races, idempotent recovery, privilege denial and exact starter/default row shape.
   - No blakinio/canary or opentibiabr/login-server code change is currently required by this operation contract.
+  - Delivery head 5e80980a4d42d3078235e3c6255d508d3e57a4ab passed CI run 29722990194 (#501), including formatting, PHPStan and full tests, and Agent Governance run 29722990265 (#422).
 derived:
   - The successor implementation can remain entirely in Oteryn Platform plus deployment provisioning of a dedicated database principal.
   - A same-account canonical name is the v1 immutable create target; vocation/sex are first-creation inputs and repeated requests must not mutate an existing character.
 unknown:
-  - none blocking implementation; real MariaDB tests must prove the proposed column-level grants support the exact FOR UPDATE and COUNT queries before merge
+  - none blocking implementation; real MariaDB implementation tests must prove the proposed column-level grants support the exact FOR UPDATE and COUNT queries before the write can merge
 conflicts: []
 first_failure:
   marker: none
@@ -114,9 +115,15 @@ validation:
   - command: operation contract review
     result: PASS
     evidence: authorization, exact insert, lock/count ordering, natural idempotency, ambiguous-commit recovery, bounded transient retries, exact grants and required real MariaDB tests are explicit
+  - command: delivery CI run 29722990194 (#501)
+    result: PASS
+    evidence: exact delivery head 5e80980a4d42d3078235e3c6255d508d3e57a4ab passed formatting, PHPStan and full tests
+  - command: delivery Agent Governance run 29722990265 (#422)
+    result: PASS
+    evidence: exact delivery head 5e80980a4d42d3078235e3c6255d508d3e57a4ab completed successfully
 blockers:
-  - none pending repository validation
-next_action: Update ACTIVE_WORK with the approved contract result, then run exact-head CI and Agent Governance and merge PR #39 only if the final gate is clean.
+  - none for merge; final exact-head revalidation required after this checkpoint update
+next_action: Revalidate CI and Agent Governance on the final checkpoint head, inspect PR #39 final diff/review/base divergence, then squash-merge if clean.
 ```
 
 ## Notes
