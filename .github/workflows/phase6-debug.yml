@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  syntax:
+  bootstrap:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,20 +24,25 @@ jobs:
           coverage: none
           tools: composer:v2
 
-      - name: Check changed PHP syntax
-        run: |
-          php -l routes/console.php
-          php -l routes/web.php
-          php -l app/Admin/AdminRoleManager.php
-          php -l app/Http/Controllers/Admin/AdminNewsController.php
-          php -l app/Http/Controllers/Admin/AdminManagedPageController.php
-          php -l app/Http/Controllers/Admin/AdminRoleController.php
-          php -l app/Http/Controllers/Admin/AdminAuditController.php
-          php -l app/Cms/Actions/SaveNewsPost.php
-          php -l app/Cms/Actions/SaveManagedPage.php
-
       - name: Install dependencies without scripts
         run: composer install --no-interaction --prefer-dist --no-progress --quiet --no-scripts
 
-      - name: Run Laravel package discovery explicitly
-        run: php artisan package:discover --ansi
+      - name: Capture Laravel package discovery
+        id: discovery
+        shell: bash
+        run: |
+          set +e
+          php artisan package:discover --no-ansi > phase6-debug.log 2>&1
+          status=$?
+          echo "exit_status=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload diagnostic log
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-bootstrap-debug
+          path: phase6-debug.log
+
+      - name: Fail when discovery failed
+        if: steps.discovery.outputs.exit_status != '0'
+        run: exit 1
