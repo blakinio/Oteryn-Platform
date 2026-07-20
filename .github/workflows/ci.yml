@@ -16,6 +16,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  static-diagnostic:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Show PHPStan errors
+        run: |
+          git init -q repo
+          cd repo
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch -q --depth=1 origin "refs/pull/${{ github.event.pull_request.number }}/merge"
+          git checkout -q FETCH_HEAD
+          curl -sS https://getcomposer.org/download/latest-stable/composer.phar -o composer.phar
+          php composer.phar install --no-interaction --prefer-dist --no-progress --quiet --ignore-platform-reqs --no-scripts
+          php vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
   test:
     runs-on: ubuntu-latest
     services:
