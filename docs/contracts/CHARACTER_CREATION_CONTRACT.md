@@ -2,29 +2,36 @@
 
 ## Status
 
-`BLOCKED — OWNERSHIP AUTHORIZATION IMPLEMENTED / PRODUCT CREATION POLICY STILL MISSING`
+`PRODUCT POLICY SELECTED — OPERATION CONTRACT STILL REQUIRED`
 
 This contract governs any future Oteryn Platform operation that creates a Canary `players` record for an authenticated user.
 
 The original Phase 5 authorization blocker is resolved for supported greenfield accounts: an authenticated Platform Identity may target only the exact Canary `accounts.id` from its ready immutable Platform-owned binding.
 
-Character creation itself is still not approved because the current repositories do not define the product's authoritative character naming policy, starter-state policy or exact dependent initialization/write surface.
+ADR 0005 now defines the authoritative Oteryn product policy for character names, the starter profile and the per-account character limit. Character creation remains blocked only until a successor operation contract proves the exact Canary transaction, idempotency/recovery behavior and dedicated least-privilege write boundary.
 
 ## Evidence baseline
 
 ### Oteryn Platform
 
 - Ownership model: `1 Platform Identity <-> 1 Canary accounts.id`.
-- Greenfield account provisioning and immutable binding are implemented on `main` through PR #33 / `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
-- Authorization for a future character-create operation must resolve the target account exclusively from the authenticated Identity's ready `identity_canary_accounts.canary_account_id` binding.
+- Greenfield account provisioning and immutable binding are implemented through PR #33 / `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
+- Authorization for character creation must resolve the target account exclusively from the authenticated Identity's ready `identity_canary_accounts.canary_account_id` binding.
 - Client-supplied account IDs, email equality and account-name matching are not ownership proof.
+- Product policy is defined by ADR `0005-character-creation-product-policy.md`.
 
 ### Canary
 
 - Repository: `blakinio/canary`.
-- Current inspected main: `37b41a29c8743d4c976eb7fcb82d684594722aa4`.
-- The commits after the previous character/account evidence pins do not modify the inspected player schema/load/login-hook semantics relevant to this decision; the latest functional change adds E2E vocation persistence coverage.
-- Access mode for this task: read-only.
+- Current policy-task evidence pin: `37b41a29c8743d4c976eb7fcb82d684594722aa4`.
+- Access mode: read-only.
+- Current `players` schema has auto-generated `id`, unique `name`, `account_id` foreign key, many gameplay defaults and `conditions MEDIUMBLOB NOT NULL` with no default.
+- Current player load requires resolvable account, group and vocation; a stored `(0,0,0)` login position is replaced with the player's temple position.
+- Current vocation configuration proves base vocation IDs `1`, `2`, `3`, `4` and `9`, with promoted forms at `5`, `6`, `7`, `8` and `10`.
+- Current migration 55 demonstrates a load-shaped level-8 player row using experience `4200`, health `185`, mana `90`, capacity `470`, `town_id = 8` and an empty non-null conditions blob.
+- Current `PlayerLogin` compatibility behavior uses looktype `136` for sex `0` and looktype `128` for sex `1`, with default colors head `114`, body `120`, legs `132`, feet `115`.
+
+These Canary facts prove implementation compatibility surfaces. ADR 0005, not the raw schema or sample row, is the product source of truth for the selected starter state.
 
 ## Authorization — RESOLVED
 
@@ -35,178 +42,197 @@ A character-create request may proceed past authorization only when:
 3. the exact target Canary `accounts.id` is the non-null `canary_account_id` stored in that binding;
 4. the operation does not accept another account ID as authoritative client input.
 
-The future character-create service must derive the account server-side from this binding.
+The character-create service must derive the account server-side from this binding before opening the Canary shared-write transaction.
 
-## Current Canary player persistence facts
+## Character-name policy — RESOLVED
 
-### PROVEN
+ADR 0005 defines the canonical first-version policy.
 
-Current `players` schema provides:
+### Allowed input and canonicalization
 
-- auto-generated `id`;
-- unique `name`;
-- `account_id` foreign key to `accounts.id`;
-- defaults for many gameplay fields including group, level, vocation, health, look, town, skills and stamina;
-- `conditions` as `MEDIUMBLOB NOT NULL` with no default.
+- only ASCII letters and ASCII space are accepted;
+- leading/trailing spaces are trimmed;
+- internal space runs collapse to one space;
+- one to three words are allowed;
+- every word contains 2 to 15 ASCII letters;
+- canonical total length is 3 to 29 characters including spaces;
+- each word is stored first-letter uppercase and remaining letters lowercase.
 
-Database uniqueness on `players.name` is the final concurrency guard for simultaneous attempts to create the same exact stored name.
+The canonical stored name is the only name submitted to Canary.
 
-Current player loading additionally requires resolvable runtime state:
+Punctuation, apostrophes, hyphens, digits, tabs, emoji and non-ASCII letters are rejected in the first slice.
 
-- the referenced account must exist;
-- the configured group ID must resolve;
-- the stored vocation ID must resolve;
-- town state must resolve or Canary applies its current fallback behavior;
-- a login position of `(0,0,0)` is replaced with the player's temple position.
+### Reserved names
 
-These are engine compatibility facts, not a product starter policy.
+After canonicalization, any word exactly equal to one of these protected words is rejected:
 
-## Name policy
+`Admin`, `Administrator`, `God`, `Gamemaster`, `GM`, `CM`, `Support`, `Tutor`, `Moderator`, `Staff`, `System`, `Server`, `Oteryn`, `Canary`.
 
-### Status
+The exact phrases `Game Master` and `Community Manager` are reserved. The first word also must not begin with the brand prefixes `Oteryn` or `Canary`, case-insensitively.
 
-`BLOCKED — PRODUCT POLICY NOT DEFINED`
+The Platform enforces this policy server-side.
 
-Current evidence proves database uniqueness of the stored `players.name`, but does not prove an Oteryn product policy for:
+Database uniqueness on `players.name` remains the final insert-time race guard. Any availability preflight is UX only.
 
-- minimum/maximum user-facing character name length within the database's broad `varchar(255)` capacity;
-- allowed alphabet/Unicode policy;
-- spaces, capitalization and punctuation;
-- canonicalization/normalization before uniqueness comparison;
-- reserved names and protected staff/system words;
-- visually confusable names;
-- whether case variants are considered the same product name before reaching the database.
+## Starter-state policy — RESOLVED
 
-No purpose-built current Canary web character-create API was proven that can be reused as an authoritative name-policy validator.
+### Creation inputs
 
-Therefore the Platform must not invent a name validator from the SQL unique constraint alone.
+The first operation accepts only:
 
-### Required product decision
+- canonicalizable `name`;
+- base `vocation` in `{1,2,3,4,9}`;
+- `sex` in `{0,1}`.
 
-Before implementation, an explicit product policy/ADR must define one canonical stored-name transformation and validation contract. The database unique constraint remains the final race guard after application validation.
+Promoted vocations `{5,6,7,8,10}` and vocation `0` are rejected by the Platform creation flow.
 
-## Starter-state policy
+`pronoun` is not a first-version input and is persisted as `0`.
 
-### Status
+### Canonical starter profile v1
 
-`BLOCKED — PRODUCT POLICY NOT DEFINED`
+The resulting character must persist:
 
-Schema defaults and sample/migration characters are compatibility evidence only. They are not approved Oteryn product policy.
+- `group_id = 1`;
+- `account_id =` ready bound Canary account ID;
+- `level = 8`;
+- `experience = 4200`;
+- selected base `vocation`;
+- `health = 185`;
+- `healthmax = 185`;
+- `mana = 90`;
+- `manamax = 90`;
+- `maglevel = 0`;
+- `manaspent = 0`;
+- `soul = 100`;
+- `cap = 470`;
+- `town_id = 8`;
+- `posx = 0`, `posy = 0`, `posz = 0`;
+- empty non-null `conditions` blob;
+- selected `sex`;
+- `pronoun = 0`;
+- `looktype = 136` for sex `0`;
+- `looktype = 128` for sex `1`;
+- `lookhead = 114`;
+- `lookbody = 120`;
+- `looklegs = 132`;
+- `lookfeet = 115`;
+- `lookaddons = 0`;
+- `istutorial = 0`;
+- classic starter skills at level `10` with zero tries.
 
-The product must explicitly decide at minimum:
+The successor operation contract must prove the exact insert column set needed to produce this state deterministically. It may rely on a current schema default only when that exact default is revalidated and covered by integration tests.
 
-- allowed creation-time vocation or vocation-selection flow;
-- allowed sex and pronoun values;
-- starting town;
-- starting position or deliberate `(0,0,0)` temple fallback;
-- starting level and experience;
-- health/healthmax;
-- mana/manamax/magic level;
-- capacity and soul;
-- outfit/look fields;
-- initial skills;
-- initial conditions blob representation;
-- inventory/equipment/container items;
-- depot/inbox/store-inbox state if required;
-- storage/quest/tutorial state;
-- whether first-login scripts are expected to perform any mandatory initialization.
+### No dependent starter writes in v1
 
-### Current login-hook evidence
+The first create operation initializes no starter inventory, inbox, store inbox, depot, reward, stash, player storage, quest, learned-spell, tutorial, guild, session or runtime rows.
 
-The inspected global login event registration hook registers gameplay events but does not establish a generic new-character starter state.
+Current global login hooks are not treated as mandatory starter initialization.
 
-The inspected global `PlayerLogin` hook handles premium-town fallback, outfit adjustment for expired premium state and channel opening. It does not prove a generic first-login starter kit or mandatory first-login initialization contract for Platform-created characters.
+Therefore the expected first operation shape is one bounded `players` insert unless live operation-contract revalidation proves that a mandatory dependent write is required for loadability.
 
-Therefore the Platform cannot rely on the inspected login hooks to turn an arbitrary minimally inserted player row into the intended product starter state.
+## Account character limit — RESOLVED
 
-## Dependent-row/write surface
+A supported Platform-owned Canary account may have at most **10 active characters**.
 
-### Status
+Quota semantics:
 
-`NOT FINALIZED`
+- `players.deletion = 0` counts toward the limit;
+- `players.deletion != 0` does not count toward the active-character quota;
+- a pending-deletion row still reserves its globally unique name until the row no longer exists.
 
-Current Canary loading supports many optional/dependent player data surfaces such as inventory, depot, inbox, storage and other gameplay systems. The current evidence does not prove that all of these require creation-time rows for a valid new character, nor does it prove which subset the Oteryn product intends to initialize immediately.
+The limit must be checked inside the same Canary transaction as creation.
 
-Until starter policy is selected, the exact atomic write set cannot be approved.
+## Required concurrency shape
 
-Consequently the final dedicated character-create database grants also cannot yet be approved. The existing read-only `canary` connection and the account-only `canary_provisioning` connection must not be broadened for character creation.
+For each create:
 
-A future character-create write path must use its own reviewed least-privilege credential/connection or another explicitly approved operation-specific boundary.
+1. resolve the authenticated Identity's ready binding before the shared-write transaction;
+2. begin the dedicated Canary character-create transaction;
+3. lock the exact bound `accounts` row using `SELECT ... FOR UPDATE` or another operation-contract-proven equivalent;
+4. count that account's `players` rows where `deletion = 0`;
+5. return deterministic limit conflict when the count is already `10`;
+6. validate canonical-name availability only as a preflight convenience;
+7. attempt the insert while retaining `players.name` uniqueness as the final global name race guard;
+8. commit only when the entire approved starter state is durable.
 
-## Account character limit
+This serialization prevents two simultaneous creates for one account from both consuming the final slot.
 
-### Status
+Different accounts need not share one account lock. Global same-name races are resolved by the database unique constraint.
 
-`BLOCKED — PRODUCT POLICY NOT DEFINED`
+## Transaction, retry and idempotency requirements still to finalize
 
-The inspected schema establishes ownership but does not enforce a maximum number of characters per account.
+The successor operation contract must define exactly:
 
-Before implementation the product must explicitly define:
+- the final insert column list;
+- whether current defaults for skills and other untouched fields are safe to rely on;
+- exact `town_id = 8` loadability for every allowed vocation/sex combination;
+- exact account-row locking query and required SELECT privilege;
+- exact active-character count query;
+- duplicate-name error mapping;
+- behavior when the same authenticated account retries the same canonical name;
+- recovery after an ambiguous database commit/connection result;
+- whether a Platform-owned server-generated idempotency key is required;
+- deadlock/serialization retry policy;
+- exact dedicated database grants.
 
-- maximum active/non-deleted characters per Canary account, or an explicit unlimited policy;
-- whether pending/soft-deleted characters count toward the limit;
-- concurrency behavior when two creates race at the limit.
+No existing character may ever be reassigned to another account as retry recovery.
 
-The limit check, if finite, must be enforced in the same operation transaction/locking strategy as creation so concurrent requests cannot exceed it.
+## Dedicated least-privilege write boundary
 
-## Transaction, concurrency and idempotency baseline
+The existing connections remain separate and unchanged:
 
-The future implementation must satisfy all of the following regardless of final starter policy:
+- `canary` / `oteryn_readonly` — read-only PublicGameData;
+- `canary_provisioning` — account provisioning only.
 
-1. resolve the authenticated Identity's ready Canary account binding server-side;
-2. fail closed if the binding is pending, conflict or absent;
-3. perform all required Canary character initialization writes in one Canary transaction;
-4. use database uniqueness on `players.name` as the final exact-name race guard;
-5. define deterministic duplicate-name conflict behavior;
-6. define account-character-limit locking if a finite limit is selected;
-7. define whether a retried create request is idempotent and, if so, use a server-controlled idempotency key rather than treating any same-name row as automatic success;
-8. never reassign an existing character to another account as retry recovery;
-9. roll back the complete character-create transaction when any mandatory initialization write fails.
+Character creation requires a new dedicated operation boundary, conceptually `canary_character_create`.
+
+The operation contract must derive its exact grants from the final transaction. Expected minimum categories are:
+
+- narrow `SELECT` needed to lock/verify the exact account;
+- narrow `SELECT` needed to count active players and inspect exact-name recovery/conflict state;
+- column-level `INSERT` on `players` for only the approved starter fields.
+
+No `UPDATE`, `DELETE`, account credential access, session writes, guild writes or unrelated player-table writes are approved by this policy contract.
+
+The deployment privilege verifier must fail closed on missing or excessive grants, and real MariaDB integration coverage is required.
 
 ## Online/session effects
 
 Current game-world authentication validates that the selected character belongs to the authenticated account and is not deleted/unavailable.
 
-No contract currently claims that an already-issued character-list response dynamically refreshes after web character creation. The safe compatibility assumption is that a new character becomes visible on a subsequent authoritative character-list/login request unless a future integration proves stronger behavior.
+No contract claims that an already-issued character-list response dynamically refreshes after web character creation. A new character becomes available on a subsequent authoritative character-list/login request unless a later integration proves stronger behavior.
+
+Character creation does not create `cluster_sessions` or `account_sessions`.
 
 ## Cross-repository change history
 
-### Current decision
+No Canary repository change is currently proven necessary for the selected starter policy because ADR 0005 intentionally avoids mandatory game-side starter hooks and dependent gameplay writes.
 
-No Canary repository change is proven necessary merely to authorize the character-create operation: ownership binding is already implemented on the Platform side and Canary already persists players in the shared schema.
-
-No Canary change is approved by this task.
-
-### Potential future Canary work
-
-If the eventual product starter policy requires mandatory game-side initialization that cannot be represented safely as a bounded transactional database write, the required Canary/datapack change must be captured in a separately authorized task before character creation is implemented.
-
-Such a task must specify:
-
-- the exact Canary component or datapack hook to own initialization;
-- an idempotent invocation/trigger contract;
-- transaction or retry behavior across Platform and Canary boundaries;
-- rollout order and backward compatibility;
-- integration tests proving a newly created character is complete and loadable.
+If operation-contract integration tests prove that `town_id = 8`, empty dependent state or another selected starter invariant cannot load safely, the task must fail closed and record the exact required Canary/datapack change for separate authorization rather than silently changing external code.
 
 The Platform must not depend on an uncontracted incidental `onLogin` side effect.
 
 ## Decision
 
-`CHARACTER CREATE IMPLEMENTATION IS NOT YET APPROVED.`
+`CHARACTER PRODUCT POLICY IS APPROVED.`
 
-### Resolved blocker
+Resolved:
 
-- `Platform Identity -> exact authorized Canary accounts.id` ownership binding: **RESOLVED / IMPLEMENTED for greenfield accounts**.
+- authenticated Identity -> exact Canary account authorization;
+- canonical name and reserved-name policy;
+- allowed base vocation/sex creation inputs;
+- starter profile v1;
+- no starter dependent writes in v1;
+- maximum 10 active characters per account;
+- account-row serialization requirement for concurrent limit enforcement.
 
-### Remaining blockers
+Remaining before implementation:
 
-1. explicit character-name normalization/reserved-name policy;
-2. explicit starter-state policy;
-3. explicit account character-limit policy;
-4. exact mandatory dependent initialization write set;
-5. resulting operation-specific least-privilege character-create DB grants.
+1. exact character-create transaction and insert column contract;
+2. exact idempotency/ambiguous-commit recovery semantics;
+3. exact `canary_character_create` least-privilege grants and verifier;
+4. real MariaDB integration tests proving starter-row load shape, account-limit locking and unique-name races.
 
-The nearest minimal dependency is an explicit Oteryn product decision covering items 1-3. Only after those decisions exist can the exact initialization/write contract and implementation be finalized without guessing.
+The nearest minimal dependency is a bounded character-create operation-contract task.
 
 `CHARACTER CREATION: BLOCKED`
