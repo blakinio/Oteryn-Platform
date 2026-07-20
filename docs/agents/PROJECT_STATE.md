@@ -31,49 +31,14 @@ Platform web authentication remains separate from the still-unimplemented author
 
 ## Phase 7 repository-owned hardening completed on main
 
-### Production topology evidence baseline — PR #48
+- PR #48 / `676a77590e3ec93bcad0247b3065d203ac209c40` — production topology evidence baseline.
+- PR #49 / `0f876d4f2209399a85cafcff1623d8e6c810b914` — fail-closed provider-independent production configuration verifier.
+- PR #50 / `3973774727c35aea22d0a646f479a0ff079042cc` — required Composer advisory scanning and bounded Dependabot updates.
+- PR #54 / `eb358a245f35fda1865f13e329c07ef0f4850d2f` — CSP and browser security headers without unsafe inline/eval allowances.
+- PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded request-completion logging.
+- PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 handover.
 
-Merged as `676a77590e3ec93bcad0247b3065d203ac209c40`.
-
-`docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` separates repository-proven capabilities from actual deployed production facts. Local `.env.example` defaults are explicitly not production evidence.
-
-### Production configuration guardrails — PR #49
-
-Merged as `0f876d4f2209399a85cafcff1623d8e6c810b914`.
-
-`php artisan production:verify-configuration` fails closed for unsafe provider-independent settings without exposing secret values.
-
-### Dependency security scanning — PR #50
-
-Merged as `3973774727c35aea22d0a646f479a0ff079042cc`.
-
-Required CI includes Composer advisory scanning; Dependabot provides bounded Composer/GitHub Actions update PRs.
-
-### Browser security headers and CSP — PR #54
-
-Merged as `eb358a245f35fda1865f13e329c07ef0f4850d2f`.
-
-The Platform enforces same-origin CSP/browser hardening without `unsafe-inline`/`unsafe-eval`. HSTS remains deployment-evidence dependent.
-
-### Request correlation and bounded structured logging — PR #55
-
-Merged as `b6650966fe877a0e7872f29606b32b6394dde99f`.
-
-Every Laravel-handled request receives a fresh server-generated UUID, normal responses expose `X-Request-ID`, and request-completion logging is bounded to request ID/method/route/status/duration. An optional JSON-to-stderr channel exists without claiming a deployed centralized sink.
-
-Final exact-head validation for PR #55 passed as CI #727 / Agent Governance #647.
-
-## Current Phase 7 slice — readiness and recovery runbooks
-
-`OTERYN-20260720-phase7-production-readiness-runbooks` — PR #56.
-
-Current branch adds:
-
-- `docs/operations/PRODUCTION_READINESS_CHECKLIST.md` — evidence-gated release/readiness checklist with `REPO-PROVEN`, `ENV-EVIDENCE-REQUIRED` and `CROSS-REPO-BLOCKED` states;
-- `docs/operations/INCIDENT_RECOVERY_RUNBOOK.md` — provider-neutral response/recovery decision order for configuration, identity/admin, Canary credential/privilege, runtime Redis, mail, logging, deployment, database restore and partial-write incidents;
-- `docs/agents/handovers/OTERYN-20260720-phase7-handover.md` — continuation state, merged hardening SHAs and explicit external blockers.
-
-This task closes the currently available repository-only Phase 7 documentation work. It does **not** close Phase 7 itself.
+PR #56 passed CI #735 and Agent Governance #655 on exact PR head `b03a2de6836ff7769b0911f847fb5b8dc0fe8572` before squash merge.
 
 ## Phase 7 completion blockers
 
@@ -106,7 +71,7 @@ php artisan canary:verify-provisioning-db-privileges
 php artisan canary:verify-character-create-db-privileges
 ```
 
-Required CI also includes strict Composer validation/install, Composer advisory audit, Pint, PHPStan and full tests.
+Required CI includes strict Composer validation/install, Composer advisory audit, Pint, PHPStan and full tests.
 
 Passing these proves only their documented repository/application boundaries.
 
@@ -141,11 +106,11 @@ No Canary/login-server repository was modified by Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-production-readiness-runbooks` — PR #56.
+`OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED pending sanitized actual-production evidence.
 
 ## Recommended next work
 
-Finish PR #56 with exact-head validation and post-merge housekeeping. Then obtain sanitized evidence for the actual production topology and run the edge/origin/database exposure review plus a dated backup-restore operational test.
+Obtain sanitized evidence for the actual production application/edge/origin/database/Redis/mail/logging/backup/deployment topology, then run the edge/origin/database exposure review and dated backup-restore operational test required by the Phase 7 exit gate.
 
 Until that evidence is available, do not mark Phase 7 COMPLETE or invent provider-specific deployment claims.
 
