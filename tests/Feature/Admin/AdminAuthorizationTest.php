@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Admin\AdminAuthorization;
+use App\Admin\AdminPermission;
 use App\Identity\Models\Identity;
 use App\Identity\Sessions\WebSessionState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -54,6 +56,14 @@ final class AdminAuthorizationTest extends TestCase
         $this->actingAsCurrent($identity);
 
         $this->get('/_test/admin-audit')->assertForbidden();
+    }
+
+    public function test_authorization_service_allows_explicit_role_permission(): void
+    {
+        $identity = $this->createIdentityWithConfirmedMfa();
+        $this->assignRole($identity, 'content_editor');
+
+        self::assertTrue(app(AdminAuthorization::class)->allows($identity, AdminPermission::ACCESS));
     }
 
     public function test_explicit_role_permission_with_confirmed_mfa_allows_access(): void
