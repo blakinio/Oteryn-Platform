@@ -56,11 +56,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T09:56:00Z
-head: 640aa6cea8f6c798118a63186e396cc3fc7e56e2
+updated_at: 2026-07-20T10:03:30Z
+head: be25d6ec3e0512bb9615329f99f16fff294d8b1d
 branch: task/OTERYN-20260720-phase6-admin-cms-audit
 pr: 45
-status: validating
+status: completed
 context_routes:
   - admin-rbac
   - web-cms
@@ -85,7 +85,7 @@ owned_paths:
   - tests/Feature/Cms/**
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/PROJECT_STATE.md
-  - docs/agents/tasks/active/OTERYN-20260720-phase6-admin-cms-audit.md
+  - docs/agents/tasks/archive/OTERYN-20260720-phase6-admin-cms-audit.md
   - docs/agents/tasks/archive/OTERYN-20260720-phase6-admin-rbac-foundation.md
   - docs/architecture/MODULE_CATALOG.md
   - docs/architecture/adr/0006-admin-rbac-and-audit-policy.md
@@ -101,10 +101,10 @@ proven:
   - ADR 0006 records the durable explicit-permission RBAC and audit policy with no wildcard administrator authorization.
   - Cloudflare Access is documented only as an optional outer gate and never as an application authorization substitute.
   - Full CI run 639 passed Composer install, Pint, PHPStan and the complete test suite on implementation head 5688edccefe90a4eb62334369155aa263f0c797c.
-  - Exact-head CI run 647 and Agent Governance run 568 passed on synchronized head 640aa6cea8f6c798118a63186e396cc3fc7e56e2.
-  - PR #45 has no comments and no review threads; its changed-file list is restricted to the Phase 6 task scope.
+  - Exact-head CI run 648 and Agent Governance run 569 passed on final PR head 9e792e43893ea40551a16d319728fbfdf0f5dc1c.
+  - PR #45 had no comments and no review threads and was squash-merged to main as be25d6ec3e0512bb9615329f99f16fff294d8b1d.
 derived:
-  - PR #45 is merge-ready after the final docs-only head receives required checks; after merge, a separate closure revalidation can evaluate the Phase 6 exit gate on live main.
+  - All implementation deliverables required for Phase 6 are present on main and can be evaluated by the separate closure task.
 unknown: []
 conflicts: []
 first_failure:
@@ -126,7 +126,7 @@ changed_paths:
   - database/migrations/2026_07_20_093400_create_managed_pages_table.php
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/PROJECT_STATE.md
-  - docs/agents/tasks/active/OTERYN-20260720-phase6-admin-cms-audit.md
+  - docs/agents/tasks/archive/OTERYN-20260720-phase6-admin-cms-audit.md
   - docs/agents/tasks/archive/OTERYN-20260720-phase6-admin-rbac-foundation.md
   - docs/architecture/MODULE_CATALOG.md
   - docs/architecture/adr/0006-admin-rbac-and-audit-policy.md
@@ -147,15 +147,12 @@ validation:
   - command: CI run 639 on 5688edccefe90a4eb62334369155aa263f0c797c
     result: PASS
     evidence: Composer validation/install, Pint, PHPStan and the complete test suite succeeded.
-  - command: CI run 647 and Agent Governance run 568 on 640aa6cea8f6c798118a63186e396cc3fc7e56e2
+  - command: CI run 648 and Agent Governance run 569 on 9e792e43893ea40551a16d319728fbfdf0f5dc1c
     result: PASS
-    evidence: exact synchronized-head required checks passed before the final task-record evidence update.
-  - command: final exact-head CI and Agent Governance after this task-record-only update
-    result: NOT_RUN
-    evidence: required before readiness and merge.
+    evidence: final exact-head required checks passed before squash merge.
 blockers:
   - none
-next_action: Verify required checks on the final docs-only head, mark PR #45 ready, and squash-merge if the merge gate remains satisfied.
+next_action: Complete OTERYN-20260720-phase6-closure against merged main.
 ```
 
 ## Notes

@@ -161,27 +161,45 @@ Exit gate — satisfied by closure revalidation:
 
 ## Phase 6 — CMS, Admin, RBAC and Audit
 
-**Status: PLANNED**
+**Status: COMPLETE**
 
-Deliverables:
+Delivered:
 
-- news/page management;
-- role/permission model;
-- dedicated privileged actions;
-- mandatory admin MFA by combining explicit RBAC/policy authorization with the Phase 3 `mfa.confirmed` gate;
-- admin audit trail;
-- Cloudflare Access deployment option/documentation;
-- no arbitrary code/plugin upload feature.
+- Platform-owned news management with published-only public reads and permission-scoped create/update administration;
+- Platform-owned managed pages with published-only public reads, permission-scoped create/update administration and escaped plain-text rendering;
+- durable explicit role/permission persistence and Identity-role assignment with no administrator assigned by default;
+- explicit initial permission registry and role bundles governed by ADR 0006, with no wildcard or implicit unrestricted administrator authorization path;
+- one-time console-only first `platform_admin` bootstrap requiring an existing MFA-confirmed Platform Identity and closing after the first administrator assignment exists;
+- administrator role assignment/removal behind `admin.roles.manage`, with transactional audit recording and supported-path protection against removing the final `platform_admin`;
+- dedicated privileged routes that independently combine `auth`, Phase 3 `mfa.confirmed` and the exact `admin.permission:<permission>` required by the operation;
+- append-oriented administrator audit events for bootstrap, role and CMS mutations, without credentials or secrets;
+- bounded administrator audit visibility behind `audit.view`, authentication and confirmed MFA;
+- optional Cloudflare Access administrator-gate deployment documentation as defense in depth only; application auth/MFA/RBAC remain authoritative;
+- no arbitrary code/plugin upload, rich HTML authoring or media upload feature.
 
-Exit gate:
+Phase 6 implementation merged through:
 
-- deny-by-default policies;
-- privileged operations covered by authorization tests;
-- admin actions auditable.
+- PR #44 / `170d52393e543c8033ebd896f42fb43f3fccdf42` — deny-by-default Admin/RBAC foundation;
+- PR #45 / `be25d6ec3e0512bb9615329f99f16fff294d8b1d` — first-admin bootstrap, audited role lifecycle, privileged news/pages and administrator audit.
+
+Closure revalidation against merged `main` confirmed:
+
+- every current administrator route requires Platform authentication, confirmed MFA and an exact explicit permission;
+- unknown permissions fail closed and no wildcard authorization path exists;
+- role, CMS and audit regression tests cover denied and authorized paths, including missing MFA/permission, first-admin bootstrap, final-platform-admin protection, CMS publication/XSS behavior and bounded audit visibility;
+- privileged role and CMS mutations append administrator audit events inside the Platform transaction boundary where practical;
+- Canary/login-server credentials, sessions, schema and game-login behavior are unchanged by Phase 6;
+- Cloudflare Access remains an optional production deployment decision and is not claimed as deployed.
+
+Exit gate — satisfied by closure revalidation:
+
+- authorization policies are deny by default;
+- privileged operations are covered by explicit authorization and confirmed-MFA tests;
+- administrator state-changing actions delivered by Phase 6 are auditable.
 
 ## Phase 7 — Production hardening and operations
 
-**Status: PLANNED**
+**Status: PLANNED / NEXT**
 
 Deliverables:
 

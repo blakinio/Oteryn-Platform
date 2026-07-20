@@ -4,95 +4,82 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase6-admin-cms-audit` — PR #45 — `task/OTERYN-20260720-phase6-admin-cms-audit`
+- `OTERYN-20260720-phase6-closure` — PR #46 — `task/OTERYN-20260720-phase6-closure`
 
 ## Current project phase
 
-**Phase 5 — Account and character management: COMPLETE**
+**Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE (closure revalidated; PR #46 pending merge)**
 
-**Phase 6 — CMS, Admin, RBAC and Audit: IN PROGRESS**
+**Phase 7 — Production hardening and operations: NEXT / PLANNED**
 
-## Proven Phase 6 foundation
+## Proven Phase 6 implementation state
 
-PR #44 merged as `170d52393e543c8033ebd896f42fb43f3fccdf42` and established:
+PR #44 merged as `170d52393e543c8033ebd896f42fb43f3fccdf42` and established the deny-by-default RBAC foundation:
 
-- durable explicit roles, permissions, role-permission mappings and Identity-role assignments;
+- explicit roles and permissions;
 - no administrator assignment by default;
-- no wildcard or implicit unrestricted-admin authorization path;
-- reusable fail-closed `admin.permission` middleware;
-- privileged route composition using `auth` + `mfa.confirmed` + an exact permission;
-- focused authorization regression coverage.
+- no wildcard or implicit unrestricted-admin path;
+- `auth` + `mfa.confirmed` + exact `admin.permission:*` composition;
+- authorization regression coverage.
 
-The completed RBAC foundation task is archived.
+PR #45 merged as `be25d6ec3e0512bb9615329f99f16fff294d8b1d` and completed the planned privileged Phase 6 vertical slice:
 
-## Current Phase 6 slice
+- one-time MFA-confirmed first-admin bootstrap;
+- audited transactional role assignment/removal with final-`platform_admin` protection;
+- permission-scoped plain-text news and managed-page administration;
+- published-only public managed pages with escaped rendering;
+- append-oriented administrator audit events;
+- bounded permission-scoped audit visibility;
+- ADR 0006 RBAC/audit policy;
+- optional Cloudflare Access deployment documentation.
 
-PR #45 implements the remaining Phase 6 privileged vertical slice:
+Final exact-head validation before merge:
 
-- one-time console-only first `platform_admin` bootstrap that requires confirmed MFA and closes after the first administrator assignment exists;
-- audited transactional role assignment/removal with protection against removing the final `platform_admin`;
-- permission-scoped plain-text news management;
-- Platform-owned managed pages with published-only public reads and escaped output;
-- permission-scoped plain-text managed-page administration;
-- append-oriented administrator audit events and bounded `audit.view` query UI;
-- ADR 0006 administrator RBAC/audit policy;
-- optional Cloudflare Access administrator-gate deployment guidance.
+- PR #44: CI #598 and Agent Governance #519 passed;
+- PR #45: CI #648 and Agent Governance #569 passed.
 
-No arbitrary code/plugin upload, rich HTML, media upload, Canary mutation, payment work or cross-repository change is introduced.
+## Phase 6 closure result
 
-## Validation state
+Closure revalidation against merged `main` found no remaining Phase 6 exit-gate gap.
 
-- Bootstrap/package-discovery failure caused by global exception `use` statements was identified from a dedicated CI artifact and fixed.
-- Pint identified three formatting-only files; exact Pint-formatted versions were applied.
-- Full CI run 639 passed Composer install, Pint, PHPStan and the complete test suite on implementation head `5688edccefe90a4eb62334369155aa263f0c797c`.
-- The temporary Phase 6 diagnostic workflow has been removed.
-- Exact-head CI and Agent Governance are still required after final task/documentation synchronization before PR #45 can merge.
+The exit gate is satisfied because:
 
-## Deferred lifecycle operations
+- administrator authorization is deny by default and unknown permissions fail closed;
+- every current admin web capability requires Platform authentication, confirmed MFA and an exact explicit permission;
+- privileged role, CMS and audit paths have authorization/MFA regression coverage;
+- delivered administrator state-changing actions append administrator audit events;
+- no arbitrary code/plugin upload, rich HTML or media upload feature exists in the delivered Phase 6 surface.
 
-Not implemented or authorized:
-
-- existing-account claim/import;
-- character deletion/soft deletion;
-- character rename;
-- irreversible Canary account deletion;
-- exceptional unlink/rebind/transfer.
-
-Each requires a new explicit operation contract before any shared write.
-
-## Remaining cross-repository dependency
-
-The authoritative Platform game-login bridge remains separate from completed Phase 5 and current Phase 6.
-
-A future explicitly authorized cross-repository task must provide exact-account Platform authorization with:
-
-- short-lived cryptographically protected exchange material;
-- explicit audience and expiry;
-- replay-resistant consumption/session semantics;
-- deterministic revocation/failure behavior;
-- no user dependency on the internal sink credential;
-- no duplicate Canary password verification inside Oteryn Platform.
-
-Expected primary external scope is `opentibiabr/login-server`. `blakinio/canary` changes are required only if the selected protocol needs direct assertion verification or stronger replay/revocation/fencing behavior.
+Phase 6 changes are Platform-only. Canary/login-server credentials, sessions, schema and game-login behavior are unchanged.
 
 ## Production enablement note
 
-Phase completion is a repository/contract milestone, not proof that production infrastructure or credentials are provisioned.
+Repository phase completion is not proof of production deployment.
 
-Before enabling Phase 5 writes in an environment:
+To enable the first administrator in an environment after Platform migrations are applied:
 
-- provision `canary_provisioning` out-of-band and pass its privilege verifier;
-- provision `canary_character_create` out-of-band and pass `php artisan canary:verify-character-create-db-privileges`;
-- fail closed if effective grants differ from approved operation surfaces.
+1. create or use an existing Platform Identity;
+2. complete and confirm Platform MFA for that Identity;
+3. run the one-time `php artisan admin:bootstrap <email>` command;
+4. manage later role assignments only through the permission-protected administrator role surface.
 
-For Phase 6 administrator enablement, create an Identity, complete MFA, then use the one-time `admin:bootstrap` command. Cloudflare Access remains optional defense in depth and never replaces application auth/MFA/RBAC.
+Cloudflare Access remains optional defense in depth. The repository does not claim that it is deployed or that a production administrator hostname/path has been chosen.
+
+## Remaining cross-repository dependency
+
+The authoritative Platform game-login bridge remains separate from completed Phase 5 and Phase 6.
+
+A future explicitly authorized cross-repository task must provide exact-account Platform authorization with short-lived cryptographically protected exchange material, explicit audience/expiry, replay-resistant consumption/session semantics and deterministic revocation/failure behavior.
+
+Expected primary external scope remains `opentibiabr/login-server`; `blakinio/canary` changes require separate explicit authorization if the selected protocol needs them.
 
 ## Recommended next work
 
-Finish PR #45 exact-head validation and merge. Then run a bounded Phase 6 closure revalidation, archive the completed task, mark Phase 6 COMPLETE only if every roadmap exit gate remains satisfied, and prepare the requested handover.
+After PR #46 merges and closure housekeeping leaves no active task, start the smallest Phase 7 production-hardening discovery task by proving the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
 
 ## Recently completed
 
+- `OTERYN-20260720-phase6-admin-cms-audit` — PR #45 / `be25d6ec3e0512bb9615329f99f16fff294d8b1d`; task archived by Phase 6 closure.
 - `OTERYN-20260720-phase6-admin-rbac-foundation` — PR #44 / `170d52393e543c8033ebd896f42fb43f3fccdf42`.
 - `OTERYN-20260720-phase5-closure` — PR #42 / `3732b29b06addecbd07423ef655489a35001247c`.
 

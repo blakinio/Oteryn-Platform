@@ -14,7 +14,8 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 3 — Identity foundation: COMPLETE**
 - **Phase 4 — Public website and read-only game data: COMPLETE**
 - **Phase 5 — Account and character management: COMPLETE**
-- **Phase 6 — CMS, Admin, RBAC and Audit: IN PROGRESS**
+- **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
+- **Phase 7 — Production hardening and operations: NEXT / PLANNED**
 
 ## Current architecture state
 
@@ -40,45 +41,70 @@ Existing Canary accounts are not imported or claimed.
 
 Platform web authentication does not imply that current native Canary/external login-server paths already enforce Platform credential policy.
 
-## Phase 6 administrator/RBAC foundation
+## Implemented Phase 6 Admin/RBAC boundary
 
-PR #44 merged as `170d52393e543c8033ebd896f42fb43f3fccdf42`.
+Phase 6 is complete through merged PRs #44 and #45.
 
-The merged foundation provides:
+PR #44 merged as `170d52393e543c8033ebd896f42fb43f3fccdf42` and provides:
 
 - durable explicit roles, permissions, role-permission mappings and Identity-role assignments;
 - no administrator assignment by default;
-- explicit current permission keys with no wildcard or implicit unrestricted-admin bypass;
+- explicit permission keys with no wildcard or implicit unrestricted-admin bypass;
 - fail-closed `admin.permission` middleware;
 - privileged route composition as `auth` + `mfa.confirmed` + `admin.permission:<exact-permission>`;
-- first protected `/admin` surface and focused authorization regression coverage.
+- focused deny/allow authorization regression coverage.
 
-ADR 0006 defines the durable administrator RBAC/audit policy. `platform_admin` is a bundle of the explicitly listed current permissions, not a wildcard for future capabilities.
+PR #45 merged as `be25d6ec3e0512bb9615329f99f16fff294d8b1d` and provides:
 
-## Current Phase 6 privileged slice
+- one-time console-only first `platform_admin` bootstrap requiring an existing MFA-confirmed Platform Identity and closing after the first administrator assignment exists;
+- audited transactional role assignment/removal behind `admin.roles.manage`;
+- supported-path protection against removing the final `platform_admin`;
+- explicit content/security/platform administrator role bundles governed by ADR 0006;
+- no wildcard future-permission inheritance for `platform_admin`.
 
-PR #45 / `OTERYN-20260720-phase6-admin-cms-audit` implements the remaining planned Phase 6 capabilities and is pending final exact-head validation/merge.
+Every current administrator web capability independently requires authenticated Platform context, confirmed MFA and its exact server-side permission.
 
-Current branch implementation includes:
+## Implemented Phase 6 CMS boundary
 
-- a one-time console-only first `platform_admin` bootstrap that requires an existing MFA-confirmed Platform Identity and closes after the first administrator assignment exists;
-- audited transactional role assignment/removal behind `admin.roles.manage` with protection against removing the final `platform_admin`;
-- privileged plain-text news create/update behind `cms.news.manage`;
-- Platform-owned managed pages with published-only public reads and escaped plain-text output;
-- privileged managed-page create/update behind `cms.pages.manage`;
-- append-oriented administrator audit events for bootstrap, role and CMS mutations;
-- bounded administrator audit visibility behind `audit.view`;
-- optional Cloudflare Access deployment guidance as defense in depth only.
+- existing Platform-owned news now has permission-scoped create/update administration behind `cms.news.manage`;
+- public news remains published-only;
+- Platform-owned managed pages provide published-only public reads;
+- managed-page create/update requires `cms.pages.manage`;
+- CMS authoring in Phase 6 is plain text and public output is escaped;
+- CMS state mutation and administrator audit append occur in the same Platform transaction where practical;
+- no rich HTML authoring, media upload, arbitrary code execution or plugin upload feature was added.
 
-Every web-admin capability independently requires authenticated Platform context, confirmed MFA and its exact server-side permission.
+## Implemented Phase 6 administrator audit boundary
 
-No arbitrary code/plugin upload, rich HTML authoring, media upload, Canary mutation, payment change or cross-repository behavior is introduced by Phase 6.
+- dedicated append-oriented `admin_audit_events` storage;
+- audit events for first-admin bootstrap, administrator role assignment/removal and privileged CMS create/update operations;
+- minimal actor/action/target/non-secret metadata only;
+- bounded administrator audit visibility at 50 rows per page behind `audit.view`, authentication and confirmed MFA;
+- audit storage is not a replacement for infrastructure/application logs.
 
-Implementation validation on PR #45 has passed Composer bootstrap, Pint, PHPStan and the complete test suite on implementation head `5688edccefe90a4eb62334369155aa263f0c797c`. Final task/document synchronization and exact-head checks are still required before merge.
+Cloudflare Access is documented as an optional production outer gate only. It never replaces Platform authentication, confirmed MFA, RBAC or audit, and Phase 6 does not claim that Access is deployed.
+
+ADR: `docs/architecture/adr/0006-admin-rbac-and-audit-policy.md`.
+
+Deployment option: `docs/operations/CLOUDFLARE_ACCESS_ADMIN.md`.
+
+## Phase 6 exit gate
+
+Satisfied by closure revalidation against merged `main`:
+
+- current administrator routes are deny-by-default through exact explicit permission checks;
+- unknown permissions fail closed and there is no wildcard authorization path;
+- privileged role, CMS and audit operations have authorization/MFA regression coverage;
+- delivered administrator state-changing operations append audit records;
+- final exact-head CI for PR #44 passed as CI #598 / Agent Governance #519;
+- final exact-head CI for PR #45 passed as CI #648 / Agent Governance #569.
+
+Phase 6 changes are Platform-only. Canary/login-server credentials, sessions, schema and game-login behavior are unchanged.
 
 ## Implemented public/read-only boundary
 
 - public Blade site shell and news;
+- public managed pages;
 - character search/profile and level highscores;
 - guild detail/membership;
 - cluster-wide online-character list;
@@ -120,20 +146,6 @@ Contract: `docs/contracts/CHARACTER_CREATION_CONTRACT.md`.
 
 `CHARACTER CREATION: IMPLEMENTED`
 
-## Phase 5 exit gate
-
-Satisfied by PR #42 closure revalidation:
-
-- every implemented shared write has an explicit operation-specific contract;
-- authorization, partial-failure/idempotency and concurrency invariants are tested;
-- both shared writes use independent least-privilege database principals;
-- generic `canary` remains SELECT-only;
-- no additional undocumented raw Canary write is approved or claimed.
-
-Generic write restrictions in the broad Canary data contract remain the default and are superseded only by these two operation-specific contracts.
-
-Phase 5 closure merged through PR #42 as `3732b29b06addecbd07423ef655489a35001247c` after exact-head CI #571 and Agent Governance #492 passed.
-
 ## Deferred account/character lifecycle work
 
 Not implemented or authorized:
@@ -167,17 +179,17 @@ Expected external work:
 - `opentibiabr/login-server`: Platform-authorized exact-account exchange and game-session creation semantics;
 - `blakinio/canary`: only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
 
-No Canary/login-server repository was modified during Phase 5 or Phase 6 work.
+No Canary/login-server repository was modified during Phase 5 or Phase 6.
 
 ## Current active task
 
-`OTERYN-20260720-phase6-admin-cms-audit` — PR #45.
+`OTERYN-20260720-phase6-closure` — PR #46.
 
 ## Recommended next work
 
-Finish PR #45 exact-head validation and merge, then perform a bounded Phase 6 closure revalidation against live `main`. Mark Phase 6 COMPLETE only after confirming deny-by-default policies, privileged-operation authorization coverage and administrator auditability on the merged state.
+After Phase 6 closure merges and housekeeping leaves no active task, begin Phase 7 with the smallest bounded production-hardening discovery task: prove the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
 
-The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled when external-repository modification is explicitly authorized.
+The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled only when external-repository modification is explicitly authorized.
 
 ## High-priority remaining unknowns
 
@@ -199,8 +211,8 @@ Oteryn Platform
        |
        +--> Platform-owned Identity + application/provisioning data
        +--> explicit Admin RBAC + confirmed MFA
-       |       +--> privileged CMS management
-       |       +--> role management
+       |       +--> permission-scoped CMS management
+       |       +--> audited role management
        |       +--> bounded administrator audit visibility
        +--> read-only Canary SQL / runtime Redis
        +--> canary_provisioning (operation-specific least privilege)
