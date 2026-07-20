@@ -40,48 +40,62 @@ Platform web authentication remains separate from the still-unimplemented author
 
 PR #56 passed CI #735 and Agent Governance #655 on exact PR head `b03a2de6836ff7769b0911f847fb5b8dc0fe8572` before squash merge.
 
-## Phase 7 controlled production-like validation in progress
+## Phase 7 controlled production-like validation
 
-PR #63 / `task/OTERYN-20260720-phase7-production-evidence-collection` is implementing a repeatable exact-SHA production-like validation workflow.
+PR #63 / `task/OTERYN-20260720-phase7-production-evidence-collection` implements a repeatable exact-SHA production-like validation workflow.
 
-Its evidence model is explicit:
+Evidence model:
 
-- `STAGING_PROVEN` — directly proven by the controlled production-like workflow;
+- `STAGING_PROVEN` — directly proven by the controlled production-like workflow and exact-SHA repository validation;
 - `PRODUCTION_PROVEN` — reserved for direct evidence from the final production environment;
-- `UNKNOWN` — not yet established.
+- `UNKNOWN` — not yet established for the stated environment.
 
-The controlled workflow is intended to validate, without claiming final production state:
+Successful staging evidence snapshot:
 
-- clean deployment, migrations, rollback and redeploy;
-- production configuration guardrails;
+- validation SHA `b6dcd6ed95c55f400206864ffd6ff799e65aa2b3`;
+- rollback SHA `b6878c4775eda542738c78ea99fd5d2e19d2b35f`;
+- Phase 7 Production-Like Validation run `29779031870` / #5: PASS;
+- required CI run `29779031976` / #755: PASS;
+- Agent Governance run `29779031673` / #675: PASS;
+- non-secret evidence classification: `STAGING_PROVEN`;
+- measured controlled restore: `102 ms`, with `13/13` tables, `11/11` migrations and matching validation-SHA probe.
+
+The controlled evidence closes the currently staging-verifiable work for:
+
+- clean deployment, migrations, controlled rollback, interrupted-release isolation and redeploy;
+- provider-independent production configuration guardrails and invalid-config fail-closed behavior;
 - effective MariaDB least-privilege principals for generic read-only, provisioning and character creation;
-- fail-closed excessive/insufficient database privileges;
-- runtime Redis ACL/key/command boundary and failure semantics;
-- SMTP delivery through a real test SMTP service and mail failure handling;
-- full critical regression suite on the exact validation SHA;
-- running health/security-header/cookie/request-correlation/sensitive-error checks;
-- measured database backup/restore with integrity and restored-environment smoke validation.
+- prohibited cross-surface writes and excessive/insufficient database privilege fail-closed behavior;
+- runtime Redis ACL/key/command boundary plus missing/malformed/unavailable dependency semantics;
+- SMTP delivery through a real test SMTP service and unavailable-mail behavior;
+- exact-SHA critical feature/integration regression coverage across Identity, admin/RBAC/CMS, account/binding, character and public game-data surfaces;
+- running health, CSP/security headers, Secure/HttpOnly cookies, request correlation, JSON request-completion logging and representative sensitive-error/log behavior;
+- real production-like MariaDB backup/clean restore/integrity/restored-environment smoke with measured staging recovery time.
+
+The `102 ms` recovery result is staging evidence only. It is not a production RTO or RPO.
+
+Detailed evidence and the final production-only checklist are maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`.
 
 ## Phase 7 final production-only completion evidence
 
 Controlled staging cannot prove the final production:
 
+- exact deployed Oteryn Platform SHA and relevant Canary/login-server versions;
 - DNS/Cloudflare/WAF/Access/TLS/HSTS posture;
-- direct-origin exposure and ingress firewall rules;
-- Platform DB engine/endpoint/network isolation/HA and actual effective grants;
-- Canary SQL production endpoints/network paths and actual credential provisioning/effective grants;
-- runtime Redis endpoint/ACL/network/TLS state;
-- effective session/cache scaling model;
-- queue/worker model;
-- mail provider/domain/delivery monitoring;
-- centralized logs/metrics/alerts/retention/on-call routing;
-- real deployment/migration/rollback mechanism;
-- production backup schedule/technology and a dated production restore result;
-- exact deployed production SHA(s) and final critical production smoke/E2E checks.
+- direct-origin exposure and ingress firewall/reverse-proxy rules;
+- Platform DB engine/endpoint/network isolation/HA and production credential ownership/rotation;
+- Canary SQL production endpoints/network paths and actual effective grants for each enabled dedicated principal;
+- runtime Redis endpoint/ACL/network/TLS state and dependency/freshness monitoring;
+- effective session/cache scaling model and queue/worker topology;
+- mail provider/domain/delivery/bounce monitoring;
+- centralized logs/metrics/alerts/retention/access/on-call routing;
+- actual provider deployment/migration/rollback mechanism and emergency operator authorization;
+- production backup scope/schedule/retention/encryption/access policy and a dated production restore result;
+- final critical production smoke/E2E checks against the exact deployed SHA.
 
 The authoritative Platform game-login bridge remains unresolved if Platform-originated game login is part of launch scope.
 
-Therefore Phase 7 must remain incomplete until the remaining final-production evidence gates are satisfied or explicitly risk-accepted where policy permits.
+Therefore Phase 7 must remain incomplete until the applicable final-production evidence gates are satisfied or explicitly risk-accepted where policy permits.
 
 ## Repository-verifiable operations gates
 
@@ -129,13 +143,13 @@ No Canary/login-server repository was modified by Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-production-evidence-collection` — IN PROGRESS — draft PR #63.
+`OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED only on final production-only evidence; draft PR #63 contains the staging validation harness and evidence closure.
 
 ## Recommended next work
 
-Finish exact-head validation of PR #63, record only non-secret `STAGING_PROVEN` results from the controlled workflow, close any workflow defects, and reduce the remaining Phase 7 checklist to the final production-only verification pass.
+When actual production access and deployment authorization are available, execute only the `PRODUCTION_PROVEN` checklist in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md` against the exact deployed SHA(s).
 
-Do not mark Phase 7 COMPLETE from staging evidence alone.
+Do not repeat the closed staging validation unless the production candidate code or relevant contracts change, and do not mark Phase 7 COMPLETE from staging evidence alone.
 
 ## High-priority remaining unknowns
 
