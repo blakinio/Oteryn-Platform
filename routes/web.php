@@ -83,6 +83,10 @@ Route::post('/account/characters', [CharacterCreationController::class, 'store']
     ->middleware(['auth', 'throttle:character-create'])
     ->name('account.characters.store');
 
+Route::view('/admin', 'admin.dashboard')
+    ->middleware(['auth', 'mfa.confirmed', 'admin.permission:admin.access'])
+    ->name('admin.dashboard');
+
 Route::get('/news', [PublicNewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [PublicNewsController::class, 'show'])->name('news.show');
 
