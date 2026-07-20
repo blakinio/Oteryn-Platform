@@ -130,7 +130,9 @@ final class AdminAuthorizationTest extends TestCase
 
     private function actingAsCurrent(Identity $identity): void
     {
+        $currentIdentity = Identity::query()->findOrFail($identity->id);
+
         $this->actingAs($identity, 'web')
-            ->withSession([WebSessionState::GENERATION_KEY => $identity->web_session_generation]);
+            ->withSession([WebSessionState::GENERATION_KEY => $currentIdentity->web_session_generation]);
     }
 }
