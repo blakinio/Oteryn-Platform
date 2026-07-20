@@ -22,6 +22,12 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
 
     private ?PDO $root = null;
 
+    private string $rootHost = '';
+
+    private string $rootPort = '3306';
+
+    private string $rootPassword = '';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -37,12 +43,10 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
         $port = is_string($portValue) && $portValue !== '' ? $portValue : '3306';
         $rootPassword = is_string($rootPasswordValue) ? $rootPasswordValue : '';
 
-        $this->root = new PDO(
-            "mysql:host={$host};port={$port};charset=utf8mb4",
-            'root',
-            $rootPassword,
-            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
-        );
+        $this->rootHost = $host;
+        $this->rootPort = $port;
+        $this->rootPassword = $rootPassword;
+        $this->connectRoot();
 
         $this->resetDatabase();
         $this->configureCharacterCreateConnection($host, $port);
@@ -51,6 +55,10 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
     protected function tearDown(): void
     {
         DB::purge(CanaryCharacterCreator::CONNECTION);
+
+        if (! $this->root instanceof PDO && $this->rootHost !== '') {
+            $this->connectRoot();
+        }
 
         if ($this->root instanceof PDO) {
             $this->root->exec('DROP DATABASE IF EXISTS `'.self::DATABASE.'`');
@@ -377,6 +385,12 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
         $barrier = $directory.'/go';
         $pids = [];
 
+        // PDO/MySQL connections are not fork-safe. Disconnect the privileged root
+        // socket before forking so child shutdown cannot terminate the parent's
+        // inherited server connection. The parent reconnects after all workers exit.
+        $this->root = null;
+        DB::purge(CanaryCharacterCreator::CONNECTION);
+
         foreach ($requests as $index => $request) {
             $pid = pcntl_fork();
 
@@ -429,6 +443,8 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
             self::assertSame(0, pcntl_wexitstatus($status));
         }
 
+        $this->connectRoot();
+
         $results = [];
 
         foreach (array_keys($requests) as $index) {
@@ -463,6 +479,20 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
         } catch (QueryException) {
             return;
         }
+    }
+
+    private function connectRoot(): void
+    {
+        if ($this->rootHost === '') {
+            self::fail('MariaDB root connection parameters are unavailable.');
+        }
+
+        $this->root = new PDO(
+            "mysql:host={$this->rootHost};port={$this->rootPort};charset=utf8mb4",
+            'root',
+            $this->rootPassword,
+            [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
+        );
     }
 
     private function rootExec(string $query): void
