@@ -35,14 +35,14 @@ final class RequestCorrelationTest extends TestCase
 
     public function test_request_completion_log_contains_only_bounded_safe_context(): void
     {
-        Log::spy();
+        $log = Log::spy();
 
         $response = $this->get('/?token=do-not-log&email=private@example.com');
         $requestId = $response->headers->get('X-Request-ID');
 
         self::assertIsString($requestId);
 
-        Log::shouldHaveReceived('info')
+        $log->shouldHaveReceived('info')
             ->once()
             ->withArgs(function (mixed $message, mixed $context) use ($requestId): bool {
                 if ($message !== 'http.request.completed' || ! is_array($context)) {
