@@ -8,8 +8,59 @@ import {
   register,
   uniqueEmail,
   waitForDifferentTotp,
-  waitForResetLink,
 } from './helpers.mjs';
+
+const mailhogBaseUrl = process.env.ACCEPTANCE_MAILHOG_URL ?? 'http://127.0.0.1:8025';
+
+function collectStrings(value, output = []) {
+  if (typeof value === 'string') {
+    output.push(value);
+    return output;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStrings(item, output);
+    return output;
+  }
+  if (value && typeof value === 'object') {
+    for (const item of Object.values(value)) collectStrings(item, output);
+  }
+  return output;
+}
+
+function decodeQuotedPrintable(value) {
+  return value
+    .replace(/=\r?\n/gu, '')
+    .replace(/=([0-9A-F]{2})/giu, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/&amp;/gu, '&');
+}
+
+async function waitForExactResetLink(email, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${mailhogBaseUrl}/api/v2/messages`);
+    if (response.ok) {
+      const payload = await response.json();
+      for (const raw of collectStrings(payload)) {
+        if (!raw.includes(email) && !raw.includes(encodeURIComponent(email))) continue;
+        const decoded = decodeQuotedPrintable(raw);
+        const candidates = decoded.match(/https?:\/\/[^\s<>"']+/gu) ?? [];
+        for (const candidateRaw of candidates) {
+          const candidate = candidateRaw.replace(/[\])}>.,;]+$/gu, '');
+          try {
+            const url = new URL(candidate);
+            if (!url.pathname.includes('/reset-password/')) continue;
+            const candidateEmail = url.searchParams.get('email');
+            if (candidateEmail === null || candidateEmail === email) return url.toString();
+          } catch {
+            // Ignore non-URL text fragments and continue polling MailHog.
+          }
+        }
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('Password reset message did not expose a valid reset URL for the requested identity.');
+}
 
 test.beforeEach(async ({ page }) => {
   page.__acceptanceDiagnostics = installDiagnostics(page);
@@ -41,7 +92,7 @@ test('Flow 3b — password recovery uses real SMTP, revokes old sessions and rej
     await resetPage.getByRole('button', { name: 'Send reset link' }).click();
     await expect(resetPage.getByRole('status')).toBeVisible();
 
-    const resetLink = await waitForResetLink(email);
+    const resetLink = await waitForExactResetLink(email);
     await resetPage.goto(resetLink);
     await resetPage.getByLabel('Email').fill(email);
     await resetPage.getByLabel('New password', { exact: true }).fill(changedPassword);
