@@ -3,6 +3,7 @@
 use App\Accounts\Actions\ProvisionCanaryAccount;
 use App\Accounts\Exceptions\CanaryAccountProvisioningException;
 use App\Accounts\Models\IdentityCanaryAccount;
+use App\CanaryIntegration\CanaryCharacterCreateDatabasePrivilegeVerifier;
 use App\CanaryIntegration\CanaryDatabasePrivilegeVerifier;
 use App\CanaryIntegration\CanaryProvisioningDatabasePrivilegeVerifier;
 use Illuminate\Foundation\Inspiring;
@@ -59,6 +60,30 @@ Artisan::command('canary:verify-provisioning-db-privileges', function () {
 
     return 0;
 })->purpose('Verify the dedicated Canary account-provisioning credential least-privilege boundary');
+
+Artisan::command('canary:verify-character-create-db-privileges', function () {
+    try {
+        $violations = app(CanaryCharacterCreateDatabasePrivilegeVerifier::class)->inspect();
+    } catch (Throwable) {
+        $this->error('Unable to inspect the Canary character-create database privilege boundary.');
+
+        return 1;
+    }
+
+    if ($violations !== []) {
+        $this->error('Canary character-create database privilege boundary verification failed.');
+
+        foreach ($violations as $violation) {
+            $this->line("- {$violation}");
+        }
+
+        return 1;
+    }
+
+    $this->info('Canary character-create database privilege boundary verified: approved column-level account/player SELECT and player INSERT only.');
+
+    return 0;
+})->purpose('Verify the dedicated Canary character-create credential least-privilege boundary');
 
 Artisan::command('canary:provision-pending-accounts {--limit=100}', function () {
     $limitOption = $this->option('limit');
