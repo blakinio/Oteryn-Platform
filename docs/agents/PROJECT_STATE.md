@@ -37,7 +37,7 @@ Existing Canary accounts are not imported or claimed.
 
 Platform web authentication remains separate from the still-unimplemented authoritative game-login bridge.
 
-## Phase 7 engineering/hardening completed on main
+## Phase 7 engineering/hardening completed
 
 - PR #48 / `676a77590e3ec93bcad0247b3065d203ac209c40` — production topology evidence baseline.
 - PR #49 / `0f876d4f2209399a85cafcff1623d8e6c810b914` — fail-closed provider-independent production configuration verifier.
@@ -46,6 +46,7 @@ Platform web authentication remains separate from the still-unimplemented author
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
+- ADR 0007 — durable separation of Phase 7 engineering completion from the Production Go-Live Gate.
 
 ## Phase 7 controlled production-like validation
 
@@ -153,13 +154,13 @@ No Canary/login-server repository was modified by Phase 7 work or ADR 0007.
 
 ## Current active task
 
-`OTERYN-20260721-phase7-go-live-gate-separation` — IN PROGRESS — draft PR #65.
+None.
 
-The earlier `OTERYN-20260720-phase7-production-evidence-collection` task completed its staging-verifiable objective through merged PR #63 and is being retired from active work by the current bounded governance task.
+The completed staging-evidence task and ADR 0007/go-live separation task are archived under `docs/agents/tasks/archive/`.
 
 ## Recommended next work
 
-Finish and merge the bounded ADR 0007/governance alignment task. After that, when actual production access and deployment authorization are available, execute only the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
+When actual production access and deployment authorization are available, create a bounded production-verification task and execute only the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
 
 Do not repeat the closed staging validation unless the production candidate code or relevant contracts change materially, and do not claim production readiness from staging evidence alone.
 
