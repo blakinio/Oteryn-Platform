@@ -29,52 +29,53 @@ Existing Canary accounts are not imported or claimed.
 
 Platform web authentication remains separate from the still-unimplemented authoritative game-login bridge.
 
-## Phase 7 completed slices
+## Phase 7 completed repository-owned slices
 
 ### Production topology evidence baseline
 
 PR #48 merged as `676a77590e3ec93bcad0247b3065d203ac209c40`.
 
-`docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` distinguishes repository-proven configuration capabilities from actual deployed production state. Local `.env.example` defaults are not production evidence.
+`docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` distinguishes repository-proven capabilities from actual deployed production state. Local `.env.example` defaults are not production evidence.
 
 ### Provider-independent production configuration guardrails
 
 PR #49 merged as `0f876d4f2209399a85cafcff1623d8e6c810b914`.
 
-`php artisan production:verify-configuration` fails closed for unsafe provider-independent production settings: non-production environment, debug enabled, missing APP_KEY, non-HTTPS/local APP_URL, insecure session cookie settings and non-delivery/test mail configuration.
-
-The verifier does not expose secret values and intentionally does not require a specific database/cache/queue/logging/Cloudflare provider.
+`php artisan production:verify-configuration` fails closed for unsafe provider-independent settings: non-production environment, debug enabled, missing APP_KEY, non-HTTPS/local APP_URL, insecure session cookie settings and non-delivery/test mail configuration.
 
 ### Dependency security scanning
 
 PR #50 merged as `3973774727c35aea22d0a646f479a0ff079042cc`.
 
-Required CI now runs:
+Required CI runs `composer audit --no-interaction` in addition to Composer validation/install, Pint, PHPStan and tests. Dependabot provides bounded weekly Composer and GitHub Actions update PRs.
 
-`composer audit --no-interaction`
+### Browser security headers and CSP
 
-The existing Composer validation/install, Pint, PHPStan and test gates remain required. Dependabot is configured for bounded weekly Composer and GitHub Actions update PRs.
+PR #54 merged as `eb358a245f35fda1865f13e329c07ef0f4850d2f`.
 
-The validated lockfile passed the advisory scan at merge time.
+- first-party CSS is same-origin and no longer embedded inline in the public layout;
+- CSP restricts default/script/style/connect/font to same-origin, permits self/data images, limits forms to self and denies objects/framing/base-uri changes;
+- no `unsafe-inline` or `unsafe-eval` allowance;
+- `nosniff`, frame denial, strict referrer policy and restrictive permissions policy are applied to web responses;
+- HSTS remains unclaimed until actual TLS/proxy/hostname topology is proven.
 
-## Current Phase 7 slice — browser security headers and CSP
+## Current Phase 7 slice — request correlation and logging
 
-`OTERYN-20260720-phase7-security-headers-csp` — PR #54.
+`OTERYN-20260720-phase7-request-correlation-logging` — PR #55.
 
 Current branch implementation:
 
-- moves first-party inline public CSS to same-origin `public/css/app.css`;
-- loads that stylesheet from public/game and administrator layouts;
-- applies browser security headers to Laravel `web` responses;
-- enforces CSP with same-origin default/script/style/connect/font sources, self/data image sources, `form-action 'self'`, `base-uri 'none'`, `frame-ancestors 'none'` and `object-src 'none'`;
-- does not grant `unsafe-eval` or inline-script execution;
-- adds `X-Content-Type-Options: nosniff`;
-- adds `X-Frame-Options: DENY`;
-- adds `Referrer-Policy: strict-origin-when-cross-origin`;
-- adds restrictive camera/geolocation/microphone/payment/USB `Permissions-Policy`;
-- covers public and authentication responses with regression tests.
+- generates a fresh server-owned UUID for every Laravel-handled request;
+- ignores inbound `X-Request-ID` as authoritative correlation input;
+- returns the server-generated identifier through `X-Request-ID` on normal responses;
+- records one bounded `http.request.completed` event with request ID, HTTP method, route name, response status and duration only;
+- excludes query strings, request bodies, full URLs, headers and credentials from that completion context;
+- adds an optional JSON-to-stderr logging channel while leaving the default logging choice unchanged;
+- correlates `/health` as well as normal application routes.
 
-HSTS is intentionally not hard-coded because deployed TLS termination, proxy and hostname/subdomain policy remain unproven.
+CI #721 passed Composer advisory audit, Pint, PHPStan and full tests on the cleaned implementation head after exact diagnostic fixes. Final synchronized exact-head validation remains required before merge.
+
+This proves only application-side correlation and log shape. A deployed centralized log/metrics/alerting sink remains `UNKNOWN`.
 
 ## Phase 7 deployed-state unknowns
 
@@ -92,48 +93,26 @@ The repository does not currently prove:
 - actual runtime Redis endpoint/ACL provisioning status;
 - actual backup/restore, deployment or rollback mechanism.
 
-## Implemented Identity boundary
+## Implemented Identity and privileged application boundary
 
 - secure Platform registration/login/logout;
 - revocable Platform web sessions;
 - password recovery/change with session revocation;
 - TOTP MFA and single-use recovery codes;
 - security-event recording;
-- reusable `mfa.confirmed` gate;
-- explicit administrator RBAC separate from authentication and MFA.
+- explicit administrator RBAC separate from authentication and MFA;
+- privileged routes require `auth` + `mfa.confirmed` + exact permission;
+- privileged CMS/role mutations are audited;
+- no wildcard administrator authorization path exists.
 
-## Implemented Admin/CMS/Audit boundary
+## Implemented public/read-only and shared-write boundary
 
-Phase 6 merged through:
-
-- PR #44 / `170d52393e543c8033ebd896f42fb43f3fccdf42` — explicit deny-by-default RBAC;
-- PR #45 / `be25d6ec3e0512bb9615329f99f16fff294d8b1d` — first-admin bootstrap, audited role lifecycle, privileged news/pages and administrator audit;
-- PR #46 / `f25abd8799718ac99acce050ac55018d04fff2de` — Phase 6 closure.
-
-Every current administrator web capability requires:
-
-`auth` + `mfa.confirmed` + `admin.permission:<exact-permission>`
-
-No wildcard administrator authorization path exists.
-
-## Implemented public/read-only boundary
-
-- public news and managed pages;
-- character search/profile and level highscores;
-- guild detail/membership;
-- cluster-wide online-character list;
-- configured channels with fresh runtime availability projection;
-- database-enforced `canary` / `oteryn_readonly` SELECT-only SQL boundary;
-- separate read-only `canary_runtime` Redis boundary.
-
-## Implemented Phase 5 shared-write boundary
-
-Exactly two Oteryn Platform -> Canary mutation surfaces are approved:
-
-- `canary_provisioning` — greenfield account provisioning/recovery under `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`;
-- `canary_character_create` — greenfield character creation under `CHARACTER_CREATION_CONTRACT.md` and ADR 0005.
-
-The generic `canary` connection remains database-enforced read-only.
+- public news, managed pages and bounded public game-data reads;
+- database-enforced generic Canary SELECT-only boundary;
+- separate read-only `canary_runtime` Redis boundary;
+- exactly two approved Oteryn Platform -> Canary mutation surfaces:
+  - `canary_provisioning` for greenfield account provisioning/recovery;
+  - `canary_character_create` for greenfield character creation.
 
 Deferred and not authorized:
 
@@ -153,11 +132,11 @@ No Canary/login-server repository was modified by Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-security-headers-csp` — PR #54.
+`OTERYN-20260720-phase7-request-correlation-logging` — PR #55.
 
 ## Recommended next work
 
-Finish PR #54 with exact-head validation. If actual deployment evidence remains unavailable, continue with provider-neutral request correlation and structured logging primitives while explicitly leaving the deployed logging/metrics/alerting sink `UNKNOWN`.
+Finish PR #55 with exact-head validation. If deployment evidence remains unavailable, continue with provider-neutral production-readiness and incident/recovery runbooks that clearly distinguish executable repository checks from environment-evidence-required operations.
 
 ## High-priority remaining unknowns
 
