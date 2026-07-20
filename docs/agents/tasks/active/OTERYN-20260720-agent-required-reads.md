@@ -19,7 +19,7 @@ Make compact continuation prompts carry task-specific architecture, contract, se
 - [x] `resume.py` emits read-routing sections before evidence and `NEXT_ACTION`.
 - [x] Existing tasks without frontmatter routing remain compatible through default required reads.
 - [ ] Exact-head Agent Governance and CI gates pass.
-- [ ] No application, Laravel, database, auth, runtime, deployment, or Canary behavior changes.
+- [x] No application, Laravel, database, auth, runtime, deployment, or Canary behavior changes.
 
 ## Ownership
 
@@ -42,11 +42,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T19:20:00+02:00
-head: b4692124f89bb814b077ed6937940fb8b2b8eab9
+updated_at: 2026-07-20T19:24:00+02:00
+head: d8f3475496fd21d0ff58d9e8de7558e9e3cbc0a6
 branch: docs/agent-required-reads-20260720
-pr: none
-status: implementing
+pr: 60
+status: validating
 context_routes:
   - agent-governance
 owned_paths:
@@ -55,11 +55,12 @@ owned_paths:
   - tools/agents/resume.py
 proven:
   - Existing Oteryn Platform resume output carried checkpoint evidence but not task-specific architecture or security document reads.
-  - Existing tasks without frontmatter must remain resumable.
+  - Task template now carries optional read-routing metadata while existing tasks without frontmatter remain resumable through default reads.
+  - Draft PR 60 is open against main and is limited to agent handoff tooling and task metadata paths.
 derived:
   - Optional task-frontmatter routing preserves the existing checkpoint contract and security-specific handoff rules.
 unknown:
-  - Final exact-head CI and Agent Governance outcomes.
+  - Final exact-head CI and Agent Governance outcomes after this checkpoint update.
 conflicts: []
 first_failure:
   marker: none
@@ -74,7 +75,7 @@ validation:
     result: PASS
     evidence: scope limited to agent handoff tooling and task template
 blockers: []
-next_action: Open the draft PR, verify exact-head Agent Governance and CI, then merge only if repository gates pass.
+next_action: Verify PR 60 exact-head Agent Governance, CI, mergeability, review state and changed-file scope, then merge only if repository gates pass.
 ```
 
 ## Notes
