@@ -43,6 +43,7 @@ test('Flow 3b — password recovery uses real SMTP, revokes old sessions and rej
 
     const resetLink = await waitForResetLink(email);
     await resetPage.goto(resetLink);
+    await resetPage.getByLabel('Email').fill(email);
     await resetPage.getByLabel('New password', { exact: true }).fill(changedPassword);
     await resetPage.getByLabel('Confirm new password', { exact: true }).fill(changedPassword);
     await resetPage.getByRole('button', { name: 'Reset password' }).click();
@@ -57,6 +58,7 @@ test('Flow 3b — password recovery uses real SMTP, revokes old sessions and rej
     await expect(resetPage.getByRole('alert')).toBeVisible();
 
     await resetPage.goto(resetLink);
+    await resetPage.getByLabel('Email').fill(email);
     await resetPage.getByLabel('New password', { exact: true }).fill('AcceptanceReplay!890');
     await resetPage.getByLabel('Confirm new password', { exact: true }).fill('AcceptanceReplay!890');
     await resetPage.getByRole('button', { name: 'Reset password' }).click();
