@@ -21,7 +21,7 @@ final class SaveManagedPage
     ): ManagedPage {
         return DB::transaction(function () use ($actor, $page, $slug, $title, $body, $publishedAt): ManagedPage {
             $created = $page === null;
-            $page ??= new ManagedPage();
+            $page ??= new ManagedPage;
             $page->fill([
                 'slug' => $slug,
                 'title' => $title,
