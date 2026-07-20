@@ -4,13 +4,14 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
+- `OTERYN-20260721-phase7-go-live-gate-separation` — IN PROGRESS — `task/OTERYN-20260721-phase7-go-live-gate-separation`
 - `OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED ON FINAL PRODUCTION-ONLY EVIDENCE — staging-validation PR #63 MERGED as `61f72ddda5c253f26c7d59aa7b6fce3506f120dc`
 
 ## Current project phase
 
 **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 
-**Phase 7 — Production hardening and operations: IN PROGRESS / FINAL PRODUCTION EVIDENCE REQUIRED FOR COMPLETION**
+**Phase 7 — Production hardening and operations: IN PROGRESS / COMPLETION SEMANTICS UNDER BOUNDED ARCHITECTURE REVIEW**
 
 ## Completed Phase 7 repository-owned slices
 
@@ -40,9 +41,13 @@ The controlled validation closes the currently staging-verifiable deployment/rol
 
 Staging evidence must not be promoted to proof of final production state or production RTO/RPO.
 
+## Current architecture review
+
+The current ROADMAP makes `production readiness checklist complete` a Phase 7 exit gate, while the checklist itself requires actual deployed-production evidence. The bounded task `OTERYN-20260721-phase7-go-live-gate-separation` is deciding whether Phase 7 engineering completion should be separated durably from a fail-closed Production Go-Live Gate. Until that decision is merged, do not change Phase 7 completion status or weaken the production checklist.
+
 ## Final production-only completion evidence
 
-Phase 7 now waits only for facts requiring the actual final production environment or separately authorized scope. The minimal pass is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md` and includes:
+The current production-only pass is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md` and includes:
 
 1. exact deployed production SHA(s) and relevant Canary/login-server versions;
 2. production DNS/edge/Cloudflare/TLS/origin/firewall state;
@@ -55,7 +60,7 @@ Phase 7 now waits only for facts requiring the actual final production environme
 9. production backup schedule/policy and dated production restore result;
 10. final production critical smoke/E2E checks against the exact deployed SHA.
 
-Until those facts are proven or eligible risks are explicitly owner-accepted, do not mark Phase 7 COMPLETE.
+None of those items becomes `PRODUCTION_PROVEN` from staging evidence.
 
 ## Repository-verifiable preflight commands
 
