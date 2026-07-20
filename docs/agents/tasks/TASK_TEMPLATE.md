@@ -1,3 +1,13 @@
+---
+task_id: OTERYN-YYYYMMDD-short-slug
+required_reads:
+  - AGENTS.md
+  - docs/agents/CONTEXT_HANDOFF.md
+  # Add task-specific architecture, contract, security, or program files here.
+search_first: []
+optional_reads: []
+---
+
 # OTERYN-YYYYMMDD-short-slug
 
 ## Goal
