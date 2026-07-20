@@ -43,7 +43,7 @@ Platform web authentication does not imply that current native Canary/external l
 
 ## Implemented Phase 6 Admin/RBAC boundary
 
-Phase 6 is complete through merged PRs #44 and #45.
+Phase 6 is complete through merged PRs #44, #45 and closure PR #46.
 
 PR #44 merged as `170d52393e543c8033ebd896f42fb43f3fccdf42` and provides:
 
@@ -66,7 +66,7 @@ Every current administrator web capability independently requires authenticated 
 
 ## Implemented Phase 6 CMS boundary
 
-- existing Platform-owned news now has permission-scoped create/update administration behind `cms.news.manage`;
+- Platform-owned news has permission-scoped create/update administration behind `cms.news.manage`;
 - public news remains published-only;
 - Platform-owned managed pages provide published-only public reads;
 - managed-page create/update requires `cms.pages.manage`;
@@ -90,14 +90,15 @@ Deployment option: `docs/operations/CLOUDFLARE_ACCESS_ADMIN.md`.
 
 ## Phase 6 exit gate
 
-Satisfied by closure revalidation against merged `main`:
+Satisfied by closure PR #46, merged as `f25abd8799718ac99acce050ac55018d04fff2de`, after merged-main revalidation:
 
 - current administrator routes are deny-by-default through exact explicit permission checks;
 - unknown permissions fail closed and there is no wildcard authorization path;
 - privileged role, CMS and audit operations have authorization/MFA regression coverage;
 - delivered administrator state-changing operations append audit records;
-- final exact-head CI for PR #44 passed as CI #598 / Agent Governance #519;
-- final exact-head CI for PR #45 passed as CI #648 / Agent Governance #569.
+- exact-head validation passed for PR #44 as CI #598 / Agent Governance #519;
+- exact-head validation passed for PR #45 as CI #648 / Agent Governance #569;
+- exact-head validation passed for PR #46 as CI #659 / Agent Governance #580.
 
 Phase 6 changes are Platform-only. Canary/login-server credentials, sessions, schema and game-login behavior are unchanged.
 
@@ -124,27 +125,10 @@ Self-service unlink/rebind/transfer is forbidden. Normal recovery restores the s
 
 Phase 5 approves exactly two Oteryn Platform -> Canary mutation surfaces.
 
-### Greenfield Canary account provisioning
+- `canary_provisioning` — greenfield account provisioning/recovery under `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`;
+- `canary_character_create` — greenfield character creation under `CHARACTER_CREATION_CONTRACT.md` and ADR 0005.
 
-Connection: `canary_provisioning`.
-
-The operation creates durable Platform provisioning intent before the Canary write, inserts only operation-approved account columns, preserves Canary-owned trigger side effects, finalizes the exact created/recovered `accounts.id`, uses forward recovery after partial failure, and uses a non-user random compatibility credential that is never disclosed to the user.
-
-It has a reviewed least-privilege SQL template, fail-closed effective-grant verifier and real MariaDB retry/recovery, trigger and privilege coverage.
-
-Contract: `docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`.
-
-### Greenfield character creation
-
-Connection: `canary_character_create`.
-
-The operation requires an authenticated Identity with a ready immutable binding, accepts only approved name/vocation/sex inputs, applies ADR 0005 name/starter policy, locks the authorized account before recovery/quota/insert, enforces maximum 10 active characters and provides natural same-account/canonical-name idempotent recovery.
-
-It has a reviewed least-privilege SQL template, fail-closed verifier and real MariaDB privilege, starter-state, quota-race and global same-name-race coverage.
-
-Contract: `docs/contracts/CHARACTER_CREATION_CONTRACT.md`.
-
-`CHARACTER CREATION: IMPLEMENTED`
+The generic `canary` connection remains database-enforced read-only.
 
 ## Deferred account/character lifecycle work
 
@@ -183,11 +167,11 @@ No Canary/login-server repository was modified during Phase 5 or Phase 6.
 
 ## Current active task
 
-`OTERYN-20260720-phase6-closure` — PR #46.
+None.
 
 ## Recommended next work
 
-After Phase 6 closure merges and housekeeping leaves no active task, begin Phase 7 with the smallest bounded production-hardening discovery task: prove the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
+Begin Phase 7 with the smallest bounded production-hardening discovery task: prove the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
 
 The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled only when external-repository modification is explicitly authorized.
 

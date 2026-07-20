@@ -20,7 +20,7 @@ Revalidate the complete Phase 6 roadmap and exit gate against live `main` after 
 owned_paths:
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/PROJECT_STATE.md
-  - docs/agents/tasks/active/OTERYN-20260720-phase6-closure.md
+  - docs/agents/tasks/archive/OTERYN-20260720-phase6-closure.md
   - docs/agents/tasks/archive/OTERYN-20260720-phase6-admin-cms-audit.md
   - docs/agents/handovers/OTERYN-20260720-phase6-handover.md
   - docs/architecture/MODULE_CATALOG.md
@@ -42,11 +42,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T10:12:00Z
-head: eee86266a1af0ccc6786d0874707ed4b38e7cf45
+updated_at: 2026-07-20T10:15:00Z
+head: f25abd8799718ac99acce050ac55018d04fff2de
 branch: task/OTERYN-20260720-phase6-closure
 pr: 46
-status: ready
+status: completed
 context_routes:
   - agent-governance
   - architecture
@@ -57,7 +57,7 @@ context_routes:
 owned_paths:
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/PROJECT_STATE.md
-  - docs/agents/tasks/active/OTERYN-20260720-phase6-closure.md
+  - docs/agents/tasks/archive/OTERYN-20260720-phase6-closure.md
   - docs/agents/tasks/archive/OTERYN-20260720-phase6-admin-cms-audit.md
   - docs/agents/handovers/OTERYN-20260720-phase6-handover.md
   - docs/architecture/MODULE_CATALOG.md
@@ -65,27 +65,22 @@ owned_paths:
 proven:
   - PR #44 merged to main as 170d52393e543c8033ebd896f42fb43f3fccdf42 after exact-head CI #598 and Agent Governance #519 passed.
   - PR #45 merged to main as be25d6ec3e0512bb9615329f99f16fff294d8b1d after exact-head CI #648 and Agent Governance #569 passed.
-  - There were no open pull requests when closure started.
   - Merged main routes require auth, mfa.confirmed and an exact admin.permission key for every current administrator web surface.
   - Merged main AdminAuthorization rejects unknown permission keys and has no wildcard authorization path.
   - Merged main AdminRoleManager requires confirmed MFA for first-admin bootstrap, closes bootstrap after the first assignment, audits role lifecycle and refuses supported removal of the final platform_admin assignment.
   - Merged main news/page save actions write CMS state and administrator audit records inside Platform transactions.
-  - Merged authorization tests cover unauthenticated, missing-MFA, missing-role, missing-permission, unknown-permission and authorized access.
-  - Merged role tests cover one-time MFA-confirmed bootstrap, explicit role permission, audited assignment/removal and final-platform-admin protection.
-  - Merged CMS tests cover publication behavior, permission denial, MFA denial, audit append and escaped plain-text public output.
-  - Merged audit tests cover audit permission denial, MFA denial and bounded 50-row pagination.
+  - Merged authorization, role, CMS and audit tests cover denied and authorized paths required by the Phase 6 exit gate.
   - Every Phase 6 roadmap deliverable is present on merged main and no arbitrary code/plugin upload, rich HTML or media upload surface was introduced.
   - The Phase 6 exit gate is satisfied: deny-by-default policies are proven, privileged operations have authorization/MFA coverage and delivered administrator state-changing actions are auditable.
   - The Phase 6 trust boundary is Platform administrator authentication/authorization, Platform-owned CMS mutation and Platform-owned administrator audit; no Canary/login-server trust boundary changed.
   - Phase 6 introduced Platform-owned migrations only; Canary schema/session compatibility is unchanged.
-  - No secret or production-only credential is introduced by Phase 6 repository changes.
+  - No secret or production-only credential was introduced by Phase 6 repository changes.
   - Cloudflare Access remains optional deployment documentation and is not claimed as deployed.
-  - PR #46 exact-head CI #658 and Agent Governance #579 passed on eee86266a1af0ccc6786d0874707ed4b38e7cf45.
-  - PR #46 changed files are restricted to the seven Phase 6 closure/handover documentation paths and there are no comments or review threads.
+  - PR #46 final exact-head CI #659 and Agent Governance #580 passed on d03e5237f5ec663e459d8ac804ee596043876416.
+  - PR #46 had no comments or review threads and was squash-merged to main as f25abd8799718ac99acce050ac55018d04fff2de.
 derived:
-  - Phase 6 can be marked COMPLETE and Phase 7 can become NEXT without changing application behavior in the closure PR.
+  - Phase 7 production-hardening discovery is the next roadmap phase.
   - Phase 6 rollback is a Platform application/database release rollback of Platform-owned RBAC/audit/page migrations and code; no cross-repository rollback coordination is required.
-  - The next roadmap task should discover the actual production topology before production-hardening implementation or readiness claims.
 unknown: []
 conflicts: []
 first_failure:
@@ -98,7 +93,7 @@ rejected_hypotheses:
 changed_paths:
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/PROJECT_STATE.md
-  - docs/agents/tasks/active/OTERYN-20260720-phase6-closure.md
+  - docs/agents/tasks/archive/OTERYN-20260720-phase6-closure.md
   - docs/agents/tasks/archive/OTERYN-20260720-phase6-admin-cms-audit.md
   - docs/agents/handovers/OTERYN-20260720-phase6-handover.md
   - docs/architecture/MODULE_CATALOG.md
@@ -106,22 +101,19 @@ changed_paths:
 validation:
   - command: merged-main Phase 6 route/authorization/role/CMS/test revalidation
     result: PASS
-    evidence: merged main source and tests prove every Phase 6 deliverable and exit-gate invariant listed above.
+    evidence: merged main source and tests prove every Phase 6 deliverable and exit-gate invariant.
   - command: PR #44 exact-head CI #598 and Agent Governance #519
     result: PASS
     evidence: merged implementation foundation validation.
   - command: PR #45 exact-head CI #648 and Agent Governance #569
     result: PASS
     evidence: merged privileged CMS/audit implementation validation.
-  - command: PR #46 CI #658 and Agent Governance #579 on eee86266a1af0ccc6786d0874707ed4b38e7cf45
+  - command: PR #46 exact-head CI #659 and Agent Governance #580 on d03e5237f5ec663e459d8ac804ee596043876416
     result: PASS
-    evidence: full Composer/Pint/PHPStan/test suite and checkpoint validation passed on the closure head before this evidence-only update.
-  - command: final PR #46 exact-head CI and Agent Governance after this evidence-only update
-    result: NOT_RUN
-    evidence: required before squash merge.
+    evidence: full Composer/Pint/PHPStan/test suite and checkpoint validation passed before closure merge.
 blockers:
   - none
-next_action: Verify required checks on the final evidence-only head and squash-merge PR #46 if the merge gate remains satisfied.
+next_action: Start the smallest Phase 7 production-hardening discovery task by proving the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
 ```
 
 ## Notes
