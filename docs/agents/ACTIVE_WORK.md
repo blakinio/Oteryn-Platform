@@ -4,67 +4,76 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase7-request-correlation-logging` — PR #55 — `task/OTERYN-20260720-phase7-request-correlation-logging`
+- `OTERYN-20260720-phase7-production-readiness-runbooks` — PR #56 — `task/OTERYN-20260720-phase7-production-readiness-runbooks`
 
 ## Current project phase
 
 **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 
-**Phase 7 — Production hardening and operations: IN PROGRESS**
+**Phase 7 — Production hardening and operations: IN PROGRESS / EXTERNAL-EVIDENCE BLOCKED FOR COMPLETION**
 
 ## Completed Phase 7 repository-owned slices
 
 - PR #48 / `676a77590e3ec93bcad0247b3065d203ac209c40` — production topology evidence baseline.
 - PR #49 / `0f876d4f2209399a85cafcff1623d8e6c810b914` — provider-independent `production:verify-configuration` guardrails.
 - PR #50 / `3973774727c35aea22d0a646f479a0ff079042cc` — required Composer advisory audit and bounded Dependabot updates.
-- PR #54 / `eb358a245f35fda1865f13e329c07ef0f4850d2f` — CSP and browser security headers without unsafe inline/eval allowances.
+- PR #54 / `eb358a245f35fda1865f13e329c07ef0f4850d2f` — CSP and browser security headers.
+- PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded structured request-completion logging.
 
 ## Current Phase 7 slice
 
-PR #55 adds provider-neutral request correlation and structured logging primitives:
+PR #56 adds provider-neutral production operations documentation:
 
-- a fresh server-generated UUID for every Laravel-handled request;
-- inbound `X-Request-ID` is never trusted as the authoritative correlation identifier;
-- normal responses expose the generated `X-Request-ID`;
-- one `http.request.completed` log event records only request ID, HTTP method, route name, response status and bounded duration;
-- request bodies, query strings, full URLs, headers and credentials are not included in that completion log context;
-- optional `stderr_json` Monolog channel emits JSON to `php://stderr` without changing the universal default logging channel.
+- `docs/operations/PRODUCTION_READINESS_CHECKLIST.md` maps repository-verifiable controls to concrete commands and separates them from `ENV-EVIDENCE-REQUIRED`/`CROSS-REPO-BLOCKED` gates;
+- `docs/operations/INCIDENT_RECOVERY_RUNBOOK.md` provides safe decision order for configuration, identity/admin, Canary SQL privilege, runtime Redis, mail, logging, deployment, database restore and shared-write incidents without inventing provider commands;
+- `docs/agents/handovers/OTERYN-20260720-phase7-handover.md` records merged Phase 7 work, unresolved environment evidence and one next action.
 
-The implementation does not claim that a centralized log, metrics or alerting service is deployed.
+This task intentionally does **not** mark Phase 7 complete.
 
-CI #721 passed Composer audit, Pint, PHPStan and the full test suite after exact static-analysis/formatting fixes. Final synchronized exact-head validation remains required before merge.
+## Phase 7 completion blockers
 
-## Phase 7 dependency status
+The repository cannot prove these without sanitized evidence from the actual environment:
 
-- provider-independent runtime production-safety guardrails — **COMPLETE**;
-- dependency vulnerability scanning/update automation — **COMPLETE**;
-- security headers/CSP — **COMPLETE**;
-- application request correlation/structured logging primitives — **IN PROGRESS**;
-- edge/origin/database exposure review — **BLOCKED ON EXTERNAL DEPLOYMENT EVIDENCE**;
-- backup/restore operational validation — **BLOCKED ON ACTUAL STORAGE/DB TOPOLOGY**;
-- deployed centralized logging/metrics/alerting validation — **BLOCKED ON EXTERNAL DEPLOYMENT EVIDENCE**;
-- queue/cache/mail deployment setup — topology/use-case dependent;
-- critical deployed E2E matrix — blocked until exact deployment and authoritative game-login dependencies exist.
+- production Cloudflare/DNS/WAF/Access/TLS/HSTS posture;
+- direct-origin exposure and ingress firewall rules;
+- production Platform DB topology/network isolation;
+- effective Canary SQL production endpoints/credential provisioning;
+- runtime Redis endpoint/ACL/network/TLS state;
+- session/cache scaling model;
+- queue/worker model;
+- production mail provider/domain/delivery monitoring;
+- centralized logs/metrics/alerts and retention/on-call routing;
+- deployment/migration/rollback mechanism;
+- backup policy and a dated successful operational restore test.
 
-## Production enablement note
+The authoritative Platform game-login bridge is also unresolved if Platform-originated game login is part of launch scope.
 
-Repository Phase 7 progress is not proof of production deployment.
+## Repository-verifiable preflight commands
 
-Cloudflare/WAF/Access, HSTS posture, private origin/database paths, backups, centralized monitoring and actual production endpoints remain `UNKNOWN` until external non-secret evidence proves them.
+```text
+php artisan production:verify-configuration
+php artisan canary:verify-db-privileges
+php artisan canary:verify-provisioning-db-privileges
+php artisan canary:verify-character-create-db-privileges
+```
 
-## Remaining cross-repository dependency
-
-The authoritative Platform game-login bridge remains separate from current Phase 7 work and requires explicit authorization before external repository writes.
+These commands prove only their documented boundaries; they do not prove the rest of the production topology.
 
 ## Recommended next work
 
-Finish PR #55 with exact-head CI. If external deployment evidence is still unavailable after merge, add provider-neutral production readiness and incident/recovery runbooks that clearly separate executable repository checks from environment-evidence-required steps.
+After PR #56 merges and housekeeping archives the task, obtain sanitized evidence for the actual production topology, then perform the edge/origin/database exposure review and dated backup-restore operational test required by the Phase 7 exit gate.
+
+Until that evidence exists, do not create provider-specific production claims or mark Phase 7 COMPLETE.
+
+## Remaining cross-repository dependency
+
+The authoritative Platform game-login bridge remains separate and requires explicit authorization before external repository writes.
 
 ## Recently completed
 
+- `OTERYN-20260720-phase7-request-correlation-logging` — PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f`.
 - `OTERYN-20260720-phase7-security-headers-csp` — PR #54 / `eb358a245f35fda1865f13e329c07ef0f4850d2f`.
 - `OTERYN-20260720-phase7-dependency-security-scanning` — PR #50 / `3973774727c35aea22d0a646f479a0ff079042cc`.
-- `OTERYN-20260720-phase7-production-config-guardrails` — PR #49 / `0f876d4f2209399a85cafcff1623d8e6c810b914`.
 
 ## Coordination rule
 
