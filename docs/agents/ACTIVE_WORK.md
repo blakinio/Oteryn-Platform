@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260721-phase7-go-live-gate-separation` — IN PROGRESS — draft PR #65 — `task/OTERYN-20260721-phase7-go-live-gate-separation`
+None.
 
 ## Current project phase
 
@@ -30,7 +30,7 @@ ADR 0007 separates Phase 7 engineering/hardening completion from final productio
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 continuation handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
 
-The completed staging evidence task `OTERYN-20260720-phase7-production-evidence-collection` is archived under `docs/agents/tasks/archive/`.
+The staging evidence task `OTERYN-20260720-phase7-production-evidence-collection` and the Phase 7/go-live separation task `OTERYN-20260721-phase7-go-live-gate-separation` are archived under `docs/agents/tasks/archive/`.
 
 ## Production-like Phase 7 validation
 
@@ -50,9 +50,9 @@ Staging evidence must not be promoted to proof of final production state or prod
 
 ## Production Go-Live Gate
 
-The authoritative fail-closed gate remains `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
+The authoritative fail-closed gate is `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
 
-It still requires direct production evidence for:
+It requires direct production evidence for:
 
 1. exact deployed production SHA(s) and relevant Canary/login-server versions;
 2. production DNS/edge/Cloudflare/TLS/origin/firewall state;
@@ -67,11 +67,11 @@ It still requires direct production evidence for:
 
 These facts remain `UNKNOWN` until directly proven. The gate cannot become `PASS` from `REPO-PROVEN` or `STAGING_PROVEN` evidence alone.
 
-## Current bounded governance task
+## Next work
 
-PR #65 records ADR 0007 and aligns ROADMAP, operations evidence and project status with the separation between Phase 7 engineering completion and final production go-live verification.
+When actual production access and deployment authorization are available, create a bounded production-verification task and execute the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
 
-Until PR #65 is merged, treat the branch decision as proposed repository state and continue to enforce the existing production gate fail closed.
+Do not repeat closed staging validation unless the production candidate code or relevant contracts change materially.
 
 ## Repository-verifiable preflight commands
 
