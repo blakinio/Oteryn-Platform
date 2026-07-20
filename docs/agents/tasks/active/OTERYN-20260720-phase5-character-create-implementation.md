@@ -68,7 +68,7 @@ cross_repository_tasks:
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 2
+checkpoint_version: 1
 updated_at: 2026-07-20T10:30:00+02:00
 head: 27520854e326ada46c19ba1bfcda05fe89de2cab
 branch: task/OTERYN-20260720-phase5-character-create-implementation
