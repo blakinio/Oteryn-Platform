@@ -37,28 +37,24 @@ Platform web authentication remains separate from the still-unimplemented author
 - PR #54 / `eb358a245f35fda1865f13e329c07ef0f4850d2f` — CSP and browser security headers without unsafe inline/eval allowances.
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 handover.
-
-PR #56 passed CI #735 and Agent Governance #655 on exact PR head `b03a2de6836ff7769b0911f847fb5b8dc0fe8572` before squash merge.
+- PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
 
 ## Phase 7 controlled production-like validation
 
-PR #63 / `task/OTERYN-20260720-phase7-production-evidence-collection` implements a repeatable exact-SHA production-like validation workflow.
+PR #63 is merged on `main`. Its final PR head `7842f78ec4ac2d07d3800ffe8bde9809b055822d` passed:
 
-Evidence model:
+- Phase 7 Production-Like Validation run `29779554130` / #9;
+- required CI run `29779553687` / #759;
+- Agent Governance run `29779554188` / #679.
 
-- `STAGING_PROVEN` — directly proven by the controlled production-like workflow and exact-SHA repository validation;
-- `PRODUCTION_PROVEN` — reserved for direct evidence from the final production environment;
-- `UNKNOWN` — not yet established for the stated environment.
+Final PR-head staging artifact evidence:
 
-Successful staging evidence snapshot:
-
-- validation SHA `b6dcd6ed95c55f400206864ffd6ff799e65aa2b3`;
-- rollback SHA `b6878c4775eda542738c78ea99fd5d2e19d2b35f`;
-- Phase 7 Production-Like Validation run `29779031870` / #5: PASS;
-- required CI run `29779031976` / #755: PASS;
-- Agent Governance run `29779031673` / #675: PASS;
-- non-secret evidence classification: `STAGING_PROVEN`;
-- measured controlled restore: `102 ms`, with `13/13` tables, `11/11` migrations and matching validation-SHA probe.
+- classification `STAGING_PROVEN`;
+- rollback target `b6878c4775eda542738c78ea99fd5d2e19d2b35f`;
+- measured controlled restore `105 ms`;
+- source/restored tables `13/13`;
+- source/restored migrations `11/11`;
+- validation-SHA probe matched.
 
 The controlled evidence closes the currently staging-verifiable work for:
 
@@ -72,9 +68,9 @@ The controlled evidence closes the currently staging-verifiable work for:
 - running health, CSP/security headers, Secure/HttpOnly cookies, request correlation, JSON request-completion logging and representative sensitive-error/log behavior;
 - real production-like MariaDB backup/clean restore/integrity/restored-environment smoke with measured staging recovery time.
 
-The `102 ms` recovery result is staging evidence only. It is not a production RTO or RPO.
+The `105 ms` final-head recovery result and the earlier durable `102 ms` snapshot are staging measurements only. Neither is a production RTO or RPO.
 
-Detailed evidence and the final production-only checklist are maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`.
+Detailed durable evidence and the final production-only checklist are maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`; the merged PR #63 description records the exact final-head run artifact and digest.
 
 ## Phase 7 final production-only completion evidence
 
@@ -143,7 +139,7 @@ No Canary/login-server repository was modified by Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED only on final production-only evidence; draft PR #63 contains the staging validation harness and evidence closure.
+`OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED only on final production-only evidence after merged staging-validation PR #63.
 
 ## Recommended next work
 
