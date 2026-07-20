@@ -15,7 +15,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 4 — Public website and read-only game data: COMPLETE**
 - **Phase 5 — Account and character management: COMPLETE**
 - **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
-- **Phase 7 — Production hardening and operations: IN PROGRESS**
+- **Phase 7 — Production hardening and operations: IN PROGRESS / EXTERNAL-EVIDENCE BLOCKED FOR COMPLETION**
 
 ## Current architecture state
 
@@ -29,90 +29,99 @@ Existing Canary accounts are not imported or claimed.
 
 Platform web authentication remains separate from the still-unimplemented authoritative game-login bridge.
 
-## Phase 7 completed repository-owned slices
+## Phase 7 repository-owned hardening completed on main
 
-### Production topology evidence baseline
+### Production topology evidence baseline — PR #48
 
-PR #48 merged as `676a77590e3ec93bcad0247b3065d203ac209c40`.
+Merged as `676a77590e3ec93bcad0247b3065d203ac209c40`.
 
-`docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` distinguishes repository-proven capabilities from actual deployed production state. Local `.env.example` defaults are not production evidence.
+`docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` separates repository-proven capabilities from actual deployed production facts. Local `.env.example` defaults are explicitly not production evidence.
 
-### Provider-independent production configuration guardrails
+### Production configuration guardrails — PR #49
 
-PR #49 merged as `0f876d4f2209399a85cafcff1623d8e6c810b914`.
+Merged as `0f876d4f2209399a85cafcff1623d8e6c810b914`.
 
-`php artisan production:verify-configuration` fails closed for unsafe provider-independent settings: non-production environment, debug enabled, missing APP_KEY, non-HTTPS/local APP_URL, insecure session cookie settings and non-delivery/test mail configuration.
+`php artisan production:verify-configuration` fails closed for unsafe provider-independent settings without exposing secret values.
 
-### Dependency security scanning
+### Dependency security scanning — PR #50
 
-PR #50 merged as `3973774727c35aea22d0a646f479a0ff079042cc`.
+Merged as `3973774727c35aea22d0a646f479a0ff079042cc`.
 
-Required CI runs `composer audit --no-interaction` in addition to Composer validation/install, Pint, PHPStan and tests. Dependabot provides bounded weekly Composer and GitHub Actions update PRs.
+Required CI includes Composer advisory scanning; Dependabot provides bounded Composer/GitHub Actions update PRs.
 
-### Browser security headers and CSP
+### Browser security headers and CSP — PR #54
 
-PR #54 merged as `eb358a245f35fda1865f13e329c07ef0f4850d2f`.
+Merged as `eb358a245f35fda1865f13e329c07ef0f4850d2f`.
 
-- first-party CSS is same-origin and no longer embedded inline in the public layout;
-- CSP restricts default/script/style/connect/font to same-origin, permits self/data images, limits forms to self and denies objects/framing/base-uri changes;
-- no `unsafe-inline` or `unsafe-eval` allowance;
-- `nosniff`, frame denial, strict referrer policy and restrictive permissions policy are applied to web responses;
-- HSTS remains unclaimed until actual TLS/proxy/hostname topology is proven.
+The Platform enforces same-origin CSP/browser hardening without `unsafe-inline`/`unsafe-eval`. HSTS remains deployment-evidence dependent.
 
-## Current Phase 7 slice — request correlation and logging
+### Request correlation and bounded structured logging — PR #55
 
-`OTERYN-20260720-phase7-request-correlation-logging` — PR #55.
+Merged as `b6650966fe877a0e7872f29606b32b6394dde99f`.
 
-Current branch implementation:
+Every Laravel-handled request receives a fresh server-generated UUID, normal responses expose `X-Request-ID`, and request-completion logging is bounded to request ID/method/route/status/duration. An optional JSON-to-stderr channel exists without claiming a deployed centralized sink.
 
-- generates a fresh server-owned UUID for every Laravel-handled request;
-- ignores inbound `X-Request-ID` as authoritative correlation input;
-- returns the server-generated identifier through `X-Request-ID` on normal responses;
-- records one bounded `http.request.completed` event with request ID, HTTP method, route name, response status and duration only;
-- excludes query strings, request bodies, full URLs, headers and credentials from that completion context;
-- adds an optional JSON-to-stderr logging channel while leaving the default logging choice unchanged;
-- correlates `/health` as well as normal application routes.
+Final exact-head validation for PR #55 passed as CI #727 / Agent Governance #647.
 
-CI #721 passed Composer advisory audit, Pint, PHPStan and full tests on the cleaned implementation head after exact diagnostic fixes. Final synchronized exact-head validation remains required before merge.
+## Current Phase 7 slice — readiness and recovery runbooks
 
-This proves only application-side correlation and log shape. A deployed centralized log/metrics/alerting sink remains `UNKNOWN`.
+`OTERYN-20260720-phase7-production-readiness-runbooks` — PR #56.
 
-## Phase 7 deployed-state unknowns
+Current branch adds:
 
-The repository does not currently prove:
+- `docs/operations/PRODUCTION_READINESS_CHECKLIST.md` — evidence-gated release/readiness checklist with `REPO-PROVEN`, `ENV-EVIDENCE-REQUIRED` and `CROSS-REPO-BLOCKED` states;
+- `docs/operations/INCIDENT_RECOVERY_RUNBOOK.md` — provider-neutral response/recovery decision order for configuration, identity/admin, Canary credential/privilege, runtime Redis, mail, logging, deployment, database restore and partial-write incidents;
+- `docs/agents/handovers/OTERYN-20260720-phase7-handover.md` — continuation state, merged hardening SHAs and explicit external blockers.
 
-- actual Cloudflare/DNS/WAF/Access configuration;
-- actual TLS termination and safe HSTS policy;
-- actual origin provider, reverse proxy or ingress firewall restrictions;
-- actual Platform production database engine/endpoint/network isolation;
-- actual production session/cache backend;
-- actual queue/worker model;
-- actual mail provider/delivery status;
-- actual centralized log/metrics/alerting sink;
-- actual Canary SQL production network paths/credential provisioning status;
-- actual runtime Redis endpoint/ACL provisioning status;
-- actual backup/restore, deployment or rollback mechanism.
+This task closes the currently available repository-only Phase 7 documentation work. It does **not** close Phase 7 itself.
 
-## Implemented Identity and privileged application boundary
+## Phase 7 completion blockers
+
+Actual environment evidence is still required for:
+
+- production DNS/Cloudflare/WAF/Access/TLS/HSTS posture;
+- direct-origin exposure and ingress firewall rules;
+- Platform DB engine/endpoint/network isolation/HA;
+- effective Canary SQL production endpoints/network paths and credential provisioning;
+- runtime Redis endpoint/ACL/network/TLS state;
+- effective session/cache scaling model;
+- queue/worker model;
+- mail provider/domain/delivery monitoring;
+- centralized logs/metrics/alerts/retention/on-call routing;
+- deployment/migration/rollback mechanism;
+- backup technology/policy and a dated successful operational restore test.
+
+The authoritative Platform game-login bridge remains unresolved if Platform-originated game login is part of launch scope.
+
+Therefore Phase 7 must remain incomplete until these evidence gates are satisfied or explicitly risk-accepted where policy permits.
+
+## Repository-verifiable operations gates
+
+Available commands:
+
+```text
+php artisan production:verify-configuration
+php artisan canary:verify-db-privileges
+php artisan canary:verify-provisioning-db-privileges
+php artisan canary:verify-character-create-db-privileges
+```
+
+Required CI also includes strict Composer validation/install, Composer advisory audit, Pint, PHPStan and full tests.
+
+Passing these proves only their documented repository/application boundaries.
+
+## Implemented Identity/admin/shared-write boundary
 
 - secure Platform registration/login/logout;
 - revocable Platform web sessions;
 - password recovery/change with session revocation;
-- TOTP MFA and single-use recovery codes;
-- security-event recording;
-- explicit administrator RBAC separate from authentication and MFA;
+- TOTP MFA and recovery codes;
+- explicit deny-by-default administrator RBAC;
 - privileged routes require `auth` + `mfa.confirmed` + exact permission;
 - privileged CMS/role mutations are audited;
-- no wildcard administrator authorization path exists.
-
-## Implemented public/read-only and shared-write boundary
-
-- public news, managed pages and bounded public game-data reads;
-- database-enforced generic Canary SELECT-only boundary;
-- separate read-only `canary_runtime` Redis boundary;
-- exactly two approved Oteryn Platform -> Canary mutation surfaces:
-  - `canary_provisioning` for greenfield account provisioning/recovery;
-  - `canary_character_create` for greenfield character creation.
+- bounded public game-data reads;
+- generic Canary SQL remains read-only;
+- exactly two approved shared-write credentials: `canary_provisioning` and `canary_character_create`.
 
 Deferred and not authorized:
 
@@ -132,11 +141,13 @@ No Canary/login-server repository was modified by Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-request-correlation-logging` — PR #55.
+`OTERYN-20260720-phase7-production-readiness-runbooks` — PR #56.
 
 ## Recommended next work
 
-Finish PR #55 with exact-head validation. If deployment evidence remains unavailable, continue with provider-neutral production-readiness and incident/recovery runbooks that clearly distinguish executable repository checks from environment-evidence-required operations.
+Finish PR #56 with exact-head validation and post-merge housekeeping. Then obtain sanitized evidence for the actual production topology and run the edge/origin/database exposure review plus a dated backup-restore operational test.
+
+Until that evidence is available, do not mark Phase 7 COMPLETE or invent provider-specific deployment claims.
 
 ## High-priority remaining unknowns
 
