@@ -4,83 +4,65 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-None.
+- `OTERYN-20260720-phase7-production-topology-discovery` — PR #48 — `task/OTERYN-20260720-phase7-production-topology-discovery`
 
 ## Current project phase
 
 **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 
-**Phase 7 — Production hardening and operations: NEXT / PLANNED**
+**Phase 7 — Production hardening and operations: IN PROGRESS**
 
-## Proven Phase 6 implementation state
+## Current Phase 7 slice
 
-PR #44 merged as `170d52393e543c8033ebd896f42fb43f3fccdf42` and established the deny-by-default RBAC foundation:
+PR #48 establishes the production-topology evidence baseline before any provider-specific hardening or production-readiness claim.
 
-- explicit roles and permissions;
-- no administrator assignment by default;
-- no wildcard or implicit unrestricted-admin path;
-- `auth` + `mfa.confirmed` + exact `admin.permission:*` composition;
-- authorization regression coverage.
+Repository-proven facts include:
 
-PR #45 merged as `be25d6ec3e0512bb9615329f99f16fff294d8b1d` and completed the planned privileged Phase 6 vertical slice:
+- provider-neutral logical target architecture with Cloudflare/edge, origin/reverse proxy and Laravel web tier;
+- Laravel `/health` route;
+- CI-only GitHub Actions workflow with no deployment step;
+- Platform SQLite/MySQL configuration support;
+- separate Canary read-only/provisioning/character-create SQL configuration surfaces;
+- dedicated Canary runtime Redis configuration surface;
+- environment-driven sessions with local file default;
+- Platform cache stores currently limited to array/file/null;
+- queue currently limited to synchronous execution;
+- SMTP/log/array mail transports;
+- single-file/stderr logging options.
 
-- one-time MFA-confirmed first-admin bootstrap;
-- audited transactional role assignment/removal with final-`platform_admin` protection;
-- permission-scoped plain-text news and managed-page administration;
-- published-only public managed pages with escaped rendering;
-- append-oriented administrator audit events;
-- bounded permission-scoped audit visibility;
-- ADR 0006 RBAC/audit policy;
-- optional Cloudflare Access deployment documentation.
+The repository does **not** prove the actual production provider, Cloudflare policy, origin ingress restrictions, database/Redis endpoints, session/cache backend, queue/worker model, mail provider, monitoring sink, backup/restore implementation or deployment/rollback mechanism.
 
-PR #46 merged as `f25abd8799718ac99acce050ac55018d04fff2de` and closed Phase 6 after merged-main revalidation.
+The evidence baseline is documented in `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` and explicitly forbids treating local `.env.example` defaults as production evidence.
 
-Final exact-head validation before merge:
+## Phase 7 dependency order
 
-- PR #44: CI #598 and Agent Governance #519 passed;
-- PR #45: CI #648 and Agent Governance #569 passed;
-- PR #46: CI #659 and Agent Governance #580 passed.
-
-## Phase 6 exit gate
-
-Satisfied:
-
-- administrator authorization is deny by default and unknown permissions fail closed;
-- every current admin web capability requires Platform authentication, confirmed MFA and an exact explicit permission;
-- privileged role, CMS and audit paths have authorization/MFA regression coverage;
-- delivered administrator state-changing actions append administrator audit events;
-- no arbitrary code/plugin upload, rich HTML or media upload feature exists in the delivered Phase 6 surface.
-
-Phase 6 changes are Platform-only. Canary/login-server credentials, sessions, schema and game-login behavior are unchanged.
+1. provider-independent runtime production-safety guardrails;
+2. actual edge/origin/database exposure review when deployment evidence exists;
+3. backup/restore contract and operational test;
+4. logging/monitoring/correlation;
+5. dependency/security scanning and security headers/CSP;
+6. queue/cache/mail setup only where deployment/use-case evidence proves need;
+7. critical E2E matrix against exact deployed versions.
 
 ## Production enablement note
 
-Repository phase completion is not proof of production deployment.
+Repository phase progress is not proof of production deployment.
 
-To enable the first administrator in an environment after Platform migrations are applied:
-
-1. create or use an existing Platform Identity;
-2. complete and confirm Platform MFA for that Identity;
-3. run the one-time `php artisan admin:bootstrap <email>` command;
-4. manage later role assignments only through the permission-protected administrator role surface.
-
-Cloudflare Access remains optional defense in depth. The repository does not claim that it is deployed or that a production administrator hostname/path has been chosen.
+Cloudflare/WAF/Access, private origin/database paths, backups, centralized monitoring and real production mail remain `UNKNOWN` until non-secret deployment evidence proves them.
 
 ## Remaining cross-repository dependency
 
-The authoritative Platform game-login bridge remains separate from completed Phase 5 and Phase 6.
+The authoritative Platform game-login bridge remains separate from Phase 7 production topology discovery.
 
 A future explicitly authorized cross-repository task must provide exact-account Platform authorization with short-lived cryptographically protected exchange material, explicit audience/expiry, replay-resistant consumption/session semantics and deterministic revocation/failure behavior.
 
-Expected primary external scope remains `opentibiabr/login-server`; `blakinio/canary` changes require separate explicit authorization if the selected protocol needs them.
-
 ## Recommended next work
 
-Start the smallest Phase 7 production-hardening discovery task by proving the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
+After PR #48 merges, implement the smallest provider-independent production runtime verifier that fails closed on unsafe invariant configuration without assuming a hosting provider.
 
 ## Recently completed
 
-- `OTERYN-20260720-phase6-closure` — PR #46 / `f25abd8799718ac99acce050ac55018d04fff2de`; task archived by post-merge housekeeping.
+- `OTERYN-20260720-phase6-closure` — PR #46 / `f25abd8799718ac99acce050ac55018d04fff2de`.
 - `OTERYN-20260720-phase6-admin-cms-audit` — PR #45 / `be25d6ec3e0512bb9615329f99f16fff294d8b1d`.
 - `OTERYN-20260720-phase6-admin-rbac-foundation` — PR #44 / `170d52393e543c8033ebd896f42fb43f3fccdf42`.
 

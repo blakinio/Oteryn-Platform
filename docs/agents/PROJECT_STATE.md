@@ -15,7 +15,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 4 — Public website and read-only game data: COMPLETE**
 - **Phase 5 — Account and character management: COMPLETE**
 - **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
-- **Phase 7 — Production hardening and operations: NEXT / PLANNED**
+- **Phase 7 — Production hardening and operations: IN PROGRESS**
 
 ## Current architecture state
 
@@ -28,6 +28,41 @@ Supported game accounts are greenfield only:
 `1 Platform Identity <-> 1 Canary accounts.id`
 
 Existing Canary accounts are not imported or claimed.
+
+## Current Phase 7 production-topology discovery
+
+`OTERYN-20260720-phase7-production-topology-discovery` / PR #48 is the first Phase 7 slice.
+
+Repository-proven production/runtime capabilities:
+
+- provider-neutral logical target architecture with an optional Cloudflare edge, origin/reverse proxy and Laravel web tier;
+- Laravel `/health` health route;
+- CI workflow validates Composer, locked dependencies, Pint, PHPStan and the full test suite but has no deployment step;
+- Platform database configuration supports SQLite and MySQL;
+- Canary integration uses separate read-only, account-provisioning and character-create SQL configuration surfaces;
+- Canary runtime status uses a separate Redis configuration surface;
+- sessions are environment-configurable with a file default and production-sensitive Secure-cookie default;
+- current Platform cache stores are array/file/null only;
+- current queue connection is synchronous only;
+- mail supports SMTP/log/array transports;
+- logging supports single-file and stderr output.
+
+Actual deployed production topology remains `UNKNOWN` unless external non-secret deployment evidence proves it. The repository does not currently prove:
+
+- actual Cloudflare/DNS/WAF/Access configuration;
+- actual origin provider, reverse proxy or ingress firewall restrictions;
+- actual Platform production database engine/endpoint/network isolation;
+- actual production session/cache backend;
+- actual queue/worker model;
+- actual mail provider;
+- actual centralized log/metrics/alerting sink;
+- actual Canary SQL production network paths/credential provisioning status;
+- actual runtime Redis endpoint/ACL provisioning status;
+- actual backup/restore, deployment or rollback mechanism.
+
+Evidence requirements and dependency order are documented in `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md`.
+
+Local `.env.example` defaults are not production evidence.
 
 ## Implemented Identity boundary
 
@@ -163,15 +198,15 @@ Expected external work:
 - `opentibiabr/login-server`: Platform-authorized exact-account exchange and game-session creation semantics;
 - `blakinio/canary`: only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
 
-No Canary/login-server repository was modified during Phase 5 or Phase 6.
+No Canary/login-server repository was modified during Phase 5, Phase 6 or the current Phase 7 discovery task.
 
 ## Current active task
 
-None.
+`OTERYN-20260720-phase7-production-topology-discovery` — PR #48.
 
 ## Recommended next work
 
-Begin Phase 7 with the smallest bounded production-hardening discovery task: prove the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
+After the topology-evidence baseline merges, implement a provider-independent runtime production-safety verifier for invariant settings before attempting provider-specific edge/origin/database hardening.
 
 The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled only when external-repository modification is explicitly authorized.
 
@@ -181,14 +216,18 @@ The authoritative game-login bridge remains a separate high-priority cross-repos
 - exact deployed production authentication topology;
 - game-login revocation across every supported entry point;
 - current Canary tournament-coin schema/code naming conflict;
-- production runtime Redis ACL/endpoint provisioning;
-- production hosting/network/mail/cache/queue topology;
+- actual production runtime Redis ACL/endpoint provisioning;
+- actual production hosting/network/mail/cache/queue topology;
+- actual production backup/restore/deployment/rollback mechanisms;
 - exact production Cloudflare Access/admin-hostname routing choice, if that optional gate is adopted.
 
 ## Architecture summary
 
 ```text
-Cloudflare / Edge
+Cloudflare / Edge (actual deployment UNKNOWN)
+       |
+       v
+Origin / reverse proxy (actual deployment UNKNOWN)
        |
        v
 Oteryn Platform
