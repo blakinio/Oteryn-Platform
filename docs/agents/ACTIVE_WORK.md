@@ -5,7 +5,6 @@ Convenience index only. The individual active task record, live PR and Git state
 ## Active tasks
 
 - `OTERYN-20260721-phase7-go-live-gate-separation` — IN PROGRESS — draft PR #65 — `task/OTERYN-20260721-phase7-go-live-gate-separation`
-- `OTERYN-20260720-phase7-production-evidence-collection` — STAGING SCOPE COMPLETE THROUGH MERGED PR #63 — pending archive by PR #65
 
 ## Current project phase
 
@@ -30,6 +29,8 @@ ADR 0007 separates Phase 7 engineering/hardening completion from final productio
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded structured request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 continuation handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
+
+The completed staging evidence task `OTERYN-20260720-phase7-production-evidence-collection` is archived under `docs/agents/tasks/archive/`.
 
 ## Production-like Phase 7 validation
 
