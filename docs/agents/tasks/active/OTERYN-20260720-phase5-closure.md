@@ -2,26 +2,27 @@
 
 ## Goal
 
-Close Phase 5 against live `main` after PR #41 by proving the roadmap exit gate, synchronizing authoritative project/contract documentation with the two implemented operation-specific shared-write boundaries, explicitly deferring optional character lifecycle operations, and recording the remaining separately authorized cross-repository game-login dependency. Do not add new shared writes and do not modify Canary/login-server repositories.
+Close Phase 5 against live `main` after PR #41 by proving the roadmap exit gate, synchronizing authoritative documentation with the two implemented operation-specific shared-write boundaries, deferring optional lifecycle operations, and recording the separate authoritative game-login dependency. No new shared writes or external-repository changes.
 
 ## Acceptance criteria
 
-- [ ] Revalidate live `main`, open PRs, active tasks and Phase 5 roadmap exit gate.
-- [ ] Prove every implemented Phase 5 shared write is covered by an explicit operation contract.
-- [ ] Prove authorization and concurrency invariants are covered for every implemented shared write.
-- [ ] Prove no additional undocumented raw Canary write path is introduced by Phase 5.
-- [ ] Synchronize `ROADMAP.md`, `PROJECT_STATE.md`, `ACTIVE_WORK.md` and relevant Phase 5 contracts with delivered state.
-- [ ] Record character deletion/rename as optional future operations requiring separate contracts, not as incomplete Phase 5 writes.
-- [ ] Record the authoritative Platform game-login bridge as separate cross-repository follow-up with exact security requirements.
-- [ ] Archive the completed character-create implementation task.
-- [ ] Run final CI and Agent Governance and merge only with a clean exact-head gate.
-- [ ] Leave post-merge housekeeping with zero active tasks and a durable handover.
+- [x] Revalidate live `main`, open PRs and Phase 5 roadmap exit gate.
+- [x] Prove every implemented shared write has an explicit operation contract.
+- [x] Prove authorization/concurrency coverage for every implemented shared write.
+- [x] Prove no additional undocumented Canary write path is introduced or approved.
+- [x] Synchronize roadmap, project state, module catalog, active work and Phase 5 contracts.
+- [x] Record deletion/rename as optional future operations requiring separate contracts.
+- [x] Record the authoritative Platform game-login bridge as a separate cross-repository follow-up.
+- [x] Archive the completed PR #41 task.
+- [ ] Pass final exact-head CI and Agent Governance and merge closure PR.
+- [ ] Complete post-merge housekeeping with zero active tasks and durable handover.
 
 ## Ownership
 
 ```yaml
 owned_paths:
   - docs/architecture/ROADMAP.md
+  - docs/architecture/MODULE_CATALOG.md
   - docs/agents/PROJECT_STATE.md
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260720-phase5-closure.md
@@ -45,22 +46,22 @@ dependencies:
   - PR #39 character-create operation contract
   - PR #41 character-create implementation
 blockers:
-  - none identified at task start; closure must fail closed if exit-gate revalidation finds an undocumented write or missing authorization/concurrency invariant
+  - none for closure merge after final exact-head validation
 cross_repository_tasks:
   - blakinio/canary remains read-only
   - opentibiabr/login-server remains read-only
-  - future authoritative Platform game-login bridge is recorded only, not implemented here
+  - authoritative Platform game-login bridge is recorded only
 ```
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T10:45:00+02:00
-head: 9839822b8e445c0e9828e73d2d7767bb237e587f
+updated_at: 2026-07-20T11:15:00+02:00
+head: b9bf24f740ec6e7f783103507581c939ce4ef9eb
 branch: task/OTERYN-20260720-phase5-closure
 pr: none
-status: investigating
+status: validating
 context_routes:
   - agent-governance
   - architecture
@@ -72,6 +73,7 @@ context_routes:
   - testing
 owned_paths:
   - docs/architecture/ROADMAP.md
+  - docs/architecture/MODULE_CATALOG.md
   - docs/agents/PROJECT_STATE.md
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260720-phase5-closure.md
@@ -82,34 +84,60 @@ owned_paths:
   - docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md
   - docs/contracts/CANARY_DATA_CONTRACT.md
 proven:
-  - main at closure start is 9839822b8e445c0e9828e73d2d7767bb237e587f, the squash merge of PR #41.
-  - Phase 5 roadmap exit gate requires contracts for every shared write, tested authorization/concurrency invariants, and no undocumented raw Canary writes.
-  - PR #33 implements the greenfield account provisioning/binding write boundary.
-  - PR #41 implements the bounded character-create write boundary.
-  - ROADMAP Phase 5 describes deletion/soft deletion and rename/lifecycle operations as potential deliverables, with rename explicitly conditional on product need.
-  - Existing-account import/claim is outside the selected greenfield ownership model.
+  - main at closure start is 9839822b8e445c0e9828e73d2d7767bb237e587f from PR #41.
+  - No open Oteryn Platform PR existed before closure delivery.
+  - Phase 5 exit gate requires contracts for every shared write, tested authorization/concurrency invariants and no undocumented raw Canary writes.
+  - config/database.php keeps generic canary read-only and defines exactly two Phase 5 mutation connections: canary_provisioning and canary_character_create.
+  - PR #33 implements/tests the contracted greenfield account provisioning and immutable binding boundary.
+  - PR #41 implements/tests the contracted character-create boundary with real MariaDB privilege and race coverage.
+  - No third Phase 5 Canary mutation connection or approved raw write surface is configured or claimed.
+  - Character deletion/rename are not implemented and remain forbidden until separately contracted.
+  - Existing-account import/claim is outside the greenfield ownership model.
+  - The completed PR #41 task is archived and removed from active tasks on the closure branch.
+  - Roadmap, project state, module catalog, active work and Phase 5 contracts are synchronized with delivered state.
 derived:
-  - Phase 5 can close without implementing deletion or rename if no such shared write is claimed and the delivered operation boundaries satisfy the exit gate.
+  - Phase 5 satisfies its exit gate without deletion/rename because those optional operations are not claimed as delivered shared writes.
+  - The authoritative Platform game-login bridge is a separate authentication/session integration programme, not an undocumented Phase 5 shared write.
 unknown:
-  - final authoritative game-login bridge protocol and exact external component changes remain a separate cross-repository design task
+  - final authoritative game-login bridge protocol and exact external component changes remain separately authorized work
 conflicts: []
 first_failure:
-  marker: none
-  evidence: closure revalidation is in progress
+  marker: STALE_PHASE5_SOURCE_OF_TRUTH_DOCUMENTATION
+  evidence: closure found roadmap/module/project/contracts still describing delivered Phase 5 capabilities as planned or blocked; closure reconciles them without adding writes
 rejected_hypotheses:
-  - Treat optional deletion/rename as mandatory Phase 5 exit criteria: rejected by current roadmap wording.
-  - Claim game-login authority from account provisioning alone: rejected; sink credential provisioning and game-login integration are separate boundaries.
+  - Treat deletion/rename as mandatory Phase 5 exit criteria: rejected by roadmap wording and delivered-scope model.
+  - Claim game-login authority from account provisioning alone: rejected; provisioning and game-login are separate boundaries.
+  - Broaden generic canary for closure: rejected; operation-specific least privilege remains mandatory.
 changed_paths:
+  - docs/architecture/ROADMAP.md
+  - docs/architecture/MODULE_CATALOG.md
+  - docs/agents/PROJECT_STATE.md
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260720-phase5-closure.md
+  - docs/agents/tasks/active/OTERYN-20260720-phase5-character-create-implementation.md
+  - docs/agents/tasks/archive/OTERYN-20260720-phase5-character-create-implementation.md
+  - docs/contracts/CHARACTER_CREATION_CONTRACT.md
+  - docs/contracts/IDENTITY_CANARY_ACCOUNT_BINDING_CONTRACT.md
+  - docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md
+  - docs/contracts/CANARY_DATA_CONTRACT.md
 validation:
   - command: closure preflight
     result: PASS
-    evidence: PR #41 merged to main as 9839822b8e445c0e9828e73d2d7767bb237e587f and Phase 5 exit gate was re-read from live roadmap
+    evidence: PR #41 merged to main and live open-PR search was empty before closure delivery
+  - command: shared-write inventory revalidation
+    result: PASS
+    evidence: generic canary remains read-only; only canary_provisioning and canary_character_create are Phase 5 mutation boundaries
+  - command: operation-contract evidence review
+    result: PASS
+    evidence: PR #33 and PR #41 authorization, failure/idempotency and real MariaDB concurrency/privilege evidence cover both writes
+  - command: Phase 5 exit-gate review
+    result: PASS
+    evidence: every delivered shared write is contracted/tested and no additional undocumented Canary write is approved or claimed
 blockers:
-  - none at task start
-next_action: Archive the completed PR #41 task, enumerate live Phase 5 shared-write surfaces and synchronize closure documentation only after exit-gate evidence is complete.
+  - none for closure merge after final CI and Agent Governance
+next_action: Open the closure PR, run exact-head CI and Agent Governance, verify divergence/review state, then squash-merge only if clean.
 ```
 
 ## Notes
 
-This is a closure/documentation revalidation task. It must not introduce new Canary shared-write capabilities.
+Closure only; no new Canary mutation capability is introduced.
