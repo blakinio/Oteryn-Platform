@@ -1,26 +1,24 @@
 # Oteryn Platform Module Catalog
 
-This catalog defines intended module responsibilities and dependency boundaries. Modules marked `PLANNED` do not yet exist in source code.
+This catalog defines module responsibilities and dependency boundaries.
 
 ## Status legend
 
 - `PLANNED` — architecture decision only; no implementation proven.
-- `DISCOVERY` — contract/research work required before implementation.
+- `DISCOVERY` — contract/research work required before a concrete capability can be implemented.
 - `IMPLEMENTING` — active source implementation exists in an active task.
-- `AVAILABLE` — implemented and validated on main.
-
-At architecture bootstrap, all product modules are `PLANNED` or `DISCOVERY`.
+- `AVAILABLE` — at least one explicitly documented capability is implemented and validated on `main`; this does not imply every conceivable operation in the module exists.
 
 | Module | Status | Owns | Must not own |
 |---|---|---|---|
-| Identity | AVAILABLE | Web authentication policy, credentials lifecycle, sessions, MFA, verification, recovery | Payments, game runtime, arbitrary character mutations |
-| Accounts | DISCOVERY | Account profile/settings and account-level business operations | Password verification logic, game runtime |
-| Characters | DISCOVERY | Authorized web-triggered character lifecycle operations allowed by contract | Direct undocumented writes to Canary tables |
+| Identity | AVAILABLE | Platform web authentication policy, credentials lifecycle, sessions, MFA, recovery | Payments, game runtime, arbitrary character mutations |
+| Accounts | AVAILABLE | Greenfield account provisioning/binding and future explicitly contracted account-level operations | Canary password verification logic, undocumented shared writes, game runtime |
+| Characters | AVAILABLE | Contract-approved web-triggered character operations; currently create | Direct undocumented Canary writes; uncontracted rename/delete |
 | PublicGameData | AVAILABLE | Read models/queries for characters, guilds, highscores, online/status | Privileged mutations |
-| CMS | AVAILABLE | News, pages, public managed content | Identity policy, game state |
+| CMS | AVAILABLE | Public news/content read boundary | Identity policy, game state, privileged authoring without Phase 6 controls |
 | Admin | PLANNED | Admin UI, privileged use cases, RBAC integration | Bypassing domain/application invariants |
-| Audit | PLANNED | Security/admin audit events and query surface | Secrets, raw credentials, business logic decisions |
-| Integration | DISCOVERY | Canary/login-server adapters, schema translation, contract enforcement | Product policy that belongs in domain modules |
+| Audit | PLANNED | Security/admin audit query surface and privileged-action audit | Secrets, raw credentials, business-rule authorization decisions |
+| Integration | AVAILABLE | Implemented Canary read/write adapters, schema translation, contract enforcement; future login bridge remains separate | Product policy that belongs in domain modules |
 | Notifications | PLANNED | Email and asynchronous user notifications | Core auth decisions, payment settlement |
 | PlatformAPI | PLANNED | Stable first-party API endpoints and API-specific auth/limits | Duplicating business logic from modules |
 | Payments | PLANNED-LATER | Provider adapters, payments, webhook handling, ledger/coins/shop when approved | Identity core, direct dependency from basic account creation/login |
@@ -30,60 +28,85 @@ At architecture bootstrap, all product modules are `PLANNED` or `DISCOVERY`.
 ### Responsibilities
 
 - login/logout;
-- credential hashing/migration strategy;
+- Platform credential hashing and lifecycle;
 - session creation, rotation and revocation;
-- password reset;
-- email verification if enabled by product policy;
-- MFA/TOTP;
-- remember-me behavior if enabled;
+- password reset/change;
+- email verification if later enabled by product policy;
+- MFA/TOTP and recovery codes;
 - authentication rate limiting;
-- security-sensitive identity audit events.
+- security-sensitive Identity audit events.
 
 ### Current available boundary
 
-The available Phase 3 implementation is the Oteryn Platform **web Identity** authority. It provides registration, framework-hashed Platform credentials, login/logout, revocable web sessions, password recovery/change, rate limiting, security-event recording and complete opt-in web MFA.
+The Platform web Identity authority provides registration, framework-hashed credentials, login/logout, revocable web sessions, password recovery/change, rate limiting, security-event recording and opt-in web MFA.
 
-Platform Identity credentials are deliberately separate from Canary reusable credentials. No Phase 3 flow writes shared Canary passwords or claims to revoke native Canary/login-server game credentials. The future authoritative game-login migration remains governed by `docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md`.
-
-Current product policy does not require email verification for Phase 3, so no email-verification gate is enabled. A future requirement must be introduced as an explicit policy change and, if intended to gate game login, integrated across every supported authentication path.
+Phase 5 makes Platform Identity the ownership authority for supported greenfield game accounts, but it does not mean native Canary/external login-server game authentication has already been replaced by Platform authorization.
 
 ### Invariants
 
-- one authoritative web identity policy;
-- credentials never stored reversibly;
-- security-sensitive changes may revoke existing Platform web sessions;
-- administrator MFA is mandatory before production readiness;
-- future privileged/Admin routes must combine authentication, explicit Admin/RBAC authorization and the reusable `mfa.confirmed` gate;
-- the MFA gate never determines administrator status or grants authorization by itself;
-- compatibility with game login remains contract-driven.
+- one authoritative Platform Identity policy for supported product users;
+- user credentials never stored reversibly;
+- security-sensitive changes may revoke Platform web sessions;
+- future privileged/Admin routes combine authentication, explicit Phase 6 authorization and `mfa.confirmed`;
+- MFA never grants authorization by itself;
+- game-login compatibility/migration remains contract-driven.
 
 ## Accounts
 
 ### Responsibilities
 
-- account profile and preferences;
-- account state visible to the user;
-- account lifecycle actions that do not belong to Identity;
-- mapping an authenticated identity to the game account contract.
+- durable mapping from authenticated Platform Identity to supported Canary game account;
+- greenfield Canary account provisioning;
+- account state/preferences and future lifecycle operations only when explicitly contracted.
+
+### Current available boundary
+
+Phase 5 implements:
+
+- immutable `1 Platform Identity <-> 1 Canary accounts.id` greenfield ownership model;
+- durable pending/ready/conflict provisioning/binding state;
+- dedicated least-privilege `canary_provisioning` adapter;
+- forward-recoverable account-create saga;
+- non-user sink credential compatibility representation;
+- fail-closed effective-grant verification and real MariaDB integration coverage.
+
+Existing Canary account claim/import, account deletion, unlink/rebind/transfer and broader account profile mutations are not implied by `AVAILABLE` and require separate contracts.
 
 ### Invariants
 
-- every account mutation requires authorization;
-- account IDs supplied by clients are never trusted as ownership proof;
-- bans/status flags shared with Canary are handled only through explicit contracts.
+- every account mutation requires authenticated/authorized Platform context;
+- browser-supplied account IDs are never ownership proof;
+- ready immutable binding is the trusted source for user-scoped Canary authorization;
+- generic `canary` remains read-only;
+- account write capability is operation-specific and least-privileged;
+- Platform does not duplicate Canary reusable-password verification.
 
 ## Characters
 
 ### Responsibilities
 
-Potential operations include create, rename, delete/soft-delete and other web account-management operations, but exact allowed operations remain `UNKNOWN` until Canary schema/rules are verified.
+- web-triggered character lifecycle operations explicitly approved by product/Canary contracts.
+
+### Current available boundary
+
+Phase 5 implements **character creation only**:
+
+- authorization through the authenticated Identity's ready immutable Canary account binding;
+- ADR 0005 canonical-name, vocation/sex, starter-state and quota policy;
+- dedicated least-privilege `canary_character_create` adapter;
+- account-row locking, same-name idempotent recovery, maximum-10-active-character enforcement and unique-name race handling;
+- real MariaDB privilege/concurrency coverage.
+
+Character deletion/soft deletion and rename are not implemented or authorized. They require separate operation contracts and do not inherit create privileges.
 
 ### Invariants
 
-- character ownership is checked server-side;
-- names and vocations/classes follow verified Canary/product rules;
-- concurrency-sensitive changes are transactional;
-- no raw undocumented mutation of shared game tables.
+- character ownership is resolved server-side from the ready binding;
+- client-controlled account IDs cannot establish ownership;
+- names and vocation/sex choices follow verified product policy;
+- concurrency-sensitive writes are transactional;
+- no raw undocumented shared-table mutation;
+- each new mutation operation gets its own contract and least-privilege boundary.
 
 ## PublicGameData
 
@@ -93,14 +116,19 @@ Potential operations include create, rename, delete/soft-delete and other web ac
 - guild pages;
 - highscores;
 - online list;
-- server/world status;
+- server/channel status;
 - public search.
 
-### Direction
+### Current available boundary
 
-Prefer dedicated query/read-model services. Cache may be introduced after correctness is established. Staleness expectations must be explicit for each view.
+Implemented Phase 4 read-only surfaces use explicit field allowlists, bounded pagination and the database-enforced `canary` / `oteryn_readonly` SQL boundary. Runtime availability uses the separate read-only `canary_runtime` Redis boundary with TTL freshness and fail-closed semantics.
 
-The module is available on main for the implemented read-only surfaces, including the cluster-wide online-character list and fresh per-channel runtime availability/count projection on the server page. The public-web shell reuses the existing Blade layout across the homepage and game-data views, and exact-name character search routes to the existing character profile endpoint rather than introducing a second query path. Runtime availability uses the dedicated read-only `canary_runtime` Redis boundary with deterministic configured-channel keys, positive TTL freshness and whole-snapshot fail-closed semantics; missing/expired keys remain unknown and runtime dependency failure does not fabricate OFFLINE or zero-player data. Caching remains deferred so it cannot extend either lease or Redis-TTL freshness beyond the proven boundaries.
+### Invariants
+
+- no privileged mutations;
+- private account/session/security fields are never public output;
+- dependency failure is explicit, not fabricated empty/offline state;
+- freshness boundaries are not extended by unbounded caching.
 
 ## CMS
 
@@ -113,14 +141,16 @@ The module is available on main for the implemented read-only surfaces, includin
 
 ### Current available boundary
 
-The available Phase 4 CMS boundary is public read-only news display backed by Platform-owned `news_posts` persistence. Public list/detail queries expose only rows with a non-null `published_at` at or before the read time, use deterministic bounded pagination, and render title/body as escaped plain text. News authoring, page management, rich HTML, media uploads and all privileged CMS mutations remain outside this boundary and require the future Phase 6 Admin/RBAC and audit controls.
+Phase 4 provides Platform-owned published-only public news display with deterministic pagination and escaped plain-text rendering.
+
+News/page authoring, rich HTML, media uploads and privileged CMS mutation remain Phase 6 work.
 
 ### Security
 
 - output escaped by default;
-- rich text sanitized with a maintained allowlist solution;
+- rich text, if introduced, requires maintained allowlist sanitization;
 - uploads require explicit MIME/content/size/storage controls;
-- admin authorization required for mutations.
+- privileged mutation requires Admin/RBAC authorization and audit.
 
 ## Admin
 
@@ -130,15 +160,15 @@ The available Phase 4 CMS boundary is public read-only news display backed by Pl
 - RBAC/policies;
 - security-sensitive account actions approved by product policy;
 - CMS administration;
-- operational visibility that is safe for the assigned role.
+- operational visibility safe for the assigned role.
 
 ### Invariants
 
 - deny by default;
 - no implicit "admin can do everything" shortcut;
 - privileged actions audited;
-- no direct arbitrary PHP/code/plugin execution feature;
-- admin access protected by explicit authorization plus the Phase 3 confirmed-MFA gate, and preferably Cloudflare Access in production.
+- no arbitrary PHP/code/plugin execution feature;
+- admin access combines explicit authorization with confirmed MFA and preferably Cloudflare Access in production.
 
 ## Audit
 
@@ -147,7 +177,7 @@ The available Phase 4 CMS boundary is public read-only news display backed by Pl
 - append-oriented security events;
 - administrator action audit;
 - authentication anomalies and important account security events;
-- references to actors/targets without leaking secrets.
+- actor/target references without secrets.
 
 Audit storage is not a replacement for infrastructure/application logs.
 
@@ -156,53 +186,57 @@ Audit storage is not a replacement for infrastructure/application logs.
 ### Responsibilities
 
 - explicit interfaces to Canary/login-server/shared schema;
-- mapping/translation between platform domain models and external schema;
+- mapping/translation between Platform domain models and external schema;
 - compatibility assertions;
+- operation-specific least-privilege database adapters;
 - integration tests/fixtures based on verified contracts.
+
+### Current available boundary
+
+Implemented adapters include:
+
+- read-only Canary SQL game-data access;
+- read-only Canary runtime Redis access;
+- greenfield account provisioning through `canary_provisioning`;
+- greenfield character creation through `canary_character_create`.
+
+The authoritative Platform game-login bridge remains a separate cross-repository integration task and is not implied by the module being `AVAILABLE`.
 
 ### Invariants
 
 - external schema assumptions documented in `docs/contracts/**`;
-- no hidden shared-table usage outside agreed integration/read boundaries;
-- breaking changes require contract updates and cross-repository coordination.
+- no hidden shared-table usage outside agreed read/operation boundaries;
+- generic Canary access remains deny-by-default for mutations;
+- breaking changes require contract updates and cross-repository coordination;
+- external repository changes require explicit authorization.
 
 ## Notifications
 
 Initial use cases:
 
-- email verification;
+- email verification if later enabled;
 - password reset;
 - security alerts.
 
-Mail delivery should be asynchronous once queue infrastructure exists, while security tokens remain generated/validated by the owning Identity use case.
+Mail delivery should be asynchronous once queue infrastructure exists, while security tokens remain owned by Identity use cases.
 
 ## PlatformAPI
 
-Expose API endpoints only when there is a concrete client/use case. Do not create a broad public API prematurely.
-
-API endpoints reuse module services/policies and must not implement a second business-rule path.
+Expose API endpoints only for a concrete client/use case. API endpoints must reuse module services/policies and must not implement a second business-rule path.
 
 ## Payments — deferred
 
-No payment implementation belongs in the initial bootstrap.
+No payment implementation belongs in the current core platform scope.
 
-Future module requirements include:
+Future requirements include provider abstraction, signed webhook verification, idempotency, immutable ledger, reconciliation, refunds/chargebacks and a dedicated threat model/security review.
 
-- provider abstraction;
-- signed/authenticated webhook verification;
-- idempotency;
-- transactional immutable ledger;
-- reconciliation;
-- refund/chargeback model;
-- strict separation from account authentication;
-- dedicated threat model and security review.
+## Adding or expanding a module
 
-## Adding a new module
+Before adding a new module or a new shared-write operation:
 
-Before adding a module:
-
-1. prove existing modules cannot own the responsibility cleanly;
-2. document responsibility and dependencies here;
-3. create an ADR for a durable new architectural boundary when material;
-4. add task ownership and tests;
-5. avoid cyclic dependencies.
+1. prove the responsibility cannot be owned cleanly by an existing boundary;
+2. document responsibility/dependencies here when architectural state changes;
+3. create/update an ADR for durable product/architecture choices when material;
+4. establish task ownership and explicit contracts;
+5. apply least privilege and required authorization/concurrency tests;
+6. avoid cyclic dependencies and undocumented cross-repository coupling.

@@ -2,78 +2,53 @@
 
 ## Status
 
-`IMPLEMENTED AND VALIDATED ON PR #41 — MERGE PENDING`
+`IMPLEMENTED — GREENFIELD CHARACTER CREATION ON MAIN`
 
 This contract defines the only approved Phase 5 operation for creating a greenfield Canary `players` row for an authenticated Oteryn Platform Identity under ADR 0005.
 
-PR #41 implements this operation within the authorization, validation, transaction, idempotency, concurrency and least-privilege boundary below. Clean implementation head `27520854e326ada46c19ba1bfcda05fe89de2cab` passed CI #563 and Agent Governance #484. Final documentation-head validation and merge remain before the implementation is considered present on `main`.
+PR #41 implemented the operation and was squash-merged to `main` as `9839822b8e445c0e9828e73d2d7767bb237e587f` after final CI #568 and Agent Governance #489 passed.
 
-`CHARACTER CREATION: IMPLEMENTED / MERGE PENDING`
+`CHARACTER CREATION: IMPLEMENTED`
 
-## Evidence baseline
+## Ownership and authorization
 
-### Oteryn Platform
+Canonical ownership model:
 
-- Ownership model: `1 Platform Identity <-> 1 Canary accounts.id`.
-- Greenfield account provisioning and immutable binding are implemented through PR #33 / `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
-- ADR 0005 character creation product policy is merged through PR #37 / `c5b8719de51deec6cea6d9270e55416fba1d6472`.
-- The implementation-ready operation contract was approved through PR #39 / `660f1790101842772b3bd5b18926b9dc9fc394a7`.
-- Authorization resolves the target Canary account exclusively from the authenticated Identity's ready `identity_canary_accounts.canary_account_id` binding.
-- Existing `canary` read-only and `canary_provisioning` account-create boundaries remain unchanged.
+`1 Platform Identity <-> 1 Canary accounts.id`
 
-### Canary
+Before any character-create Canary transaction:
 
-- Repository: `blakinio/canary`.
-- Inspected evidence pin: `800142e65c2975e57647bf34128ab468532218f0`.
-- Access mode during this task: read-only.
-- `players.id` is auto-generated.
-- `players.name` is globally unique.
-- `players.account_id` references `accounts.id`.
-- `players.conditions` is the inspected starter-relevant required field without a schema default.
-- Classic skills default to level `10` with zero tries.
-- Player load requires a resolvable account, group and vocation.
-- Persisted `(0,0,0)` login position is replaced by the player's temple position on the current load path.
-- An empty `conditions` stream is accepted by the current load path.
+1. caller is an authenticated Platform Identity;
+2. Platform-owned `identity_canary_accounts` binding exists and is `ready`;
+3. binding contains one non-null exact `canary_account_id`;
+4. that server-resolved ID becomes the operation `account_id`;
+5. browser-supplied account IDs, account names or email values cannot establish or override authorization.
 
-No Canary or login-server repository change is required by this bounded database character-create operation.
-
-## Authorization — REQUIRED AND IMPLEMENTED
-
-Before the character-create Canary transaction is opened:
-
-1. the caller is an authenticated Platform Identity;
-2. the Platform-owned Identity-to-Canary binding exists and is `ready`;
-3. the binding contains one non-null `canary_account_id`;
-4. that exact server-resolved ID becomes the operation `account_id`;
-5. no browser/client-supplied account ID, account name or email may establish or override authorization.
-
-If the binding is absent, pending or conflict, the implementation fails closed before invoking the character-write gateway.
+Absent, pending or conflict binding fails closed before the character-write gateway is invoked.
 
 ## User-controlled inputs
 
-The only user-controlled operation inputs are:
+Only:
 
 - `name`;
 - `vocation`;
 - `sex`.
 
-The server applies ADR 0005 canonicalization and reserved-name rules before opening the shared-write transaction. Only the canonical name is passed to Canary.
+ADR 0005 canonicalization/reserved-name policy is applied before shared write.
 
-Allowed vocation IDs are exactly:
+Allowed vocation IDs:
 
 `1`, `2`, `3`, `4`, `9`.
 
-Allowed sex values are exactly:
+Allowed sex values:
 
 `0`, `1`.
 
-All other creation-time fields are server-selected constants. Client-supplied `account_id`, level, town, position, conditions or other starter-state fields are ignored/rejected as authorization or state inputs.
+All other starter values are server-selected. Client-supplied `account_id`, level, town, position, conditions or other starter-state fields are not trusted inputs.
 
-Validation failure performs no Canary write.
+## Exact starter insert
 
-## Exact starter row
-
-The dedicated character-create principal may insert only these `players` columns:
+The dedicated principal may insert only these `players` columns:
 
 - `name`;
 - `group_id`;
@@ -118,140 +93,90 @@ The dedicated character-create principal may insert only these `players` columns
 - `skill_fishing`;
 - `skill_fishing_tries`.
 
-No other `players` column is approved for direct insertion by this principal in v1.
+No other direct `players` insert column is approved in v1.
 
-Exact inserted values are:
+Exact server-selected values include:
 
-- `name =` canonical validated name;
+- canonical `name`;
 - `group_id = 1`;
-- `account_id =` exact ready bound Canary account ID;
+- exact ready bound `account_id`;
 - `level = 8`;
-- `vocation =` validated value in `{1,2,3,4,9}`;
-- `health = 185`;
-- `healthmax = 185`;
+- validated vocation;
+- `health = healthmax = 185`;
 - `experience = 4200`;
-- `lookbody = 120`;
-- `lookfeet = 115`;
-- `lookhead = 114`;
-- `looklegs = 132`;
-- `looktype = 136` when `sex = 0`, otherwise `128`;
-- `lookaddons = 0`;
+- approved starter outfit values with sex-dependent `looktype`;
 - `maglevel = 0`;
-- `mana = 90`;
-- `manamax = 90`;
+- `mana = manamax = 90`;
 - `manaspent = 0`;
 - `soul = 100`;
 - `town_id = 8`;
-- `posx = 0`;
-- `posy = 0`;
-- `posz = 0`;
-- `conditions =` empty non-null payload;
+- persisted position `(0,0,0)`;
+- non-null empty `conditions` payload;
 - `cap = 470`;
-- `sex =` validated value in `{0,1}`;
+- validated sex;
 - `pronoun = 0`;
 - `istutorial = 0`;
-- every listed classic skill level = `10`;
-- every listed classic skill tries value = `0`.
+- listed classic skill levels `10` with zero tries.
 
-All other current `players` columns are intentionally omitted and use the current Canary schema default or nullable behavior. Real MariaDB coverage asserts representative relied-upon defaults including:
+Other current `players` columns intentionally use current schema defaults/nullable behavior. Real MariaDB tests assert representative relied-upon defaults including active deletion state, save flag, balance, stamina, offline-training state, reward state and forge dust level.
 
-- `deletion = 0`;
-- `save = 1`;
-- `balance = 0`;
-- `stamina = 2520`;
-- `offlinetraining_time = 43200`;
-- `offlinetraining_skill = -1`;
-- `isreward = 1`;
-- `forge_dust_level = 100`.
-
-A future Canary schema change that removes or materially changes a relied-upon default requires contract revalidation before deployment.
+A material Canary schema/default change requires revalidation before deployment.
 
 ## No dependent starter writes
 
-The operation performs no direct writes to:
+The operation does not directly write:
 
-- `player_items`;
-- inbox/store-inbox/depot/reward tables;
-- stash or storage tables;
-- quest/tutorial side tables;
-- learned-spell tables;
+- player items/inboxes/depots/reward containers;
+- stash/storage/quest/tutorial side tables;
+- learned spells;
 - guild tables;
-- `account_sessions`;
-- `cluster_sessions`;
-- account credential fields.
+- account or cluster session tables;
+- account credentials.
 
-No incidental first-login script is treated as part of the atomic creation contract.
+No incidental first-login script is part of the atomic creation contract.
 
 ## Operation identity and idempotency
 
-The durable v1 operation identity is:
+Natural v1 operation identity:
 
 `(authorized Canary accounts.id, canonical players.name)`
 
-A separate client-supplied idempotency key is not used.
+Existing exact-name classification after locking the account row:
 
-After locking the authorized account row, the operation queries the exact canonical name.
+- same authorized account + active row -> idempotent existing success with the same `players.id` and no mutation;
+- another account -> deterministic `name_conflict`;
+- same account + non-zero deletion -> deterministic `name_conflict`.
 
-Existing-name classification:
+The first successful creation fixes vocation/sex/starter state. Repeated same-name requests do not mutate the existing row.
 
-- same authorized account and `deletion = 0` -> return existing `players.id` as idempotent/recovered success without mutation;
-- different account -> deterministic `name_conflict`;
-- same account with `deletion != 0` -> deterministic `name_conflict`.
+No player UPDATE, ownership reassignment or destructive compensation is permitted for recovery.
 
-Repeated same-account requests for an active canonical name do not change vocation, sex or gameplay state. The first successful creation wins.
+## Exact Canary transaction
 
-No `UPDATE`, ownership reassignment or destructive compensation is permitted for retry recovery.
+Using only `canary_character_create`:
 
-An ambiguous connection/commit outcome is not treated as success from the exception alone. A normal retry re-enters the complete operation and may recover a previously committed same-account active player by the natural operation identity.
+1. begin transaction;
+2. `SELECT id FROM accounts WHERE id = ? FOR UPDATE` for the authorized account;
+3. missing account -> `account_missing`;
+4. query exact canonical player name selecting only `id`, `name`, `account_id`, `deletion`;
+5. perform idempotent/conflict classification;
+6. if no row exists, count active characters for the locked account;
+7. count `>= 10` -> `character_limit`;
+8. insert exactly the approved starter columns/values;
+9. obtain generated player ID;
+10. commit and return created result.
 
-## Exact Canary transaction — IMPLEMENTED
+Exact-name recovery occurs before quota evaluation so retrying a successfully created tenth character returns the same player rather than a false limit result.
 
-Using only the dedicated `canary_character_create` connection:
+## Concurrency and retry
 
-1. begin a Canary database transaction;
-2. lock and verify the authorized account row with `SELECT id FROM accounts WHERE id = ? FOR UPDATE`;
-3. missing account -> roll back and return `account_missing`;
-4. query `SELECT id, name, account_id, deletion FROM players WHERE name = ? LIMIT 1`;
-5. classify existing exact-name state using the idempotency/conflict rules above;
-6. same-account active recovery returns the existing player ID before quota evaluation;
-7. if no exact-name row exists, count active characters for the locked account with `deletion = 0`;
-8. count `>= 10` -> roll back and return `character_limit`;
-9. insert exactly the approved starter columns and values;
-10. obtain the generated `players.id` from the same connection;
-11. commit;
-12. return the created player ID.
+Same-account create operations serialize on the same account row lock before quota evaluation.
 
-The recovery check occurs before the quota check so retrying a successfully created tenth character returns the same player rather than a false limit error.
+Real MariaDB coverage proves the nine-to-ten concurrent last-slot race results in exactly one new active character and one limit outcome.
 
-## Concurrency guarantees — TESTED
+Global name uniqueness is protected by the Canary `players.name` unique constraint. Real MariaDB coverage proves two accounts racing the same canonical name produce exactly one committed row and one deterministic conflict outcome.
 
-### Same account quota race
-
-Every create transaction for one Canary account locks the same `accounts.id` row before recovery, count and insert. Two concurrent creates therefore serialize.
-
-Real MariaDB integration coverage proves that with nine active characters, concurrent distinct-name requests result in exactly one tenth active character and one limit outcome.
-
-### Global same-name race
-
-`players.name` database uniqueness is the final durable guard.
-
-Real MariaDB integration coverage proves that two different accounts racing the same canonical name produce exactly one committed player row. The losing operation resolves to deterministic conflict unless normal same-account recovery applies.
-
-A pre-insert availability query is never treated as durable uniqueness evidence.
-
-## Transient retry
-
-The implementation may retry the whole Canary transaction up to **3 total attempts** only for explicitly recognized deadlock/serialization failures.
-
-Every retry uses the same:
-
-- authenticated Platform Identity authorization result;
-- bound Canary account ID;
-- canonical name;
-- validated vocation;
-- validated sex.
-
-Permanent validation, ownership, conflict, quota and privilege errors are not automatically retried.
+The implementation retries the whole transaction up to three total attempts only for explicitly recognized deadlock/serialization failures. Permanent authorization, validation, conflict, quota and privilege errors are not retried.
 
 ## Result/error contract
 
@@ -266,11 +191,11 @@ Bounded outcomes are equivalent to:
 - `character_limit`;
 - `dependency_unavailable`.
 
-Raw SQL errors, credentials, connection strings and database exception text are not exposed to the browser.
+Raw SQL errors, credentials and database exception details are not exposed to the browser.
 
-## Dedicated least-privilege database boundary — IMPLEMENTED
+## Dedicated least-privilege boundary
 
-The operation uses a third independent connection/principal:
+Connection:
 
 `canary_character_create`
 
@@ -279,81 +204,72 @@ It does not reuse or broaden:
 - `canary` / `oteryn_readonly`;
 - `canary_provisioning`.
 
-Approved SELECT surface is column-level only:
+Approved SELECT surface:
 
 - `accounts(id)`;
 - `players(id, name, account_id, deletion)`.
 
-Approved INSERT surface is column-level only for the exact starter columns listed above.
+Approved INSERT surface:
 
-The principal must not have:
+- only the exact starter columns listed above.
 
-- table-level SELECT on `accounts` or `players`;
-- access to `accounts.password`, email or session material;
-- player UPDATE or DELETE;
-- INSERT on unapproved player columns;
+Forbidden:
+
+- table-level broad SELECT;
+- `accounts.password` or unrelated account fields;
+- player UPDATE/DELETE;
+- unapproved player INSERT columns;
 - writes to unrelated player/account/session tables;
 - DDL;
-- `GRANT OPTION`;
-- administrative privileges.
+- `GRANT OPTION` or administrative privileges.
 
-A reviewed SQL template defines the deployment grants. Production credentials remain outside Git.
+A reviewed SQL provisioning template defines the deployment grants. Production credentials stay outside Git.
 
-## Fail-closed privilege verification — IMPLEMENTED
-
-`CanaryCharacterCreateDatabasePrivilegeVerifier` inspects effective grants and rejects missing required columns or broader/unapproved privileges.
+`CanaryCharacterCreateDatabasePrivilegeVerifier` fails closed when required privileges are missing or broader privileges are present.
 
 Deployment verification command:
 
 `php artisan canary:verify-character-create-db-privileges`
 
-The verifier does not require or log the database password.
-
 ## Validation evidence
 
 PR #41 includes:
 
-- `CharacterNamePolicy` unit coverage;
-- authenticated feature coverage using the real Platform login/session establishment path;
-- request non-control tests for `account_id` and starter state;
-- ready/pending binding authorization tests;
-- deterministic conflict/idempotent-result tests;
-- exact grant verifier unit tests;
-- real MariaDB tests for exact grants and denied privileges;
-- real MariaDB `FOR UPDATE`, active quota and starter/default persisted row tests;
+- name-policy unit tests;
+- authenticated feature tests through the real Platform login/session establishment flow;
+- binding authorization and browser non-control tests;
+- deterministic validation/conflict/idempotent result tests;
+- effective-grant verifier tests;
+- real MariaDB exact-grant and denied-privilege tests;
+- real MariaDB account lock, starter/default persisted state and active-limit tests;
 - real MariaDB same-account last-slot race;
 - real MariaDB cross-account same-name race;
 - committed-row forward recovery coverage.
 
-Clean implementation head `27520854e326ada46c19ba1bfcda05fe89de2cab` passed:
+The initial feature-test 403 was a test-harness mismatch: synthetic authentication state did not establish the production web-session generation marker. Tests were corrected to exercise the real login flow; the security middleware was not bypassed.
 
-- CI #563: Composer validation/install, Pint, PHPStan and full tests including real MariaDB integration/race coverage;
-- Agent Governance #484.
-
-The initial character feature-test 403 was a test-harness mismatch: synthetic `actingAs()` state did not establish the production `identity.web_session_generation` marker required by `EnsureIdentitySessionIsCurrent`. Feature tests now use the real `POST /login` flow, preserving the production security invariant instead of bypassing middleware.
+Final PR #41 head `1e6291afb29a4c92d1ba690f74c6d23671876107` passed CI #568 and Agent Governance #489 before squash merge.
 
 ## Deployment gate
 
-Repository implementation readiness does not itself prove production deployment readiness.
+Before enabling character creation in an environment:
 
-Before enabling this write path in an environment:
-
-1. provision the dedicated `canary_character_create` principal out-of-band using the reviewed SQL template;
-2. provide its secret through approved deployment secret management, never Git;
+1. provision `canary_character_create` out-of-band using the reviewed SQL template;
+2. provide credentials through approved secret management;
 3. run `php artisan canary:verify-character-create-db-privileges`;
-4. fail closed if verification reports missing or excessive grants;
-5. revalidate the contract if the deployed Canary schema materially differs from the evidence pin.
+4. fail closed on missing/excessive grants;
+5. revalidate if deployed Canary schema materially differs from the evidence baseline.
 
 ## Cross-repository decision
 
-No `blakinio/canary` or `opentibiabr/login-server` modification was required for this bounded character-create database operation.
+No `blakinio/canary` or `opentibiabr/login-server` change was required for this bounded character-create database operation.
 
-The future authoritative Platform game-login bridge remains a separate cross-repository dependency. It must not be inferred as implemented by character creation.
+The authoritative Platform game-login bridge remains a separate cross-repository dependency and is not implied by character creation.
 
 ## Decision
 
-`CHARACTER CREATE OPERATION: IMPLEMENTED AND VALIDATED ON PR #41`
+`CHARACTER CREATE OPERATION: IMPLEMENTED`
 
-`CHARACTER CREATION: MERGE PENDING`
+`CHARACTER CREATION: UNBLOCKED AND PRESENT ON MAIN`
 
-After PR #41 merges, Phase 5 closure must revalidate the roadmap exit gate against live `main`. Character deletion and rename remain optional future lifecycle operations and are forbidden until separately contracted and tested.
+Character deletion/soft deletion and rename remain optional future lifecycle operations and are forbidden until separately contracted, least-privileged and tested.

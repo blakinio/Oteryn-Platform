@@ -114,7 +114,7 @@ Delivered:
 - dedicated read/query boundaries using explicit public field allowlists and database-enforced SELECT-only Canary privileges for the implemented SQL read surface;
 - caching intentionally absent where it could extend `cluster_sessions` lease expiry or Canary runtime Redis TTL freshness.
 
-Closure revalidation found one concrete exit-gate gap: `onlineCharacters()` still terminated in an unbounded `get()`. PR #23 replaces that mass-query path with a `LengthAwarePaginator` defaulting to 100 rows and adds route-level regression coverage proving 101 fresh online characters split across two pages.
+Closure revalidation found one concrete exit-gate gap: `onlineCharacters()` still terminated in an unbounded `get()`. PR #23 replaced that mass-query path with a `LengthAwarePaginator` defaulting to 100 rows and added route-level regression coverage proving 101 fresh online characters split across two pages.
 
 Known privileged/group-hidden ranking policy, production runtime Redis ACL/endpoint provisioning, exact production wall-clock skew and broader cache policy remain explicit later product/deployment unknowns. They are not silently resolved by Phase 4 completion and do not authorize shared writes or deployment claims.
 
@@ -126,24 +126,38 @@ Exit gate — satisfied by closure revalidation:
 
 ## Phase 5 — Account and character management
 
-**Status: PLANNED**
+**Status: COMPLETE**
 
-Deliverables depend on verified Canary contract and may include:
+Delivered greenfield scope:
 
-- account profile/settings;
-- character creation;
-- character deletion/soft deletion;
-- character rename or other lifecycle operations if product requires them;
-- ownership and online-state checks;
-- transactional integration tests.
+- Oteryn Platform is the authoritative owner of user Identity, account lifecycle policy and credentials;
+- immutable `1 Platform Identity <-> 1 Canary accounts.id` ownership binding for supported greenfield accounts;
+- Platform-originated Canary account provisioning with durable pending/ready/conflict state and forward recovery;
+- separate least-privilege `canary_provisioning` database principal restricted to the approved account-create/recovery columns;
+- non-user random sink credential strategy that preserves the current required Canary password representation without making Canary reusable passwords a user authentication authority;
+- authenticated character creation authorized exclusively through the ready immutable binding;
+- ADR 0005 canonical character-name, starter-state, allowed-vocation/sex and maximum-10-active-character product policy;
+- separate least-privilege `canary_character_create` database principal restricted to the approved account/player columns;
+- locked account-row transaction, natural idempotent recovery, active-character quota enforcement and global-name conflict handling;
+- fail-closed effective-grant verifiers and reviewed SQL provisioning templates for both write principals;
+- real MariaDB integration coverage for account trigger side effects, denied excessive privileges, provisioning retry/recovery, character starter/default shape, account locking, quota races and global same-name races.
 
-Exit gate:
+Supported Phase 5 shared-write surfaces are exactly:
 
-- every shared write is documented in contract;
-- authorization and concurrency invariants tested;
-- no undocumented raw writes to Canary-owned data.
+1. Platform-originated Canary account provisioning governed by `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md` and the immutable binding contract;
+2. Platform-driven character creation governed by `CHARACTER_CREATION_CONTRACT.md` and ADR 0005.
 
-The first Phase 5 task must be a bounded operation-contract/discovery task derived from live repository and Canary evidence. It must select one concrete operation and prove ownership, authorization, validation, transaction, concurrency, side-effect and rollback semantics before implementing any shared write.
+Character deletion/soft deletion and rename/lifecycle operations were not selected for the delivered greenfield scope. They remain optional future capabilities and are forbidden until separately contracted, least-privileged and tested. Existing-account claim/import is outside the greenfield product model.
+
+The separately required authoritative Platform game-login bridge is **not** part of the Phase 5 shared-write exit gate and is not claimed as implemented. Platform-originated accounts currently carry an intentionally undisclosed random sink credential; enabling user game login under Platform credential authority requires separately authorized cross-repository integration with explicit expiry, replay/session and revocation semantics.
+
+Exit gate — satisfied by closure revalidation:
+
+- every implemented shared write is documented by an explicit operation-specific contract;
+- authorization, idempotency/failure and concurrency invariants are covered by unit/feature and real MariaDB integration tests;
+- the generic `canary` connection remains database-enforced read-only;
+- shared mutations are isolated to the two dedicated operation-specific least-privilege connections above;
+- no additional undocumented raw Canary write path is approved or claimed by Phase 5.
 
 ## Phase 6 — CMS, Admin, RBAC and Audit
 

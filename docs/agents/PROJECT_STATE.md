@@ -4,279 +4,165 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 ## Last architecture-state update
 
-2026-07-19
+2026-07-20
 
 ## Current phase
 
-**Phase 0 — Architecture and agent bootstrap: COMPLETE**
+- **Phase 0 — Architecture and agent bootstrap: COMPLETE**
+- **Phase 1 — Laravel application bootstrap: COMPLETE**
+- **Phase 2 — Canary/login authentication discovery for current implementation boundaries: COMPLETE**
+- **Phase 3 — Identity foundation: COMPLETE**
+- **Phase 4 — Public website and read-only game data: COMPLETE**
+- **Phase 5 — Account and character management: COMPLETE**
+- **Phase 6 — CMS, Admin, RBAC and Audit: NEXT / PLANNED**
 
-**Phase 1 — Laravel application bootstrap: COMPLETE**
+## Current architecture state
 
-**Phase 2 — Canary and login authentication discovery for current implementation boundaries: COMPLETE**
+Oteryn Platform is a Laravel 13 / PHP 8.5 modular monolith with Platform-owned Identity and application persistence.
 
-**Phase 3 — Identity foundation: COMPLETE**
+Platform Identity owns supported user identity, account ownership policy and user credentials.
 
-**Phase 4 — Public website and read-only game data: COMPLETE**
+Supported game accounts are greenfield only:
 
-**Initial read-only PublicGameData implementation: COMPLETE**
+`1 Platform Identity <-> 1 Canary accounts.id`
 
-**Cluster-wide online-status discovery: COMPLETE**
+Existing Canary accounts are not imported or claimed.
 
-**Cluster-wide online-character read model: COMPLETE**
+## Implemented Identity boundary
 
-**Public site shell and exact-name character search: COMPLETE**
+- registration and secure Platform web login/logout;
+- revocable web-session generation;
+- password recovery/change with Platform session revocation;
+- opt-in TOTP MFA and single-use recovery codes;
+- security event recording;
+- reusable `mfa.confirmed` gate for future privileged routes;
+- administrator classification and RBAC remain Phase 6 work.
 
-**Public news read model: COMPLETE**
+Platform web authentication does not imply that current native Canary/external login-server paths already enforce Platform credential policy.
 
-**Channel runtime availability transport discovery: COMPLETE**
+## Implemented public/read-only boundary
 
-**Channel runtime availability read model: COMPLETE**
+- public Blade site shell and news;
+- character search/profile and level highscores;
+- guild detail/membership;
+- cluster-wide online-character list;
+- configured channels with fresh runtime availability projection;
+- database-enforced `canary` / `oteryn_readonly` SELECT-only SQL boundary;
+- separate read-only `canary_runtime` Redis boundary.
 
-**Phase 4 closure revalidation: COMPLETE**
+## Implemented Phase 5 account ownership
 
-## What exists on main
+The immutable Platform-owned binding is implemented through durable `identity_canary_accounts` state.
 
-- root agent governance in `AGENTS.md`;
-- repository map and context routing;
-- durable task/checkpoint/handoff model;
-- target system architecture and module boundaries;
-- security architecture and data ownership rules;
-- test strategy and delivery roadmap;
-- ADRs for Laravel modular monolith, separate Canary repository and deferred payments;
-- Laravel 13 application foundation targeting PHP 8.5;
-- Blade as the initial server-rendered UI layer;
-- safe `.env.example` local defaults/placeholders with no committed application secret;
-- committed Composer lockfile;
-- SQLite as the default Platform local/test database connection;
-- `GET /health` application availability route;
-- Laravel Pint formatting checks, PHPStan/Larastan and GitHub Actions CI;
-- Platform-owned Identity registration using framework password hashing;
-- secure Platform web login/logout with revocable `web_session_generation` state and fail-closed current-session middleware;
-- Platform password recovery and authenticated password change with web-session revocation and security audit events;
-- complete opt-in Platform web MFA using maintained `pragmarx/google2fa`, including secure enrollment confirmation, pending-login second-factor challenge, replay-resistant persisted TOTP timestep, hash-only single-use recovery codes inside encrypted state, layered rate limits, audit, disable and session revocation;
-- reusable `mfa.confirmed` middleware for future privileged routes; this gate requires confirmed MFA but does not classify administrators or grant authorization;
-- Phase 3 administrator-authentication composition defined as `auth` + explicit Phase 6 RBAC/policy authorization + mandatory `mfa.confirmed`;
-- current email-verification policy explicitly not required for Phase 3 and therefore not enabled;
-- Phase 3 credential compatibility strategy explicitly preserves game-login behavior by keeping Platform Identity credentials separate from Canary reusable credentials and performing no shared password migration/write;
-- evidence-backed Canary data contract with approved read boundaries and zero approved direct shared-data writes;
-- evidence-backed current web/login-server/Canary authentication contract and staged target direction for one authoritative Identity policy plus short-lived atomic game-login authorization;
-- dedicated Canary read connection configured independently from the Platform-owned database;
-- database-enforced least-privilege Canary credential verification with direct table-level `SELECT` allowlisting for the implemented read surface, including `cluster_sessions` for the online-character read model;
-- dedicated named `canary_runtime` Redis connection configuration for read-only runtime availability, separate from Platform cache/session state and without a key prefix that would alter Canary runtime keys;
-- shared Blade public shell used by the homepage, news and implemented public game-data surfaces, with navigation for Home, News, Online, Highscores and Servers;
-- homepage exact-name character search at `GET /characters?name=...`, validating the submitted name and redirecting to the existing character profile route rather than introducing a second query path;
-- Platform-owned `news_posts` persistence with unique slug, title, plain-text body and nullable publication timestamp;
-- published-only public news list at `GET /news` and detail at `GET /news/{slug}`, excluding drafts and future-scheduled posts;
-- deterministic public news ordering by `published_at DESC, id DESC` with bounded pagination of 10 posts;
-- escaped plain-text public news rendering with no rich-HTML or media-upload boundary introduced;
-- read-only public level highscores at `GET /highscores`, ordered deterministically and paginated 50 rows per page;
-- read-only active character profiles at `GET /characters/{name}` through one bounded lookup;
-- read-only public guild details and membership at `GET /guilds/{name}` with joined membership pagination;
-- read-only configured channel metadata plus fresh per-channel runtime status/player counts at `GET /servers` when the dedicated runtime dependency is available;
-- cluster-wide read-only online-character list at `GET /online` using fresh `cluster_sessions` identity joined to public player and approved channel fields, paginated 100 rows per page;
-- integration tests that exercise PublicGameData routes after placing an isolated Canary SQLite connection in `query_only` mode;
-- online-list integration coverage for fresh `ONLINE`, expired, non-`ONLINE`, deleted-player, dependency-failure, public-field allowlist and 100-row pagination cases;
-- runtime availability coverage for deterministic runtime keys, positive TTL freshness, explicit states/counts/full, missing/expired keys, malformed data and whole-snapshot transport failure;
-- mandatory online filters `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms` and `players.deletion = 0`;
-- explicit online-read stale/failure semantics: expired lease rows are excluded, Canary DB failure is returned as dependency unavailable rather than an empty list, and raw session/security fields remain non-public;
-- explicit runtime stale/failure semantics: missing/expired Redis keys are unknown, malformed data or Redis dependency failure invalidates the whole runtime snapshot, configured channel metadata remains independently renderable, and no synthetic `OFFLINE` or zero-player fallback is produced;
-- proven rejection of shared `players_online` as a multichannel authority because every process periodically rewrites/prunes it from only its local player set;
-- proven rejection of SQL `channel_runtime_status` and process-local `ProtocolStatus` as authoritative runtime availability fallbacks;
-- Phase 4 closure revalidation proving the public read surface requires no Canary/shared-data writes, avoids the concrete obvious N+1/mass-query patterns found in source, and renders implemented public content through escaped/plain-text boundaries.
+A user-scoped Canary operation is authorized only from the authenticated Identity's ready exact `canary_account_id` binding. Pending/conflict state fails closed. Browser-supplied account identifiers, account names and email equality are not ownership evidence.
 
-## Phase 3 Identity summary
+Self-service unlink/rebind/transfer is forbidden. Normal recovery restores the same Platform Identity and retains the same binding.
 
-Phase 3 is complete for the Platform-owned web Identity boundary.
+## Implemented Phase 5 shared writes
 
-Implemented properties:
+Phase 5 approves exactly two Oteryn Platform -> Canary mutation surfaces.
 
-- registration, login/logout, password recovery/change, revocable sessions, layered rate limiting and account security event recording are available on main;
-- MFA enrollment does not become confirmed until a maintained-provider TOTP is verified;
-- confirmed-MFA identities remain unauthenticated after password verification until a valid TOTP or recovery code completes the pending login challenge;
-- TOTP replay prevention persists the last accepted timestep and verifies/updates under database row locking;
-- recovery codes are returned in plaintext only at creation, framework-hashed before encrypted persistence and consumed atomically once;
-- MFA reset/disable and credential changes revoke Platform web sessions according to explicit policy;
-- future privileged routes can require the tested `mfa.confirmed` middleware in addition to authentication and separate authorization;
-- no `is_admin` or equivalent authorization shortcut was introduced.
+### 1. Greenfield Canary account provisioning
 
-Phase 3 credential strategy:
+Connection: `canary_provisioning`.
 
-- Platform Identity passwords are Platform-owned and framework-hashed;
-- Phase 3 does not read or write the shared Canary `accounts.password` field and therefore preserves current game-login compatibility by non-interference;
-- shared credential migration remains blocked until every supported login entry point is integrated with the authoritative Identity contract, direct/fallback reusable-password paths are fenced, revocation is implemented across game credentials and exact deployed versions are proven;
-- Platform password reset/change and MFA currently govern Platform web authentication only and must not be described as globally revoking or gating native Canary/external login-server authentication.
+The operation:
 
-Email verification policy:
+- creates durable Platform provisioning intent before the Canary write;
+- inserts only the operation-approved account columns;
+- allows Canary-owned account-create trigger side effects to execute inside the Canary transaction;
+- finalizes the exact created/recovered `accounts.id` into the immutable Platform binding;
+- uses forward recovery after partial failure instead of destructive compensation;
+- uses a non-user random compatibility credential that is never disclosed to the user;
+- has a reviewed least-privilege SQL template and fail-closed effective-grant verifier;
+- is covered by real MariaDB retry/recovery, trigger and privilege tests.
 
-- current Phase 3 product policy does not require email verification, so no verification gate is enabled;
-- a future Platform-web requirement may be added as a dedicated policy task;
-- a future requirement intended to gate game login cannot be claimed globally until every supported Canary/login-server path consults the same authoritative policy.
+Contract: `docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`.
 
-Administrator authentication policy:
+### 2. Greenfield character creation
 
-- administrator identity classification and permissions belong to Phase 6 Admin/RBAC;
-- every future privileged/Admin route must require normal authentication, explicit deny-by-default RBAC/policy authorization and confirmed MFA through `mfa.confirmed`;
-- the MFA middleware is deliberately not an authorization mechanism and does not determine administrator status.
+Connection: `canary_character_create`.
 
-## PublicGameData implementation summary
+The operation:
 
-The current PublicGameData implementation is intentionally narrow and read-only, and Phase 4 closure revalidation has satisfied its roadmap exit gate.
+- requires an authenticated Identity with a ready immutable Canary account binding;
+- accepts only character name, approved vocation and approved sex as user-controlled inputs;
+- applies ADR 0005 canonical-name/reserved-name and fixed starter-state policy;
+- locks the authorized account row before recovery, quota evaluation and insert;
+- enforces maximum 10 active characters;
+- provides natural same-account/canonical-name idempotent recovery;
+- uses a reviewed column-level least-privilege SQL template and fail-closed verifier;
+- is covered by real MariaDB privilege, starter-state, quota-race and global same-name-race tests.
 
-Proven implementation properties:
+Contract: `docs/contracts/CHARACTER_CREATION_CONTRACT.md`.
 
-- shared Canary tables are accessed through a dedicated query service using Laravel query builder rather than mutation-capable shared Eloquent models;
-- deployment documentation requires a separate least-privilege SELECT-only Canary database credential, and the verifier/provisioning allowlist includes `cluster_sessions` because the online-list adapter reads it;
-- the shared Blade public shell exposes Home, News, Online, Highscores and Servers navigation and the homepage uses that same layout rather than a separate document;
-- exact-name homepage character search validates the `name` query value and redirects to the existing `game.characters.show` route, so no duplicate character query implementation or extra Canary privilege is introduced;
-- character/highscore/guild member reads filter `players.deletion = 0`;
-- highscores select only public fields, use deterministic `level DESC, name ASC` ordering and paginate 50 rows;
-- public character profiles expose only `id`, `name`, `level` and `vocation` to the query layer, while the view renders only name/level/vocation;
-- guild details exclude `guilds.balance` and membership data is joined in one paginated read path without per-member N+1 queries;
-- Blade output escapes guild content by default and XSS regression coverage exists for MOTD rendering;
-- server/channel page exposes configured enabled channel metadata plus the implemented independent runtime availability/count projection;
-- `GET /online` reads `cluster_sessions` joined to `players` and `channels`, selects only public player fields plus durable `channel_id` and channel name, applies mandatory online/expiry/deletion filters, and paginates 100 rows per page;
-- the closure regression proves 101 fresh online characters split across two route pages rather than being loaded as one unbounded result set;
-- Canary DB query failure for `/online` becomes an explicit HTTP 503 dependency-unavailable result rather than a synthetic empty list;
-- no application caching is used yet.
+`CHARACTER CREATION: IMPLEMENTED`
 
-The implemented PublicGameData online-list contract is:
+## Phase 5 exit gate
 
-- backend identity source: `cluster_sessions` joined to `players`;
-- mandatory positive filters: `cluster_sessions.status = 'ONLINE'`, `cluster_sessions.expires_at > read_time_epoch_ms`, `players.deletion = 0`;
-- output: explicit public player allowlist plus durable `channels.id` and approved channel name, never raw account/session/lease identifiers;
-- pagination: `LengthAwarePaginator`, default 100 rows per page, deterministic ordering by channel sort order, durable channel ID and player name;
-- dependency failure: Canary DB read failure remains an explicit unavailable/error result, never a synthetic empty list;
-- `players_online`, process-local `ProtocolStatus`, and unbounded stale cache are forbidden fallbacks;
-- runtime availability remains independent from online-character identity.
+Satisfied by closure revalidation:
 
-The implemented per-channel runtime-availability boundary is:
+- every implemented shared write has an explicit operation-specific contract;
+- authorization, partial-failure/idempotency and concurrency invariants are tested;
+- both shared writes use independent least-privilege database principals;
+- the generic `canary` connection remains SELECT-only;
+- no additional undocumented raw Canary write is approved or claimed.
 
-- expected channel IDs come from the existing enabled `channels` database read;
-- runtime source is the deterministic Redis hash `cluster:channel:{channels.id}:runtime` through the dedicated named `canary_runtime` Platform connection/credential boundary;
-- the reader requests only `channel_id`, `status` and `players_online`, plus Redis `PTTL` for freshness validation;
-- positive Redis TTL plus valid runtime fields/state defines a fresh runtime value; missing/expired keys while Redis is healthy mean runtime availability is unknown, not synthetic `OFFLINE` or zero players;
-- any malformed runtime value or Redis transport/protocol failure while reading one logical configured-channel snapshot invalidates all runtime fields for that snapshot; static configured metadata still renders independently;
-- public runtime output is limited to explicit runtime `status` and non-negative `players_online` joined to the already-public durable channel; operational instance/node/build/map/data metadata remains private;
-- `full` is derived only for `ONLINE` where configured `max_players > 0` and `players_online >= max_players`;
-- SQL `channel_runtime_status` remains a forbidden authoritative fallback, as does process-local `ProtocolStatus`;
-- no runtime application cache is used, so Platform does not extend data past the Redis-TTL freshness boundary;
-- runtime availability remains independent from the `/online` `cluster_sessions` identity contract.
+Generic write restrictions in the broad Canary discovery contract remain the default. They are superseded only by the two operation-specific Phase 5 contracts above.
 
-Known PublicGameData unknowns retained after Phase 4 closure:
+## Deferred account/character lifecycle work
 
-- privileged/group-hidden character filtering policy for future public ranking policy — non-blocking for the currently specified deterministic read-only level highscore surface;
-- production cache/staleness expectations outside the bounded online-lease and Redis-runtime freshness contracts — non-blocking because Phase 4 intentionally leaves caching absent;
-- maximum production wall-clock skew relevant to the exact `cluster_sessions` online-character freshness SLA — operations/SLA unknown; expiry filtering remains fail-closed;
-- production provisioning details for the dedicated read-only Canary runtime Redis ACL credential/endpoint — deployment input outside Git, not a Phase 4 code blocker.
+Not implemented or authorized:
 
-## CMS implementation summary
+- existing-account claim/import;
+- character deletion/soft deletion;
+- character rename;
+- irreversible Canary account deletion;
+- exceptional unlink/rebind/transfer.
 
-The current CMS implementation is intentionally public-read-only and Platform-owned.
+These are optional future lifecycle capabilities and each requires its own explicit operation contract, least-privilege boundary and tests before any shared write.
 
-Implemented properties:
+## Game-login boundary
 
-- `news_posts` belongs to the Platform database and is managed by an authoritative Laravel migration; it does not introduce a Canary/shared-data contract;
-- public list/detail queries use the dedicated `PublicNewsQuery` boundary and expose only rows where `published_at` is non-null and not later than the read time;
-- drafts and future-scheduled posts remain non-public, including direct detail lookup by slug;
-- the list orders by `published_at DESC` and then `id DESC`, and paginates 10 posts per page;
-- slugs are unique at the database level;
-- title and body are rendered through escaped Blade output, with body treated as plain text and whitespace preserved;
-- focused tests cover required schema, unique slug, publication-state visibility, deterministic ordering/pagination, detail 404 behavior and XSS escaping.
+Account ownership/provisioning and game-login authorization remain separate boundaries.
 
-Not included in the current CMS boundary:
+Platform-originated users still require a separately authorized authoritative game-login bridge before game login can use Platform credential authority.
 
-- authoring or editing routes/UI;
-- page management;
-- Admin/RBAC or privileged CMS permissions;
-- privileged CMS audit actions;
-- arbitrary rich HTML or a sanitizer integration;
-- media/file uploads.
+Required future security properties:
 
-Those mutation and privileged-management capabilities remain Phase 6 work and must not be inferred from the public read model.
+- authorization bound to the exact Platform-owned Canary account binding;
+- short-lived cryptographically protected exchange material;
+- explicit audience and expiry;
+- replay-resistant consumption semantics;
+- deterministic failure/revocation behavior;
+- no user dependency on the internal compatibility credential;
+- no duplicate Canary password verification in Oteryn Platform.
 
-## Canary data-contract summary
+Likely external work:
 
-`docs/contracts/CANARY_DATA_CONTRACT.md` is partially proven and is the baseline for read-only integration design.
+- `opentibiabr/login-server`: add the Platform-authorized exact-account exchange and define game-session creation semantics;
+- `blakinio/canary`: change only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
 
-Key proven points:
-
-- the contract is revalidated against Canary `main` at `d4f8bb3aa3a6ca31b54f324797078360da28f8f8`;
-- accounts and characters are global across channels;
-- `players.account_id` owns the account-to-character relationship;
-- persistent channel identity is `channels.id`;
-- modern protocol world-list index is transient and must not be persisted as `channels.id`;
-- guild ownership/membership/rank tables and constraints are documented;
-- account/IP bans, namelocks and session structures are documented;
-- `account_sessions` and `cluster_sessions` are separate concepts;
-- current `players_online` lifecycle is incompatible with cluster-wide completeness and is rejected as a multichannel authority;
-- `cluster_sessions` acquire/heartbeat/expiry behavior supports the implemented bounded sanitized online-character read model when status and expiry are both filtered;
-- Redis `ChannelRuntimeRegistry` is the fail-closed per-channel liveness fast path and its dedicated direct read-only runtime-key boundary is implemented by the Platform runtime adapter;
-- SQL `channel_runtime_status` is a best-effort asynchronous diagnostic mirror and is not approved as an authoritative public runtime fallback;
-- process-local `ProtocolStatus` is not a cluster-wide runtime or character-identity source;
-- there are no approved direct Oteryn Platform writes to shared Canary data.
-
-Known data-contract blockers/unknowns:
-
-- `schema.sql` defines `accounts.tournament_coins`, while Canary repository code expects `accounts.coins_tournament` for tournament coin access;
-- actual deployed database shape for that field is not proven;
-- whether another cleanup path eventually physically deletes every expired orphaned `cluster_sessions` row is not proven, but online-read correctness no longer depends on physical deletion because expiry filtering is mandatory;
-- maximum production wall-clock skew relevant to the `cluster_sessions` lease-expiry SLA is not proven;
-- product initialization rules for Platform-driven character creation are not proven.
-
-## Authentication contract summary
-
-`docs/contracts/AUTH_GAME_LOGIN_CONTRACT.md` maps current behavior and separately documents a recommended target contract.
-
-Global credential migration remains blocked because:
-
-- native Canary and external login-server authentication paths can coexist;
-- current native Canary verifies custom Argon2 then SHA-1 fallback;
-- current upstream external login-server verifies SHA-1 only;
-- standard Laravel Argon2id stored-string compatibility with Canary is not proven;
-- password/reset revocation across all game-login credential classes is not proven;
-- current game-login paths do not globally enforce Platform MFA or email verification;
-- failed native Canary password authentication logs the stored credential hash value and requires a separate Canary security fix.
-
-These blockers do not block the completed Platform-owned Phase 3 web Identity boundary because that implementation does not mutate shared Canary credentials or claim game-login enforcement.
-
-## What does not exist yet
-
-Unless source is added after this state update, the following are **not implemented**:
-
-- CMS news/page authoring and management, privileged CMS administration, rich-HTML publishing or media uploads;
-- shared password/hash migration to an authoritative cross-component credential model;
-- global game-login enforcement of Platform MFA/email verification;
-- account management beyond Identity-owned credential/security operations;
-- character creation/delete/rename;
-- Admin/RBAC/audit UI and administrator identity classification;
-- Canary/shared-data write paths;
-- login-server integration code owned by Oteryn Platform;
-- production Cloudflare/deployment configuration;
-- payments/shop.
-
-Agents must verify repository source before relying on this list because later tasks may supersede it.
+No Canary/login-server repository was modified during Phase 5.
 
 ## Current active task
 
-None.
+`OTERYN-20260720-phase5-closure` — closure/documentation revalidation only; no new shared writes.
 
 ## Recommended next work
 
-Derive one bounded Phase 5 operation-contract/discovery task from live repository and Canary evidence. Select one concrete account or character operation and prove its shared-data ownership, authorization, validation, transaction, concurrency, side-effect and rollback contract before implementing any shared write.
+After Phase 5 closure housekeeping, begin Phase 6 with the smallest bounded Admin/RBAC foundation task derived from live repository state.
 
-## High-priority unknowns and blockers
+The authoritative game-login bridge remains a separate high-priority cross-repository integration programme and may be scheduled when external-repository modification is explicitly authorized.
 
-- exact deployed production authentication topology and login-server image digest;
-- shared password hash compatibility/migration rollout;
-- password reset/change and global game-credential revocation behavior;
-- MFA/email-verification enforcement across every game-login path;
-- tournament-coin schema/code conflict;
-- maximum production wall-clock skew for exact `cluster_sessions` lease freshness SLA;
-- production endpoint and ACL/user provisioning for the dedicated read-only Canary runtime Redis connection;
-- privileged/group-hidden public-ranking product policy;
-- broader production cache/staleness policy outside the proven online-lease and runtime Redis-TTL contracts;
-- final production hosting/network topology;
-- production mail/cache/queue providers.
+## High-priority remaining unknowns
+
+- exact authoritative game-login assertion/session protocol and rollout;
+- exact deployed production authentication topology;
+- game-login revocation across every supported entry point;
+- current Canary tournament-coin schema/code naming conflict;
+- production runtime Redis ACL/endpoint provisioning;
+- production hosting/network/mail/cache/queue topology.
 
 ## Architecture summary
 
@@ -284,24 +170,22 @@ Derive one bounded Phase 5 operation-contract/discovery task from live repositor
 Cloudflare / Edge
        |
        v
-Oteryn Platform (Laravel 13 / PHP 8.5 modular monolith)
+Oteryn Platform
        |
-       +--> Platform-owned Identity + application data
-       |
-       +--> explicit read/auth contracts
+       +--> Platform-owned Identity + application/provisioning data
+       +--> read-only Canary SQL / runtime Redis
+       +--> canary_provisioning (operation-specific least privilege)
+       +--> canary_character_create (operation-specific least privilege)
+       +--> future authoritative game-login bridge (not implemented)
                     |
                     v
-                  Canary
+             Canary / login-server
 ```
 
-Initial UI direction: Laravel Blade.
-
-Payments: deferred.
-
-MyAAC: not a target dependency for the long-term platform; it may remain only as an external reference during migration/discovery, not as the architectural foundation.
+Payments remain deferred.
 
 ## How to update this file
 
-Update only when the project-level phase, implemented capabilities, major unknowns or next recommended work materially changes.
+Update only when project-level phase, implemented capabilities, major unknowns or next recommended work materially changes.
 
-Do not use this file as a per-PR scratchpad. Detailed progress belongs in active task records and live PRs.
+Detailed progress belongs in active task records and live PRs.
