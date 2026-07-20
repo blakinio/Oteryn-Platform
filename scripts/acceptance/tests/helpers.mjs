@@ -98,6 +98,15 @@ export function runArtisan(...args) {
   }).trim();
 }
 
+export function runBinary(binary, args) {
+  return execFileSync(binary, args, {
+    cwd: repoRoot,
+    env: process.env,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  }).trim();
+}
+
 function base32Decode(value) {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
   const normalized = value.toUpperCase().replace(/=+$/u, '').replace(/\s+/gu, '');
@@ -178,12 +187,18 @@ export async function login(page, email, password) {
 }
 
 export async function logout(page) {
-  await page.evaluate(async () => {
-    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    if (token) {
-      await fetch('/logout', { method: 'POST', headers: { 'X-CSRF-TOKEN': token } });
-    }
-  });
+  await page.goto('/mfa');
+  const token = await page.locator('input[name="_token"]').first().inputValue();
+  const status = await page.evaluate(async (csrfToken) => {
+    const response = await fetch('/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ _token: csrfToken }),
+    });
+    return response.status;
+  }, token);
+  expect(status).toBe(200);
+  await page.goto('/');
 }
 
 export async function enrollMfa(page, password) {
