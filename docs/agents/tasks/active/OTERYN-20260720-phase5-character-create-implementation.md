@@ -74,6 +74,34 @@ head: 27520854e326ada46c19ba1bfcda05fe89de2cab
 branch: task/OTERYN-20260720-phase5-character-create-implementation
 pr: 41
 status: ready
+context_routes:
+  - agent-governance
+  - accounts-characters
+  - auth-identity
+  - canary-integration
+  - database
+  - security
+  - testing
+owned_paths:
+  - .env.example
+  - .github/workflows/ci.yml
+  - app/Characters/**
+  - app/CanaryIntegration/CanaryCharacterCreator.php
+  - app/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifier.php
+  - app/Http/Controllers/Characters/**
+  - app/Http/Requests/Characters/**
+  - app/Providers/AppServiceProvider.php
+  - config/database.php
+  - database/provisioning/canary-character-create.sql.template
+  - resources/views/characters/create.blade.php
+  - routes/web.php
+  - routes/console.php
+  - tests/Feature/Characters/**
+  - tests/Unit/Characters/**
+  - tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php
+  - docs/contracts/CHARACTER_CREATION_CONTRACT.md
+  - docs/agents/ACTIVE_WORK.md
+  - docs/agents/tasks/active/OTERYN-20260720-phase5-character-create-implementation.md
 proven:
   - main at task start was 164824b953600b45603cc05a44071100f52664f4.
   - PR #39 approved the exact character-create transaction and least-privilege boundary.
@@ -120,6 +148,7 @@ changed_paths:
   - tests/Feature/Characters/**
   - tests/Unit/Characters/**
   - tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php
+  - docs/contracts/CHARACTER_CREATION_CONTRACT.md
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260720-phase5-character-create-implementation.md
 validation:
