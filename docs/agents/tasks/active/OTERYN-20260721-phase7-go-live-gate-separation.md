@@ -63,7 +63,7 @@ cross_repository_tasks:
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-07-20T22:19:46Z
-head: 1018ff189dde2f8fc74e548b76f6f900ca064db2
+head: ab8c67dc26fae289aa0c0e842887256578a1e961
 branch: task/OTERYN-20260721-phase7-go-live-gate-separation
 pr: 65
 status: validating
@@ -98,8 +98,8 @@ unknown:
   - final production go-live facts remain intentionally UNKNOWN pending direct production verification
 conflicts: []
 first_failure:
-  marker: none
-  evidence: the roadmap/checklist semantic conflict was resolved by accepted ADR 0007 without weakening production verification
+  marker: PR #65 Agent Governance checkpoint validation
+  evidence: checkpoint used unsupported validation result PENDING; governance contract permits only PASS, FAIL, BLOCKED or NOT_RUN
 rejected_hypotheses:
   - Staging evidence is production evidence: rejected.
   - Phase 7 can be marked COMPLETE by status-only edit without an ADR/roadmap decision: rejected; ADR 0007 provides the durable decision.
@@ -120,11 +120,11 @@ validation:
     result: PASS
     evidence: source-of-truth documents and workflow records were revalidated before implementation
   - command: PR #65 required GitHub checks
-    result: PENDING
-    evidence: final-head CI/governance checks are still running or not yet observed complete
+    result: NOT_RUN
+    evidence: exact-head checks must rerun after fixing the checkpoint contract violation
 blockers:
   - none
-next_action: Inspect PR #65 exact-head CI and Agent Governance results; fix only task-owned failures, then archive this task and merge if the merge gate is satisfied.
+next_action: Re-check PR #65 exact-head CI, Agent Governance and production-like validation after the checkpoint fix; archive this task and merge only if all required checks pass.
 ```
 
 ## Notes
