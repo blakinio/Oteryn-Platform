@@ -16,63 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  full-test-diagnostic:
-    runs-on: ubuntu-latest
-    services:
-      mariadb:
-        image: mariadb:11.8
-        env:
-          MARIADB_ROOT_PASSWORD: oteryn-ci-root-password
-          MARIADB_ROOT_HOST: "%"
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=20
-    env:
-      CANARY_PROVISIONING_INTEGRATION_HOST: 127.0.0.1
-      CANARY_PROVISIONING_INTEGRATION_PORT: 3306
-      CANARY_PROVISIONING_INTEGRATION_ROOT_PASSWORD: oteryn-ci-root-password
-      CANARY_CHARACTER_CREATE_INTEGRATION_HOST: 127.0.0.1
-      CANARY_CHARACTER_CREATE_INTEGRATION_PORT: 3306
-      CANARY_CHARACTER_CREATE_INTEGRATION_ROOT_PASSWORD: oteryn-ci-root-password
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          coverage: none
-          extensions: pdo_mysql, pcntl
-          tools: composer:v2
-
-      - name: Install dependencies from lockfile
-        run: composer install --no-interaction --prefer-dist --no-progress
-
-      - name: Run full tests and capture output
-        id: full_tests
-        continue-on-error: true
-        run: |
-          set +e
-          composer test > full-test.log 2>&1
-          status=$?
-          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Upload full test diagnostic log
-        uses: actions/upload-artifact@v4
-        with:
-          name: full-test-log
-          path: full-test.log
-
-      - name: Fail when full tests fail
-        if: steps.full_tests.outputs.exit_code != '0'
-        run: exit 1
-
   test:
     runs-on: ubuntu-latest
     services:
