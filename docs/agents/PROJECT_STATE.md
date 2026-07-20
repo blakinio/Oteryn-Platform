@@ -29,11 +29,11 @@ Supported game accounts are greenfield only:
 
 Existing Canary accounts are not imported or claimed.
 
-## Current Phase 7 production-topology discovery
+## Phase 7 production-hardening state
 
-`OTERYN-20260720-phase7-production-topology-discovery` / PR #48 is the first Phase 7 slice.
+PR #48 merged as `676a77590e3ec93bcad0247b3065d203ac209c40` and established the production-topology evidence baseline in `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md`.
 
-Repository-proven production/runtime capabilities:
+Repository-proven runtime/deployment capabilities include:
 
 - provider-neutral logical target architecture with an optional Cloudflare edge, origin/reverse proxy and Laravel web tier;
 - Laravel `/health` health route;
@@ -41,28 +41,46 @@ Repository-proven production/runtime capabilities:
 - Platform database configuration supports SQLite and MySQL;
 - Canary integration uses separate read-only, account-provisioning and character-create SQL configuration surfaces;
 - Canary runtime status uses a separate Redis configuration surface;
-- sessions are environment-configurable with a file default and production-sensitive Secure-cookie default;
+- sessions are environment-configurable;
 - current Platform cache stores are array/file/null only;
 - current queue connection is synchronous only;
 - mail supports SMTP/log/array transports;
 - logging supports single-file and stderr output.
 
-Actual deployed production topology remains `UNKNOWN` unless external non-secret deployment evidence proves it. The repository does not currently prove:
+Actual deployed production topology remains `UNKNOWN` unless external non-secret deployment evidence proves it. Local `.env.example` defaults are not production evidence.
+
+PR #49 / `OTERYN-20260720-phase7-production-config-guardrails` adds provider-independent runtime checks for:
+
+- production environment mode;
+- debug disabled;
+- configured application encryption key;
+- HTTPS non-localhost/loopback application URL;
+- Secure and HttpOnly session cookies;
+- delivery-capable mail transport;
+- valid non-test sender address.
+
+Command:
+
+`php artisan production:verify-configuration`
+
+The verifier returns non-zero on violations and reports only setting classes/messages, not secret values.
+
+The verifier intentionally does not require a specific database engine, Redis session/cache backend, asynchronous queue, logging provider or Cloudflare policy because actual topology does not prove those are universal requirements.
+
+## Phase 7 deployed-state unknowns
+
+The repository does not currently prove:
 
 - actual Cloudflare/DNS/WAF/Access configuration;
 - actual origin provider, reverse proxy or ingress firewall restrictions;
 - actual Platform production database engine/endpoint/network isolation;
 - actual production session/cache backend;
 - actual queue/worker model;
-- actual mail provider;
+- actual mail provider/delivery status;
 - actual centralized log/metrics/alerting sink;
 - actual Canary SQL production network paths/credential provisioning status;
 - actual runtime Redis endpoint/ACL provisioning status;
 - actual backup/restore, deployment or rollback mechanism.
-
-Evidence requirements and dependency order are documented in `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md`.
-
-Local `.env.example` defaults are not production evidence.
 
 ## Implemented Identity boundary
 
@@ -198,15 +216,15 @@ Expected external work:
 - `opentibiabr/login-server`: Platform-authorized exact-account exchange and game-session creation semantics;
 - `blakinio/canary`: only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
 
-No Canary/login-server repository was modified during Phase 5, Phase 6 or the current Phase 7 discovery task.
+No Canary/login-server repository was modified during Phase 5, Phase 6 or current Phase 7 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-production-topology-discovery` — PR #48.
+`OTERYN-20260720-phase7-production-config-guardrails` — PR #49.
 
 ## Recommended next work
 
-After the topology-evidence baseline merges, implement a provider-independent runtime production-safety verifier for invariant settings before attempting provider-specific edge/origin/database hardening.
+Finish PR #49 with exact-head validation. If actual deployment evidence remains unavailable, continue with repository-owned dependency/security scanning and security-header/CSP review rather than inventing edge/origin/database state.
 
 The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled only when external-repository modification is explicitly authorized.
 

@@ -1,0 +1,133 @@
+<?php
+
+namespace Tests\Feature\Operations;
+
+use App\Operations\ProductionConfigurationVerifier;
+use Illuminate\Support\Facades\Artisan;
+use Tests\TestCase;
+
+final class ProductionConfigurationVerifierTest extends TestCase
+{
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config([
+            'app.env' => 'production',
+            'app.debug' => false,
+            'app.key' => 'base64:dGVzdC1vbmx5LXByb2R1Y3Rpb24ta2V5',
+            'app.url' => 'https://platform.oteryn.com',
+            'session.secure' => true,
+            'session.http_only' => true,
+            'mail.default' => 'smtp',
+            'mail.mailers.smtp.transport' => 'smtp',
+            'mail.from.address' => 'noreply@oteryn.com',
+        ]);
+    }
+
+    public function test_compliant_provider_independent_configuration_passes(): void
+    {
+        self::assertSame([], app(ProductionConfigurationVerifier::class)->inspect());
+
+        self::assertSame(0, Artisan::call('production:verify-configuration'));
+        self::assertStringContainsString(
+            'Production configuration invariant checks passed.',
+            Artisan::output(),
+        );
+    }
+
+    public function test_non_production_environment_is_rejected(): void
+    {
+        config(['app.env' => 'local']);
+
+        $this->assertViolation('APP_ENV must be production.');
+    }
+
+    public function test_debug_mode_is_rejected(): void
+    {
+        config(['app.debug' => true]);
+
+        $this->assertViolation('APP_DEBUG must be disabled.');
+    }
+
+    public function test_missing_application_key_is_rejected(): void
+    {
+        config(['app.key' => '']);
+
+        $this->assertViolation('APP_KEY must be configured.');
+    }
+
+    public function test_non_https_application_url_is_rejected(): void
+    {
+        config(['app.url' => 'http://platform.oteryn.com']);
+
+        $this->assertViolation('APP_URL must use HTTPS.');
+    }
+
+    public function test_localhost_and_loopback_application_urls_are_rejected(): void
+    {
+        config(['app.url' => 'https://localhost']);
+        $this->assertViolation('APP_URL must not use a localhost or loopback host.');
+
+        config(['app.url' => 'https://127.0.0.5']);
+        $this->assertViolation('APP_URL must not use a localhost or loopback host.');
+
+        config(['app.url' => 'https://[::1]']);
+        $this->assertViolation('APP_URL must not use a localhost or loopback host.');
+    }
+
+    public function test_insecure_session_cookie_is_rejected(): void
+    {
+        config(['session.secure' => false]);
+
+        $this->assertViolation('Secure session cookies must be enabled.');
+    }
+
+    public function test_non_http_only_session_cookie_is_rejected(): void
+    {
+        config(['session.http_only' => false]);
+
+        $this->assertViolation('HttpOnly session cookies must be enabled.');
+    }
+
+    public function test_non_delivery_mail_transports_are_rejected(): void
+    {
+        config([
+            'mail.default' => 'array',
+            'mail.mailers.array.transport' => 'array',
+        ]);
+        $this->assertViolation('The default mailer must use a delivery-capable transport.');
+
+        config([
+            'mail.default' => 'log',
+            'mail.mailers.log.transport' => 'log',
+        ]);
+        $this->assertViolation('The default mailer must use a delivery-capable transport.');
+    }
+
+    public function test_invalid_or_reserved_test_sender_address_is_rejected(): void
+    {
+        config(['mail.from.address' => 'not-an-email']);
+        $this->assertViolation('MAIL_FROM_ADDRESS must be a valid email address.');
+
+        config(['mail.from.address' => 'noreply@example.test']);
+        $this->assertViolation('MAIL_FROM_ADDRESS must not use a reserved test domain.');
+    }
+
+    public function test_command_fails_closed_without_printing_application_key(): void
+    {
+        config([
+            'app.env' => 'local',
+            'app.key' => 'do-not-print-this-secret-value',
+        ]);
+
+        self::assertSame(1, Artisan::call('production:verify-configuration'));
+        self::assertStringContainsString('Production configuration verification failed.', Artisan::output());
+        self::assertStringNotContainsString('do-not-print-this-secret-value', Artisan::output());
+    }
+
+    private function assertViolation(string $message): void
+    {
+        self::assertContains($message, app(ProductionConfigurationVerifier::class)->inspect());
+    }
+}

@@ -9,12 +9,37 @@ use App\CanaryIntegration\CanaryDatabasePrivilegeVerifier;
 use App\CanaryIntegration\CanaryProvisioningDatabasePrivilegeVerifier;
 use App\Identity\Models\Identity;
 use App\Identity\Support\CanonicalEmail;
+use App\Operations\ProductionConfigurationVerifier;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('production:verify-configuration', function () {
+    try {
+        $violations = app(ProductionConfigurationVerifier::class)->inspect();
+    } catch (Throwable) {
+        $this->error('Unable to inspect the production configuration boundary.');
+
+        return 1;
+    }
+
+    if ($violations !== []) {
+        $this->error('Production configuration verification failed.');
+
+        foreach ($violations as $violation) {
+            $this->line("- {$violation}");
+        }
+
+        return 1;
+    }
+
+    $this->info('Production configuration invariant checks passed.');
+
+    return 0;
+})->purpose('Verify provider-independent production configuration security invariants');
 
 Artisan::command('canary:verify-db-privileges', function () {
     try {
