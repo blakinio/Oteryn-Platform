@@ -81,11 +81,11 @@ final class CanaryCharacterCreator implements CanaryCharacterCreationGateway
                 $this->starterRow($accountId, $canonicalName, $vocation, $sex),
             );
 
-            if ((! is_int($playerId) && ! is_string($playerId)) || (int) $playerId <= 0) {
+            if ($playerId <= 0) {
                 throw new CharacterCreationUnavailable('Character creation did not return a valid player identifier.');
             }
 
-            return new CharacterCreationResult((int) $playerId, $canonicalName, true);
+            return new CharacterCreationResult($playerId, $canonicalName, true);
         }, 1);
     }
 
