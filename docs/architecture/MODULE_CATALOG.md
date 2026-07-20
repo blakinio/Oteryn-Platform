@@ -15,9 +15,9 @@ This catalog defines module responsibilities and dependency boundaries.
 | Accounts | AVAILABLE | Greenfield account provisioning/binding and future explicitly contracted account-level operations | Canary password verification logic, undocumented shared writes, game runtime |
 | Characters | AVAILABLE | Contract-approved web-triggered character operations; currently create | Direct undocumented Canary writes; uncontracted rename/delete |
 | PublicGameData | AVAILABLE | Read models/queries for characters, guilds, highscores, online/status | Privileged mutations |
-| CMS | AVAILABLE | Public news/content read boundary | Identity policy, game state, privileged authoring without Phase 6 controls |
+| CMS | AVAILABLE | Public content reads and permission-scoped Platform content management | Identity policy, game state, rich/upload surfaces without explicit security controls |
 | Admin | IMPLEMENTING | Admin UI, privileged use cases, RBAC integration | Bypassing domain/application invariants |
-| Audit | PLANNED | Security/admin audit query surface and privileged-action audit | Secrets, raw credentials, business-rule authorization decisions |
+| Audit | IMPLEMENTING | Security/admin audit query surface and privileged-action audit | Secrets, raw credentials, business-rule authorization decisions |
 | Integration | AVAILABLE | Implemented Canary read/write adapters, schema translation, contract enforcement; future login bridge remains separate | Product policy that belongs in domain modules |
 | Notifications | PLANNED | Email and asynchronous user notifications | Core auth decisions, payment settlement |
 | PlatformAPI | PLANNED | Stable first-party API endpoints and API-specific auth/limits | Duplicating business logic from modules |
@@ -139,18 +139,28 @@ Implemented Phase 4 read-only surfaces use explicit field allowlists, bounded pa
 - publication state;
 - media references when upload security is implemented.
 
-### Current available boundary
+### Current boundary
 
 Phase 4 provides Platform-owned published-only public news display with deterministic pagination and escaped plain-text rendering.
 
-News/page authoring, rich HTML, media uploads and privileged CMS mutation remain Phase 6 work.
+Phase 6 PR #45 adds the current privileged CMS authoring boundary pending final merge:
+
+- news create/update behind `cms.news.manage`;
+- Platform-owned managed-page persistence;
+- published-only managed-page public reads;
+- managed-page create/update behind `cms.pages.manage`;
+- authenticated confirmed-MFA administrator context for every privileged CMS route;
+- audit append in the same Platform transaction as CMS state mutation where practical;
+- plain-text authoring and escaped public output only.
+
+Rich HTML, media uploads and arbitrary plugin/code upload remain out of scope and are not implied by the current CMS module.
 
 ### Security
 
 - output escaped by default;
 - rich text, if introduced, requires maintained allowlist sanitization;
 - uploads require explicit MIME/content/size/storage controls;
-- privileged mutation requires Admin/RBAC authorization and audit.
+- privileged mutation requires explicit Admin/RBAC authorization, confirmed MFA and audit.
 
 ## Admin
 
@@ -164,7 +174,7 @@ News/page authoring, rich HTML, media uploads and privileged CMS mutation remain
 
 ### Current implementation boundary
 
-Phase 6 PR #44 establishes the first Admin foundation:
+Merged PR #44 establishes:
 
 - durable explicit role, permission, role-permission and identity-role assignment persistence;
 - no administrator assignment by default;
@@ -173,15 +183,24 @@ Phase 6 PR #44 establishes the first Admin foundation:
 - mandatory composition of `auth`, `mfa.confirmed` and an explicit permission on privileged routes;
 - first protected `/admin` surface.
 
-Role-assignment management, privileged CMS authoring and administrator audit query surfaces remain successor Phase 6 work until separately merged and validated.
+Phase 6 PR #45 adds, pending final merge:
+
+- one-time console-only first-admin bootstrap requiring confirmed MFA and no prior administrator assignment;
+- explicit `content_editor`, `security_admin` and `platform_admin` role bundles governed by ADR 0006;
+- audited transactional role assignment/removal behind `admin.roles.manage`;
+- supported-path protection against removing the final `platform_admin`;
+- permission-scoped CMS administration;
+- permission-scoped bounded audit visibility;
+- optional Cloudflare Access deployment guidance as defense in depth.
 
 ### Invariants
 
 - deny by default;
 - no implicit "admin can do everything" shortcut;
+- `platform_admin` is an explicit current permission bundle, not a wildcard for future permissions;
 - privileged actions audited;
 - no arbitrary PHP/code/plugin execution feature;
-- admin access combines explicit authorization with confirmed MFA and preferably Cloudflare Access in production.
+- admin access combines explicit authorization with confirmed MFA and may additionally use Cloudflare Access in production.
 
 ## Audit
 
@@ -192,7 +211,18 @@ Role-assignment management, privileged CMS authoring and administrator audit que
 - authentication anomalies and important account security events;
 - actor/target references without secrets.
 
-Audit storage is not a replacement for infrastructure/application logs.
+### Current implementation boundary
+
+Existing Identity security events remain append-oriented security primitives.
+
+Phase 6 PR #45 adds, pending final merge:
+
+- dedicated append-oriented administrator audit storage;
+- audit events for first-admin bootstrap, role assignment/removal and privileged CMS create/update operations;
+- minimal actor/action/target/non-secret metadata records;
+- bounded 50-row-per-page administrator audit visibility behind `audit.view`, authentication and confirmed MFA.
+
+Audit storage is not a replacement for infrastructure/application logs and must never contain raw credentials, session/reset tokens or MFA secrets.
 
 ## Integration
 

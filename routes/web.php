@@ -1,7 +1,12 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminAuditController;
+use App\Http\Controllers\Admin\AdminManagedPageController;
+use App\Http\Controllers\Admin\AdminNewsController;
+use App\Http\Controllers\Admin\AdminRoleController;
 use App\Http\Controllers\Characters\CharacterCreationController;
 use App\Http\Controllers\Cms\PublicNewsController;
+use App\Http\Controllers\Cms\PublicPageController;
 use App\Http\Controllers\Identity\Mfa\MfaChallengeController;
 use App\Http\Controllers\Identity\Mfa\MfaEnrollmentController;
 use App\Http\Controllers\Identity\PasswordChangeController;
@@ -87,8 +92,41 @@ Route::view('/admin', 'admin.dashboard')
     ->middleware(['auth', 'mfa.confirmed', 'admin.permission:admin.access'])
     ->name('admin.dashboard');
 
+Route::middleware(['auth', 'mfa.confirmed', 'admin.permission:cms.news.manage'])
+    ->prefix('admin/news')
+    ->group(function (): void {
+        Route::get('/', [AdminNewsController::class, 'index'])->name('admin.news.index');
+        Route::get('/create', [AdminNewsController::class, 'create'])->name('admin.news.create');
+        Route::post('/', [AdminNewsController::class, 'store'])->name('admin.news.store');
+        Route::get('/{newsPost}/edit', [AdminNewsController::class, 'edit'])->name('admin.news.edit');
+        Route::put('/{newsPost}', [AdminNewsController::class, 'update'])->name('admin.news.update');
+    });
+
+Route::middleware(['auth', 'mfa.confirmed', 'admin.permission:cms.pages.manage'])
+    ->prefix('admin/pages')
+    ->group(function (): void {
+        Route::get('/', [AdminManagedPageController::class, 'index'])->name('admin.pages.index');
+        Route::get('/create', [AdminManagedPageController::class, 'create'])->name('admin.pages.create');
+        Route::post('/', [AdminManagedPageController::class, 'store'])->name('admin.pages.store');
+        Route::get('/{managedPage}/edit', [AdminManagedPageController::class, 'edit'])->name('admin.pages.edit');
+        Route::put('/{managedPage}', [AdminManagedPageController::class, 'update'])->name('admin.pages.update');
+    });
+
+Route::middleware(['auth', 'mfa.confirmed', 'admin.permission:admin.roles.manage'])
+    ->prefix('admin/roles')
+    ->group(function (): void {
+        Route::get('/', [AdminRoleController::class, 'index'])->name('admin.roles.index');
+        Route::post('/identities/{identity}', [AdminRoleController::class, 'store'])->name('admin.roles.store');
+        Route::delete('/identities/{identity}/{roleKey}', [AdminRoleController::class, 'destroy'])->name('admin.roles.destroy');
+    });
+
+Route::get('/admin/audit', [AdminAuditController::class, 'index'])
+    ->middleware(['auth', 'mfa.confirmed', 'admin.permission:audit.view'])
+    ->name('admin.audit.index');
+
 Route::get('/news', [PublicNewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [PublicNewsController::class, 'show'])->name('news.show');
+Route::get('/pages/{slug}', [PublicPageController::class, 'show'])->name('pages.show');
 
 Route::get('/highscores', [PublicGameDataController::class, 'highscores'])->name('game.highscores.index');
 Route::get('/characters', [PublicGameDataController::class, 'characterSearch'])->name('game.characters.search');

@@ -3,9 +3,12 @@
 use App\Accounts\Actions\ProvisionCanaryAccount;
 use App\Accounts\Exceptions\CanaryAccountProvisioningException;
 use App\Accounts\Models\IdentityCanaryAccount;
+use App\Admin\AdminRoleManager;
 use App\CanaryIntegration\CanaryCharacterCreateDatabasePrivilegeVerifier;
 use App\CanaryIntegration\CanaryDatabasePrivilegeVerifier;
 use App\CanaryIntegration\CanaryProvisioningDatabasePrivilegeVerifier;
+use App\Identity\Models\Identity;
+use App\Identity\Support\CanonicalEmail;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 
@@ -128,3 +131,34 @@ Artisan::command('canary:provision-pending-accounts {--limit=100}', function () 
 
     return $failed === 0 ? 0 : 1;
 })->purpose('Retry bounded pending Platform-originated Canary account provisioning records');
+
+Artisan::command('admin:bootstrap {email}', function () {
+    $emailArgument = $this->argument('email');
+
+    if (! is_string($emailArgument)) {
+        $this->error('The email argument must be a string.');
+
+        return 1;
+    }
+
+    $canonicalEmail = CanonicalEmail::normalize($emailArgument);
+    $identity = Identity::query()->where('email', $canonicalEmail)->first();
+
+    if (! $identity instanceof Identity) {
+        $this->error('No Platform Identity exists for the supplied email.');
+
+        return 1;
+    }
+
+    try {
+        app(AdminRoleManager::class)->bootstrapFirstPlatformAdmin($identity->id);
+    } catch (DomainException|InvalidArgumentException $exception) {
+        $this->error($exception->getMessage());
+
+        return 1;
+    }
+
+    $this->info("First platform administrator assigned to {$identity->email}.");
+
+    return 0;
+})->purpose('Assign the one-time first platform_admin role to an MFA-confirmed Platform Identity');

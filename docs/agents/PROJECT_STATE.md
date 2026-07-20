@@ -36,23 +36,45 @@ Existing Canary accounts are not imported or claimed.
 - opt-in TOTP MFA and single-use recovery codes;
 - security event recording;
 - reusable `mfa.confirmed` gate for privileged routes;
-- Phase 6 now adds explicit administrator RBAC authorization as a separate gate from MFA.
+- explicit administrator RBAC authorization as a separate boundary from authentication and MFA.
 
 Platform web authentication does not imply that current native Canary/external login-server paths already enforce Platform credential policy.
 
-## Implemented Phase 6 authorization foundation
+## Phase 6 administrator/RBAC foundation
 
-The active Phase 6 RBAC foundation on PR #44 establishes durable explicit roles and permissions with no administrator assigned by default.
+PR #44 merged as `170d52393e543c8033ebd896f42fb43f3fccdf42`.
 
-Current role definitions grant only enumerated permissions. No wildcard or implicit unrestricted-admin bypass exists.
+The merged foundation provides:
 
-Privileged routes compose three independent server-side gates:
+- durable explicit roles, permissions, role-permission mappings and Identity-role assignments;
+- no administrator assignment by default;
+- explicit current permission keys with no wildcard or implicit unrestricted-admin bypass;
+- fail-closed `admin.permission` middleware;
+- privileged route composition as `auth` + `mfa.confirmed` + `admin.permission:<exact-permission>`;
+- first protected `/admin` surface and focused authorization regression coverage.
 
-`auth` + `mfa.confirmed` + `admin.permission:<explicit-permission>`
+ADR 0006 defines the durable administrator RBAC/audit policy. `platform_admin` is a bundle of the explicitly listed current permissions, not a wildcard for future capabilities.
 
-Unknown permissions, missing assignments and ambiguous authorization fail closed. The first protected surface is `/admin` with explicit `admin.access`.
+## Current Phase 6 privileged slice
 
-Privileged CMS mutation, role-assignment management, administrator audit query surfaces and Cloudflare Access deployment documentation remain successor Phase 6 work until merged and validated.
+PR #45 / `OTERYN-20260720-phase6-admin-cms-audit` implements the remaining planned Phase 6 capabilities and is pending final exact-head validation/merge.
+
+Current branch implementation includes:
+
+- a one-time console-only first `platform_admin` bootstrap that requires an existing MFA-confirmed Platform Identity and closes after the first administrator assignment exists;
+- audited transactional role assignment/removal behind `admin.roles.manage` with protection against removing the final `platform_admin`;
+- privileged plain-text news create/update behind `cms.news.manage`;
+- Platform-owned managed pages with published-only public reads and escaped plain-text output;
+- privileged managed-page create/update behind `cms.pages.manage`;
+- append-oriented administrator audit events for bootstrap, role and CMS mutations;
+- bounded administrator audit visibility behind `audit.view`;
+- optional Cloudflare Access deployment guidance as defense in depth only.
+
+Every web-admin capability independently requires authenticated Platform context, confirmed MFA and its exact server-side permission.
+
+No arbitrary code/plugin upload, rich HTML authoring, media upload, Canary mutation, payment change or cross-repository behavior is introduced by Phase 6.
+
+Implementation validation on PR #45 has passed Composer bootstrap, Pint, PHPStan and the complete test suite on implementation head `5688edccefe90a4eb62334369155aa263f0c797c`. Final task/document synchronization and exact-head checks are still required before merge.
 
 ## Implemented public/read-only boundary
 
@@ -145,15 +167,15 @@ Expected external work:
 - `opentibiabr/login-server`: Platform-authorized exact-account exchange and game-session creation semantics;
 - `blakinio/canary`: only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
 
-No Canary/login-server repository was modified during Phase 5 or the current Phase 6 work.
+No Canary/login-server repository was modified during Phase 5 or Phase 6 work.
 
 ## Current active task
 
-`OTERYN-20260720-phase6-admin-rbac-foundation` — PR #44.
+`OTERYN-20260720-phase6-admin-cms-audit` — PR #45.
 
 ## Recommended next work
 
-Complete PR #44, then immediately add audited administrator role assignment and privileged news/page management behind the established explicit permission + confirmed-MFA boundary.
+Finish PR #45 exact-head validation and merge, then perform a bounded Phase 6 closure revalidation against live `main`. Mark Phase 6 COMPLETE only after confirming deny-by-default policies, privileged-operation authorization coverage and administrator auditability on the merged state.
 
 The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled when external-repository modification is explicitly authorized.
 
@@ -164,7 +186,8 @@ The authoritative game-login bridge remains a separate high-priority cross-repos
 - game-login revocation across every supported entry point;
 - current Canary tournament-coin schema/code naming conflict;
 - production runtime Redis ACL/endpoint provisioning;
-- production hosting/network/mail/cache/queue topology.
+- production hosting/network/mail/cache/queue topology;
+- exact production Cloudflare Access/admin-hostname routing choice, if that optional gate is adopted.
 
 ## Architecture summary
 
@@ -175,7 +198,10 @@ Cloudflare / Edge
 Oteryn Platform
        |
        +--> Platform-owned Identity + application/provisioning data
-       +--> explicit Admin RBAC + confirmed MFA (Phase 6 in progress)
+       +--> explicit Admin RBAC + confirmed MFA
+       |       +--> privileged CMS management
+       |       +--> role management
+       |       +--> bounded administrator audit visibility
        +--> read-only Canary SQL / runtime Redis
        +--> canary_provisioning (operation-specific least privilege)
        +--> canary_character_create (operation-specific least privilege)

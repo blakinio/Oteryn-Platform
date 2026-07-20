@@ -43,11 +43,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T09:29:08Z
-head: fbf9ff5a799a513843965a282d06a2edf034034b
+updated_at: 2026-07-20T09:31:12Z
+head: 170d52393e543c8033ebd896f42fb43f3fccdf42
 branch: task/OTERYN-20260720-phase6-admin-rbac-foundation
 pr: 44
-status: validating
+status: completed
 context_routes:
   - admin-rbac
   - security
@@ -65,13 +65,14 @@ owned_paths:
   - docs/agents/tasks/active/OTERYN-20260720-phase6-admin-rbac-foundation.md
   - docs/architecture/MODULE_CATALOG.md
 proven:
-  - Phase 5 is complete and Phase 6 is in progress with PR #44 as the first bounded slice.
+  - Phase 5 is complete and Phase 6 started with PR #44 as the first bounded slice.
   - No administrator role is assigned by the RBAC migration.
   - Current roles map only to explicit enumerated permissions; unknown permission keys fail closed.
   - Privileged routes compose auth, mfa.confirmed and admin.permission middleware independently.
   - Focused AdminAuthorizationTest passed after using the persisted web_session_generation in request fixtures.
   - Full CI run 593 passed formatting, PHPStan and the complete test suite on implementation head 09739f45ab05918c1ed0a2fcdafd60988d943396.
-  - Agent Governance passed on implementation heads during validation.
+  - Exact-head CI run 598 and Agent Governance run 519 passed on 5729be1c443cfcac9a0cf16abef65475464847fc.
+  - PR #44 was squash-merged to main as 170d52393e543c8033ebd896f42fb43f3fccdf42.
 derived:
   - Privileged CMS mutation and role-management endpoints can now be added only behind explicit permission keys and confirmed MFA.
 unknown: []
@@ -102,14 +103,14 @@ validation:
   - command: CI run 593 on 09739f45ab05918c1ed0a2fcdafd60988d943396
     result: PASS
     evidence: formatting, static analysis and full tests succeeded.
-  - command: exact-head CI after documentation/checkpoint finalization
-    result: NOT_RUN
-    evidence: required before readiness and merge.
+  - command: exact-head CI run 598 and Agent Governance run 519 on 5729be1c443cfcac9a0cf16abef65475464847fc
+    result: PASS
+    evidence: required checks passed before squash merge.
 blockers:
   - none
-next_action: Verify exact-head CI and Agent Governance, mark PR #44 ready, and squash-merge if the merge gate remains satisfied.
+next_action: Continue Phase 6 through OTERYN-20260720-phase6-admin-cms-audit.
 ```
 
 ## Notes
 
-This task intentionally creates no CMS authoring, account-security mutation, role-management UI, audit query UI, upload surface, or cross-repository behavior.
+This task intentionally created no CMS authoring, account-security mutation, role-management UI, audit query UI, upload surface, or cross-repository behavior.
