@@ -62,37 +62,23 @@ Self-service unlink/rebind/transfer is forbidden. Normal recovery restores the s
 
 Phase 5 approves exactly two Oteryn Platform -> Canary mutation surfaces.
 
-### 1. Greenfield Canary account provisioning
+### Greenfield Canary account provisioning
 
 Connection: `canary_provisioning`.
 
-The operation:
+The operation creates durable Platform provisioning intent before the Canary write, inserts only operation-approved account columns, preserves Canary-owned trigger side effects, finalizes the exact created/recovered `accounts.id`, uses forward recovery after partial failure, and uses a non-user random compatibility credential that is never disclosed to the user.
 
-- creates durable Platform provisioning intent before the Canary write;
-- inserts only the operation-approved account columns;
-- allows Canary-owned account-create trigger side effects to execute inside the Canary transaction;
-- finalizes the exact created/recovered `accounts.id` into the immutable Platform binding;
-- uses forward recovery after partial failure instead of destructive compensation;
-- uses a non-user random compatibility credential that is never disclosed to the user;
-- has a reviewed least-privilege SQL template and fail-closed effective-grant verifier;
-- is covered by real MariaDB retry/recovery, trigger and privilege tests.
+It has a reviewed least-privilege SQL template, fail-closed effective-grant verifier and real MariaDB retry/recovery, trigger and privilege coverage.
 
 Contract: `docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`.
 
-### 2. Greenfield character creation
+### Greenfield character creation
 
 Connection: `canary_character_create`.
 
-The operation:
+The operation requires an authenticated Identity with a ready immutable binding, accepts only approved name/vocation/sex inputs, applies ADR 0005 name/starter policy, locks the authorized account before recovery/quota/insert, enforces maximum 10 active characters and provides natural same-account/canonical-name idempotent recovery.
 
-- requires an authenticated Identity with a ready immutable Canary account binding;
-- accepts only character name, approved vocation and approved sex as user-controlled inputs;
-- applies ADR 0005 canonical-name/reserved-name and fixed starter-state policy;
-- locks the authorized account row before recovery, quota evaluation and insert;
-- enforces maximum 10 active characters;
-- provides natural same-account/canonical-name idempotent recovery;
-- uses a reviewed column-level least-privilege SQL template and fail-closed verifier;
-- is covered by real MariaDB privilege, starter-state, quota-race and global same-name-race tests.
+It has a reviewed least-privilege SQL template, fail-closed verifier and real MariaDB privilege, starter-state, quota-race and global same-name-race coverage.
 
 Contract: `docs/contracts/CHARACTER_CREATION_CONTRACT.md`.
 
@@ -100,15 +86,17 @@ Contract: `docs/contracts/CHARACTER_CREATION_CONTRACT.md`.
 
 ## Phase 5 exit gate
 
-Satisfied by closure revalidation:
+Satisfied by PR #42 closure revalidation:
 
 - every implemented shared write has an explicit operation-specific contract;
 - authorization, partial-failure/idempotency and concurrency invariants are tested;
 - both shared writes use independent least-privilege database principals;
-- the generic `canary` connection remains SELECT-only;
+- generic `canary` remains SELECT-only;
 - no additional undocumented raw Canary write is approved or claimed.
 
-Generic write restrictions in the broad Canary discovery contract remain the default. They are superseded only by the two operation-specific Phase 5 contracts above.
+Generic write restrictions in the broad Canary data contract remain the default and are superseded only by these two operation-specific contracts.
+
+Phase 5 closure merged through PR #42 as `3732b29b06addecbd07423ef655489a35001247c` after exact-head CI #571 and Agent Governance #492 passed.
 
 ## Deferred account/character lifecycle work
 
@@ -120,7 +108,7 @@ Not implemented or authorized:
 - irreversible Canary account deletion;
 - exceptional unlink/rebind/transfer.
 
-These are optional future lifecycle capabilities and each requires its own explicit operation contract, least-privilege boundary and tests before any shared write.
+Each requires its own explicit operation contract, least-privilege boundary and tests before any shared write.
 
 ## Game-login boundary
 
@@ -128,32 +116,32 @@ Account ownership/provisioning and game-login authorization remain separate boun
 
 Platform-originated users still require a separately authorized authoritative game-login bridge before game login can use Platform credential authority.
 
-Required future security properties:
+Required future properties:
 
 - authorization bound to the exact Platform-owned Canary account binding;
 - short-lived cryptographically protected exchange material;
 - explicit audience and expiry;
-- replay-resistant consumption semantics;
+- replay-resistant consumption/session semantics;
 - deterministic failure/revocation behavior;
 - no user dependency on the internal compatibility credential;
 - no duplicate Canary password verification in Oteryn Platform.
 
-Likely external work:
+Expected external work:
 
-- `opentibiabr/login-server`: add the Platform-authorized exact-account exchange and define game-session creation semantics;
-- `blakinio/canary`: change only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
+- `opentibiabr/login-server`: Platform-authorized exact-account exchange and game-session creation semantics;
+- `blakinio/canary`: only if the selected protocol requires direct assertion verification or stronger replay/revocation/fencing semantics.
 
 No Canary/login-server repository was modified during Phase 5.
 
 ## Current active task
 
-`OTERYN-20260720-phase5-closure` — closure/documentation revalidation only; no new shared writes.
+None.
 
 ## Recommended next work
 
-After Phase 5 closure housekeeping, begin Phase 6 with the smallest bounded Admin/RBAC foundation task derived from live repository state.
+Begin Phase 6 with the smallest bounded Admin/RBAC foundation task derived from live repository state. Establish deny-by-default administrator identity/role authorization and compose it with existing `auth` + `mfa.confirmed` before adding privileged CMS/account actions.
 
-The authoritative game-login bridge remains a separate high-priority cross-repository integration programme and may be scheduled when external-repository modification is explicitly authorized.
+The authoritative game-login bridge remains a separate high-priority cross-repository programme that may be scheduled when external-repository modification is explicitly authorized.
 
 ## High-priority remaining unknowns
 
