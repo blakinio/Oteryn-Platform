@@ -42,11 +42,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T10:07:00Z
-head: cf9df784d0a8db5cea6532cb40a82bf77762fc92
+updated_at: 2026-07-20T10:12:00Z
+head: eee86266a1af0ccc6786d0874707ed4b38e7cf45
 branch: task/OTERYN-20260720-phase6-closure
 pr: 46
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -80,6 +80,8 @@ proven:
   - Phase 6 introduced Platform-owned migrations only; Canary schema/session compatibility is unchanged.
   - No secret or production-only credential is introduced by Phase 6 repository changes.
   - Cloudflare Access remains optional deployment documentation and is not claimed as deployed.
+  - PR #46 exact-head CI #658 and Agent Governance #579 passed on eee86266a1af0ccc6786d0874707ed4b38e7cf45.
+  - PR #46 changed files are restricted to the seven Phase 6 closure/handover documentation paths and there are no comments or review threads.
 derived:
   - Phase 6 can be marked COMPLETE and Phase 7 can become NEXT without changing application behavior in the closure PR.
   - Phase 6 rollback is a Platform application/database release rollback of Platform-owned RBAC/audit/page migrations and code; no cross-repository rollback coordination is required.
@@ -111,12 +113,15 @@ validation:
   - command: PR #45 exact-head CI #648 and Agent Governance #569
     result: PASS
     evidence: merged privileged CMS/audit implementation validation.
-  - command: PR #46 exact-head CI and Agent Governance
+  - command: PR #46 CI #658 and Agent Governance #579 on eee86266a1af0ccc6786d0874707ed4b38e7cf45
+    result: PASS
+    evidence: full Composer/Pint/PHPStan/test suite and checkpoint validation passed on the closure head before this evidence-only update.
+  - command: final PR #46 exact-head CI and Agent Governance after this evidence-only update
     result: NOT_RUN
-    evidence: required after final closure documentation synchronization.
+    evidence: required before squash merge.
 blockers:
   - none
-next_action: Verify PR #46 exact-head CI and Agent Governance, then squash-merge the documentation-only Phase 6 closure if the merge gate remains satisfied.
+next_action: Verify required checks on the final evidence-only head and squash-merge PR #46 if the merge gate remains satisfied.
 ```
 
 ## Notes
