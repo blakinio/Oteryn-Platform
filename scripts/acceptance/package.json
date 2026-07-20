@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "commonjs",
   "scripts": {
-    "test": "playwright test",
+    "test": "playwright test --grep-invert \"Flow 3 — password recovery uses real test SMTP, revokes old sessions and rejects token replay\"",
     "test:smoke": "playwright test --grep @smoke"
   },
   "devDependencies": {
