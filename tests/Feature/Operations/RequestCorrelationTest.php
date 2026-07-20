@@ -37,7 +37,7 @@ final class RequestCorrelationTest extends TestCase
 
     public function test_request_completion_log_contains_only_bounded_safe_context(): void
     {
-        $logger = new CapturingLogger();
+        $logger = new CapturingLogger;
         Log::swap($logger);
 
         $response = $this->get('/?token=do-not-log&email=private@example.com');
