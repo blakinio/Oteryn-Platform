@@ -101,6 +101,18 @@ python tools/agents/test_checkpoint.py
 
 The validator checks deterministic structure only. It does **not** verify that `head`, branch, PR state, CI status, evidence references or repository state are currently true; agents must still perform live Git/PR/CI verification.
 
+## Starting a continuation agent
+
+Generate the compact continuation prompt from the durable task record:
+
+```sh
+python tools/agents/resume.py --task docs/agents/tasks/active/<task>.md
+```
+
+The generated prompt contains only the current checkpoint evidence, validation, blockers and one `NEXT_ACTION`. The continuation agent must verify only live state that can invalidate that action, must not rediscover `PROVEN` facts unless evidence changed, and must not reconstruct state from the previous chat.
+
+If the task has no checkpoint, `resume.py` emits an explicit `CHECKPOINT_MISSING` recovery prompt whose only next action is to reconstruct a valid checkpoint from current Git, PR, CI and task evidence before substantive implementation.
+
 ## Evidence states
 
 - `PROVEN`: directly supported by source, deterministic tool output, tests, logs, artifacts or live GitHub state.
