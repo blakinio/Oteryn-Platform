@@ -5,7 +5,7 @@ branch: docs/agent-handoff-core-20260720
 base_branch: main
 created: 2026-07-20
 updated: 2026-07-20
-related_pr: ""
+related_pr: "58"
 owned_paths:
   - docs/agents/CONTEXT_HANDOFF.md
   - docs/agents/tasks/active/OTERYN-20260720-agent-handoff-core.md
@@ -31,10 +31,10 @@ Add a compact continuation prompt generator to the existing Oteryn Platform chec
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T13:40:00Z
-head: 4b53e27074691f56a8799a38dca30d6a97a2c390
+updated_at: 2026-07-20T13:42:30Z
+head: 3fb825f1383f516822850b25f4f9b5c3734bdd94
 branch: docs/agent-handoff-core-20260720
-pr: none
+pr: 58
 status: validating
 context_routes:
   - agent-governance
@@ -45,6 +45,7 @@ owned_paths:
 proven:
   - Oteryn Platform already has checkpoint contract version 1 and a deterministic checkpoint validator.
   - Open Phase 7 PR 56 does not overlap CONTEXT_HANDOFF.md or tools/agents/resume.py.
+  - Rollout PR 58 is open against main from docs/agent-handoff-core-20260720.
 derived:
   - Adding only the resume generator and documentation preserves existing repository-specific security handoff rules.
 unknown:
@@ -63,5 +64,5 @@ validation:
     result: PASS
     evidence: PR 56 touches separate task/state/runbook paths
 blockers: []
-next_action: Open the rollout PR, verify the exact final head, required CI checks, review state and changed-file scope, then merge only if the repository merge gate passes.
+next_action: Verify the exact final PR head, required CI checks, review state and changed-file scope, then merge only if the repository merge gate passes.
 ```
