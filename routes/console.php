@@ -152,7 +152,7 @@ Artisan::command('admin:bootstrap {email}', function () {
 
     try {
         app(AdminRoleManager::class)->bootstrapFirstPlatformAdmin($identity->id);
-    } catch (\DomainException|\InvalidArgumentException $exception) {
+    } catch (DomainException|InvalidArgumentException $exception) {
         $this->error($exception->getMessage());
 
         return 1;
