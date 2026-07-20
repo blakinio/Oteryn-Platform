@@ -6,7 +6,7 @@
 
 This contract defines the authorization boundary between an authenticated Oteryn Platform Identity and Canary `accounts.id`.
 
-Oteryn Platform is the authoritative owner of user Identity, account lifecycle and credential policy. Existing Canary accounts are outside the supported Phase 5 ownership model and are not imported or claimed.
+Oteryn Platform is the authoritative owner of user Identity, supported account lifecycle policy and user credential policy. Existing Canary accounts are outside the supported Phase 5 ownership model and are not imported or claimed.
 
 The greenfield ownership-binding implementation is delivered by the Platform-originated account provisioning flow governed by `docs/contracts/PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`.
 
@@ -45,7 +45,7 @@ Pending or conflict state fails closed.
 
 ## Required authorization answer
 
-For every future user-scoped Canary operation the Platform must answer server-side:
+For every user-scoped Canary operation the Platform must answer server-side:
 
 > Does the currently authenticated Platform Identity have the ready immutable binding to this exact Canary `accounts.id`?
 
@@ -99,9 +99,10 @@ Exact irreversible Canary account deletion semantics require a separate account-
 - Canary remains semantic owner of Canary-owned schema/game state.
 - Existing `canary` / `oteryn_readonly` remains SELECT-only and unchanged.
 - Account provisioning uses separate `canary_provisioning` credentials restricted to the approved column-level account-create/recovery surface.
+- Character creation uses separate `canary_character_create` credentials restricted to the approved column-level character-create surface.
 - Platform does not read `accounts.password` and does not verify Canary passwords.
 - Canary `accounts.password` receives only the non-user random sink-credential compatibility digest defined by the provisioning contract.
-- Sink plaintext and digest are never stored in Platform binding/audit state or exposed to users.
+- Sink plaintext is never stored in Platform binding/audit state or exposed to users.
 
 ## Failure and concurrency invariants
 
@@ -115,43 +116,59 @@ The implemented provisioning saga ensures:
 - mismatched recovery evidence fails closed as conflict;
 - no destructive automatic account deletion is used as partial-failure compensation.
 
+The implemented character-create operation additionally ensures:
+
+- only the authenticated Identity's ready exact binding supplies the target `account_id`;
+- same-account character creates serialize through the account-row lock before quota evaluation;
+- the active-character limit cannot be exceeded by concurrent Platform create requests for one account;
+- global character-name uniqueness remains protected by the Canary database unique constraint;
+- same-account active same-name retries recover idempotently without ownership reassignment or generic player UPDATE.
+
 ## Validation evidence
 
-PR #33 implementation validation includes:
+PR #33 account-provisioning/binding validation includes:
 
 - registration tests proving client-supplied `account_id` and `provisioning_name` cannot control ownership;
 - saga tests for success, pending dependency failure, retry, idempotent completed state, hard conflict and binding uniqueness;
 - privilege-policy tests rejecting table-level/excessive grants and password-read capability;
-- real MariaDB 11.8 integration coverage proving the effective column-level provisioning grants, Canary-compatible account trigger side effects, denial of `accounts.password` reads, duplicate-free retry and forward recovery of an already committed Canary account;
-- formatting and PHPStan level-10 validation.
+- real MariaDB 11.8 integration coverage proving effective column-level provisioning grants, Canary-compatible account-trigger side effects, denial of `accounts.password` reads, duplicate-free retry and forward recovery.
 
-Delivery-validation head `9d404bec37410ab1ef5c9954896f544b40963f54` passed CI run `29707658067` (#474) and Agent Governance run `29707658068` (#395).
+PR #41 character-create validation includes:
+
+- authenticated feature tests using the real Platform login/session establishment path;
+- ready-binding authorization and request non-control tests;
+- exact name/vocation/sex policy tests;
+- real MariaDB exact-grant and forbidden-privilege tests;
+- real MariaDB account-lock/quota and global same-name race tests;
+- starter/default persisted-row and committed-row recovery tests.
+
+PR #41 merged to `main` as `9839822b8e445c0e9828e73d2d7767bb237e587f` after final CI #568 and Agent Governance #489 passed.
 
 ## Existing-account proof
 
 A side-effect-free authoritative existing-account control proof remains unimplemented, but it is not required for the greenfield product because existing Canary accounts are out of scope.
 
-Adding import/claim later requires a new explicitly approved contract and, likely, separately authorized auth-side work.
+Adding import/claim later requires a new explicitly approved contract and likely separately authorized auth-side work.
 
 ## Game-login follow-up
 
 Ownership binding and game-login availability are separate boundaries.
 
-The immutable ownership binding is implemented, but Platform-originated users still require the separately authorized authoritative game-login integration recorded in `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md` before they can authenticate to the game without knowledge of the intentionally undisclosed sink credential.
+The immutable ownership binding and character creation are implemented, but Platform-originated users still require a separately authorized authoritative game-login integration before they can authenticate to the game under Platform credential authority.
 
 Required future direction:
 
-- `opentibiabr/login-server`: Platform-authorized short-lived cryptographic assertion/session exchange bound to exact `accounts.id`, with explicit expiry/replay/session semantics and no sink-password dependency;
-- `blakinio/canary`: only if the final login contract requires stronger single-use/revocation/direct assertion/fencing semantics beyond current DB-backed session consumption; any such change requires a separate authorized task and rollout/backward-compatibility contract update.
+- `opentibiabr/login-server`: Platform-authorized short-lived cryptographic assertion/session exchange bound to exact `accounts.id`, with explicit audience, expiry, replay/session-consumption and revocation semantics and no sink-password dependency;
+- `blakinio/canary`: only if the final login contract requires direct assertion verification or stronger replay/revocation/fencing semantics beyond the selected login-server integration.
 
-No Canary/login-server repository was modified by the ownership-binding implementation task.
+No Canary/login-server repository was modified by Phase 5.
 
 ## Decision
 
 `PLATFORM IDENTITY -> AUTHORIZED CANARY accounts.id OWNERSHIP BINDING: IMPLEMENTED FOR GREENFIELD ACCOUNTS.`
 
+`GREENFIELD CHARACTER CREATION THROUGH THE READY BINDING: IMPLEMENTED.`
+
 The original Phase 5 ownership-binding blocker is resolved for supported greenfield accounts.
 
-Character creation remains blocked only by its independent operation-contract requirements: authoritative character naming policy, exact starter-state policy and approved least-privilege character-create write/initialization semantics.
-
-`CHARACTER CREATION: BLOCKED`
+Character deletion, rename and account deletion/rebind/transfer are not authorized by this contract and require separate future operation contracts.
