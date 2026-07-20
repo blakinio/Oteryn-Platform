@@ -11,6 +11,7 @@ import {
 } from './helpers.mjs';
 
 test.setTimeout(120_000);
+test.describe.configure({ retries: 0 });
 
 test.beforeEach(async ({ page }) => {
   page.__acceptanceDiagnostics = installDiagnostics(page);
@@ -58,10 +59,10 @@ test('Flow 3c — authenticated password change revokes existing sessions and re
     await page.getByLabel('Confirm new password', { exact: true }).fill(changedPassword);
     await page.getByRole('button', { name: 'Change password' }).click();
     await expect(page.getByRole('status')).toContainText('Your password has been changed. Sign in again.');
+    await expect(page).toHaveURL(/\/login$/u);
 
-    const currentSessionResponse = await page.goto('/mfa');
-    expect(currentSessionResponse?.status()).toBe(403);
-    await expect(page.getByRole('heading', { name: '403' })).toBeVisible();
+    await page.goto('/mfa');
+    await expect(page).toHaveURL(/\/login$/u);
 
     const staleSessionResponse = await stalePage.goto('/mfa');
     expect(staleSessionResponse?.status()).toBe(403);
