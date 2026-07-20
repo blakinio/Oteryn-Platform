@@ -94,35 +94,38 @@ Priority areas:
 
 ## CI direction
 
-Phase 1 should establish CI that at minimum:
-
-1. installs pinned PHP/Composer dependencies;
-2. validates dependency lock consistency;
-3. runs syntax/lint/format/static checks selected by the bootstrap task;
-4. runs unit/feature tests;
-5. runs isolated migration/database tests where configured.
+Phase 1 established the baseline PHP CI. Phase 7 adds fail-closed dependency advisory scanning without removing existing gates.
 
 The current mandatory PHP CI gate runs, in order:
 
 1. `composer validate --strict`;
 2. `composer install --no-interaction --prefer-dist --no-progress` from the committed lockfile;
-3. `composer format:check`;
-4. `composer analyse` using PHPStan with Larastan at level 10 across `app`, `bootstrap`, `config`, `database`, `routes` and `tests`;
-5. `composer test`.
+3. `composer audit --no-interaction` and fails when Composer reports a security advisory for the installed dependency set;
+4. `composer format:check`;
+5. `composer analyse` using PHPStan with Larastan at level 10 across `app`, `bootstrap`, `config`, `database`, `routes` and `tests`;
+6. `composer test`.
 
 No PHPStan baseline is currently committed. New static-analysis errors therefore fail CI directly rather than being absorbed into an ignore list or baseline.
 
+Dependabot is configured for bounded weekly update PRs for:
+
+- Composer dependencies;
+- GitHub Actions dependencies.
+
+Dependabot update automation complements but does not replace the required Composer advisory gate.
+
 Later workflows may add:
 
-- dependency vulnerability scanning;
 - contract tests against pinned schema fixtures;
 - browser/E2E tests;
-- deployment image/build verification.
+- deployment image/build verification;
+- additional ecosystem-specific security scanners when a new dependency surface is introduced.
 
 ## Merge expectations
 
 - security-critical changes require relevant regression tests;
 - shared data changes require contract/integration evidence;
+- known dependency advisories fail the required Composer audit gate;
 - do not merge on tests from an old commit when current head changed;
 - do not weaken or delete failing tests to make CI green;
 - document exact unavailable environments rather than claiming tests passed.
