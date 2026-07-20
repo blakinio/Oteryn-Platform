@@ -75,6 +75,12 @@ jobs:
       CANARY_CHARACTER_CREATE_DB_DATABASE: canary
       CANARY_CHARACTER_CREATE_DB_USERNAME: oteryn_character_create
       CANARY_CHARACTER_CREATE_DB_PASSWORD: phase7-ci-character-not-a-secret
+      CANARY_PROVISIONING_INTEGRATION_HOST: 127.0.0.1
+      CANARY_PROVISIONING_INTEGRATION_PORT: 3306
+      CANARY_PROVISIONING_INTEGRATION_ROOT_PASSWORD: phase7-ci-root-not-a-secret
+      CANARY_CHARACTER_CREATE_INTEGRATION_HOST: 127.0.0.1
+      CANARY_CHARACTER_CREATE_INTEGRATION_PORT: 3306
+      CANARY_CHARACTER_CREATE_INTEGRATION_ROOT_PASSWORD: phase7-ci-root-not-a-secret
       CANARY_RUNTIME_REDIS_CLIENT: phpredis
       CANARY_RUNTIME_REDIS_SCHEME: tcp
       CANARY_RUNTIME_REDIS_HOST: 127.0.0.1
@@ -221,9 +227,6 @@ jobs:
 
       - name: Validate clean current-SHA deployment and migrations
         run: |
-          mkdir -p /tmp/phase7-releases
-          git archive "$VALIDATION_SHA" | tar -x -C /tmp/phase7-releases
-          mv /tmp/phase7-releases/artisan "/tmp/phase7-releases/artisan-${VALIDATION_SHA}"
           mkdir -p "/tmp/phase7-releases/${VALIDATION_SHA}"
           git archive "$VALIDATION_SHA" | tar -x -C "/tmp/phase7-releases/${VALIDATION_SHA}"
           (
@@ -375,6 +378,15 @@ jobs:
           fi
 
       - name: Run exact-SHA critical regression suite
+        env:
+          APP_ENV: testing
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          CACHE_STORE: array
+          DB_CONNECTION: sqlite
+          DB_DATABASE: ':memory:'
+          MAIL_MAILER: array
+          QUEUE_CONNECTION: sync
+          SESSION_DRIVER: array
         run: composer test
 
       - name: Validate running health, headers, cookies, correlation and error behavior
@@ -448,6 +460,10 @@ jobs:
 
           rm -f /tmp/phase7-platform.sql
           echo "RESTORE_MS=$RESTORE_MS" >> "$GITHUB_ENV"
+          echo "SOURCE_TABLES=$SOURCE_TABLES" >> "$GITHUB_ENV"
+          echo "RESTORE_TABLES=$RESTORE_TABLES" >> "$GITHUB_ENV"
+          echo "SOURCE_MIGRATIONS=$SOURCE_MIGRATIONS" >> "$GITHUB_ENV"
+          echo "RESTORE_MIGRATIONS=$RESTORE_MIGRATIONS" >> "$GITHUB_ENV"
           {
             echo "### Phase 7 production-like restore evidence"
             echo "- validation_sha: \`$VALIDATION_SHA\`"
@@ -499,3 +515,43 @@ jobs:
             echo "- redeploy_current_sha: PASS"
             echo "- classification: STAGING_PROVEN"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write non-secret staging evidence artifact
+        run: |
+          VALIDATED_AT_UTC="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > /tmp/phase7-production-like-evidence.json <<JSON
+          {
+            "classification": "STAGING_PROVEN",
+            "validated_at_utc": "${VALIDATED_AT_UTC}",
+            "validation_sha": "${VALIDATION_SHA}",
+            "rollback_sha": "${BASE_SHA}",
+            "clean_deploy": "PASS",
+            "migrations": "PASS",
+            "configuration_guardrails": "PASS",
+            "canary_readonly_privileges": "PASS",
+            "canary_provisioning_privileges": "PASS",
+            "canary_character_create_privileges": "PASS",
+            "database_privilege_fail_closed": "PASS",
+            "runtime_redis_acl_and_failure_semantics": "PASS",
+            "smtp_delivery_and_failure_semantics": "PASS",
+            "critical_regression_suite": "PASS",
+            "live_security_headers_cookies_correlation": "PASS",
+            "backup_restore_integrity": "PASS",
+            "restore_ms": ${RESTORE_MS},
+            "source_table_count": ${SOURCE_TABLES},
+            "restored_table_count": ${RESTORE_TABLES},
+            "source_migration_count": ${SOURCE_MIGRATIONS},
+            "restored_migration_count": ${RESTORE_MIGRATIONS},
+            "rollback_switch": "PASS",
+            "interrupted_release_not_activated": "PASS",
+            "redeploy_current_sha": "PASS"
+          }
+          JSON
+
+      - name: Upload non-secret staging evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase7-production-like-evidence-${{ github.run_id }}
+          path: /tmp/phase7-production-like-evidence.json
+          retention-days: 7
+          if-no-files-found: error
