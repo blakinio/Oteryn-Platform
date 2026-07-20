@@ -4,74 +4,61 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-None.
+- `OTERYN-20260720-phase5-character-create-implementation` — PR #41. The authenticated greenfield character-create slice is implemented and validated; final documentation-head CI/Governance revalidation and merge remain. Character deletion/rename remain out of scope.
 
-## Proven implementation result
+## Proven Phase 5 implementation state
 
-Phase 5 greenfield ownership provisioning and immutable binding are implemented on `main` through PR #33 as `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
+Greenfield ownership provisioning and immutable `1 Platform Identity <-> 1 Canary accounts.id` binding are implemented on `main` through PR #33 as `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
 
 ADR 0005 character creation product policy is merged through PR #37 as `c5b8719de51deec6cea6d9270e55416fba1d6472`.
 
-The implementation-ready character-create operation contract is merged through PR #39 as `660f1790101842772b3bd5b18926b9dc9fc394a7`.
+The character-create operation contract is merged through PR #39 as `660f1790101842772b3bd5b18926b9dc9fc394a7`.
+
+PR #41 implements and has validated:
+
+- server-side ADR 0005 canonical-name and reserved-name validation;
+- authenticated `/account/characters/create` and `POST /account/characters` boundaries;
+- authorization derived exclusively from the authenticated Identity's ready immutable Canary account binding;
+- no client control over `account_id` or starter-state fields;
+- dedicated `canary_character_create` least-privilege connection;
+- account `FOR UPDATE` -> exact-name recovery -> active quota -> exact 42-column starter INSERT transaction;
+- natural `(account_id, canonical name)` idempotent recovery without player UPDATE or ownership reassignment;
+- maximum 10 active characters under same-account serialization;
+- bounded deadlock/serialization retry;
+- exact SQL grant template and fail-closed effective-grant verifier;
+- unit/feature tests and real MariaDB tests for privileges, starter/default row shape, forbidden access, idempotency, same-account quota race and global same-name race.
 
 The existing `canary` read-only and `canary_provisioning` account-create connections remain unchanged.
 
-## Approved character-create implementation shape
+Clean implementation head `27520854e326ada46c19ba1bfcda05fe89de2cab` passed CI #563 and Agent Governance #484.
 
-- authorize only from the authenticated Identity's ready immutable Canary account binding;
-- validate/canonicalize `name`, base `vocation` and `sex` server-side;
-- use a third dedicated `canary_character_create` transaction boundary;
-- lock the exact bound `accounts.id` row before same-account recovery/quota/insert;
-- use `(authorized accounts.id, canonical players.name)` as the v1 natural idempotent create target;
-- recover an existing same-account active canonical name read-only;
-- treat other-account same name and same-account deleted same name as `name_conflict`;
-- enforce maximum 10 `deletion = 0` characters while the account row is locked;
-- insert exactly the approved 42 starter columns and no dependent rows;
-- retry only transient deadlock/serialization failures, at most 3 total transaction attempts;
-- retain database uniqueness on `players.name` as the final global race guard;
-- recover ambiguous commit by normal account/name retry, never by UPDATE or destructive compensation.
+`CHARACTER CREATION: IMPLEMENTED ON PR #41 / MERGE PENDING`
 
-Approved database privilege target:
-
-- column-level `SELECT` on `accounts(id)`;
-- column-level `SELECT` on `players(id,name,account_id,deletion)`;
-- column-level `INSERT` only on the exact starter columns defined in `CHARACTER_CREATION_CONTRACT.md`;
-- no table-level SELECT, no UPDATE/DELETE, no credential/session/unrelated-table access, DDL or GRANT OPTION.
-
-`CHARACTER CREATION: BLOCKED` only until the successor implementation task passes the required code, real MariaDB privilege, locking, quota-race and name-race tests.
-
-## Recommended next dependency
-
-Implement the approved character-create vertical slice in Oteryn Platform with:
-
-1. server-side character-name canonicalizer and reserved-name validator;
-2. authenticated create-character HTTP/service boundary deriving the ready Canary account binding server-side;
-3. dedicated `canary_character_create` connection/gateway;
-4. exact locked transaction, natural idempotency and deterministic result mapping;
-5. reviewed SQL provisioning template and fail-closed effective-grant verifier;
-6. feature/unit tests plus real MariaDB integration coverage for exact grants, `FOR UPDATE`, quota races, unique-name races, ambiguous recovery and starter/default row shape.
-
-No Canary code change is currently proven necessary.
+Production enablement requires out-of-band provisioning of the dedicated DB principal and a passing `php artisan canary:verify-character-create-db-privileges` check before enabling the write path.
 
 ## Cross-repository state
 
-Current Canary evidence pin is `800142e65c2975e57647bf34128ab468532218f0`.
+Current Canary evidence pin for character creation is `800142e65c2975e57647bf34128ab468532218f0`.
 
-If implementation integration tests disprove a selected starter/loadability assumption, record the exact Canary/datapack change for a separately authorized task rather than applying it implicitly.
+No Canary or login-server change was required for the bounded character-create operation. Those repositories remained read-only.
 
-The future authoritative game-login bridge remains separate work recorded in `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md`.
+The future authoritative Platform game-login bridge remains separate work recorded in `PLATFORM_CANARY_ACCOUNT_PROVISIONING_CONTRACT.md` and must be performed as a separately authorized cross-repository task if/when selected.
 
-## Other queued work
+## Phase 5 closure candidate
 
-- Existing-account claim/import is out of scope for the greenfield product.
-- Admin/RBAC identity classification and permissions remain Phase 6.
+After PR #41 merges, run one bounded Phase 5 closure task against live `main` to verify the roadmap exit gate:
+
+- every implemented shared write has an explicit contract;
+- authorization and concurrency invariants are tested;
+- no undocumented raw Canary write exists.
+
+Character deletion and rename are optional future lifecycle capabilities and remain forbidden until separately contracted. Existing-account claim/import remains out of scope for the greenfield product.
 
 ## Recently completed
 
-- `OTERYN-20260720-phase5-character-create-operation-contract` — approved the exact character-create transaction/idempotency/least-privilege implementation shape, merged through PR #39 as `660f1790101842772b3bd5b18926b9dc9fc394a7`; final exact head passed CI #502 and Agent Governance #423. The task record is archived unchanged by post-merge housekeeping.
-- `OTERYN-20260720-phase5-character-product-policy` — selected ADR 0005 and merged through PR #37 as `c5b8719de51deec6cea6d9270e55416fba1d6472`.
-- `OTERYN-20260720-phase5-character-creation-policy-revalidation` — revalidated the character-create gate after ownership binding, merged through PR #35 as `35ca943d6051ff27f215b813d51a5ae557cbac40`.
-- `OTERYN-20260720-phase5-platform-account-provisioning-implementation` — implemented immutable greenfield account provisioning/binding, merged through PR #33 as `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
+- `OTERYN-20260720-phase5-character-create-operation-contract` — PR #39 / `660f1790101842772b3bd5b18926b9dc9fc394a7`.
+- `OTERYN-20260720-phase5-character-product-policy` — PR #37 / `c5b8719de51deec6cea6d9270e55416fba1d6472`.
+- `OTERYN-20260720-phase5-platform-account-provisioning-implementation` — PR #33 / `d5c319448737ee5badd8ab73967535a5ec9b67d1`.
 
 ## Coordination rule
 
