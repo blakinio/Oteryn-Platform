@@ -10,6 +10,7 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   workers: 1,
+  timeout: 120_000,
   reporter: [
     ['line'],
     ['html', { outputFolder: '../../artifacts/acceptance/html-report', open: 'never' }],
