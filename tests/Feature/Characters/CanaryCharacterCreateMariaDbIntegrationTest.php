@@ -420,6 +420,11 @@ final class CanaryCharacterCreateMariaDbIntegrationTest extends TestCase
             $status = 0;
             $waitedPid = pcntl_waitpid($pid, $status);
             self::assertSame($pid, $waitedPid);
+
+            if (! is_int($status)) {
+                self::fail('pcntl_waitpid returned a non-integer process status.');
+            }
+
             self::assertTrue(pcntl_wifexited($status));
             self::assertSame(0, pcntl_wexitstatus($status));
         }
