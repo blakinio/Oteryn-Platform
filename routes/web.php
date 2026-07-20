@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Characters\CharacterCreationController;
 use App\Http\Controllers\Cms\PublicNewsController;
 use App\Http\Controllers\Identity\Mfa\MfaChallengeController;
 use App\Http\Controllers\Identity\Mfa\MfaEnrollmentController;
@@ -74,6 +75,13 @@ Route::get('/password/change', [PasswordChangeController::class, 'create'])
 Route::put('/password/change', [PasswordChangeController::class, 'update'])
     ->middleware(['auth', 'throttle:identity-password-change'])
     ->name('identity.password.change.update');
+
+Route::get('/account/characters/create', [CharacterCreationController::class, 'create'])
+    ->middleware('auth')
+    ->name('account.characters.create');
+Route::post('/account/characters', [CharacterCreationController::class, 'store'])
+    ->middleware(['auth', 'throttle:character-create'])
+    ->name('account.characters.store');
 
 Route::get('/news', [PublicNewsController::class, 'index'])->name('news.index');
 Route::get('/news/{slug}', [PublicNewsController::class, 'show'])->name('news.show');
