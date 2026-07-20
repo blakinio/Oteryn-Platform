@@ -12,7 +12,6 @@ import {
   runArtisan,
   runBinary,
   runPhpState,
-  totp,
   uniqueCharacterName,
   uniqueEmail,
   waitForDifferentTotp,
@@ -22,6 +21,7 @@ import {
 const primaryEmail = uniqueEmail('player');
 let primaryPassword = 'AcceptancePassword!234';
 const changedPassword = 'AcceptanceChanged!567';
+const rotatedPassword = 'AcceptanceRotated!890';
 const editorEmail = uniqueEmail('editor');
 const editorPassword = 'AcceptanceEditor!234';
 const foreignEmail = uniqueEmail('foreign');
@@ -32,9 +32,10 @@ let editorMfa;
 let primaryLastTotp;
 let editorLastTotp;
 let primaryCharacter;
-let editorIdentityId;
 const newsSlug = `acceptance-news-${(process.env.ACCEPTANCE_RUN_ID ?? 'local').replace(/[^a-zA-Z0-9-]/gu, '-').toLowerCase()}`;
 const pageSlug = `acceptance-page-${(process.env.ACCEPTANCE_RUN_ID ?? 'local').replace(/[^a-zA-Z0-9-]/gu, '-').toLowerCase()}`;
+
+test.setTimeout(120_000);
 
 async function createCharacter(page, name) {
   await page.goto('/account/characters/create');
@@ -66,6 +67,21 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(async ({ page }, testInfo) => {
   await attachDiagnostics(testInfo, page.__acceptanceDiagnostics);
+
+  if (testInfo.status !== testInfo.expectedStatus && !page.isClosed()) {
+    const screenshot = await page.screenshot({
+      fullPage: true,
+      mask: [
+        page.locator('input'),
+        page.locator('textarea'),
+        page.locator('code'),
+      ],
+    });
+    await testInfo.attach('sanitized-failure-screenshot', {
+      body: screenshot,
+      contentType: 'image/png',
+    });
+  }
 });
 
 test.describe('full production-like acceptance', () => {
@@ -131,7 +147,7 @@ test.describe('full production-like acceptance', () => {
 
       const resetLink = await waitForResetLink(primaryEmail);
       await resetPage.goto(resetLink);
-      await resetPage.getByLabel('New password').fill(changedPassword);
+      await resetPage.getByLabel('New password', { exact: true }).fill(changedPassword);
       await resetPage.getByLabel('Confirm new password').fill(changedPassword);
       await resetPage.getByRole('button', { name: 'Reset password' }).click();
       await expect(resetPage.getByRole('status')).toContainText('Your password has been reset. Sign in again.');
@@ -145,7 +161,7 @@ test.describe('full production-like acceptance', () => {
       await expect(resetPage.getByRole('alert')).toBeVisible();
 
       await resetPage.goto(resetLink);
-      await resetPage.getByLabel('New password').fill('AcceptanceReplay!890');
+      await resetPage.getByLabel('New password', { exact: true }).fill('AcceptanceReplay!890');
       await resetPage.getByLabel('Confirm new password').fill('AcceptanceReplay!890');
       await resetPage.getByRole('button', { name: 'Reset password' }).click();
       await expect(resetPage.getByRole('alert')).toContainText('This password reset link is invalid or expired.');
@@ -158,6 +174,44 @@ test.describe('full production-like acceptance', () => {
       await expect(resetPage).toHaveURL(/\/$/u);
     } finally {
       await resetContext.close();
+    }
+  });
+
+  test('Password change — authenticated change revokes all existing sessions and requires the new password', async ({ browser, page }) => {
+    await signInWithPrimaryMfa(page);
+
+    const staleContext = await browser.newContext();
+    const stalePage = await staleContext.newPage();
+    try {
+      await login(stalePage, primaryEmail, primaryPassword);
+      const staleCode = await waitForDifferentTotp(primaryMfa.secret, primaryLastTotp);
+      await completeMfaChallenge(stalePage, staleCode);
+      primaryLastTotp = staleCode;
+      await expect(stalePage).toHaveURL(/\/$/u);
+
+      await page.goto('/password/change');
+      await page.getByLabel('Current password').fill(primaryPassword);
+      await page.getByLabel('New password', { exact: true }).fill(rotatedPassword);
+      await page.getByLabel('Confirm new password').fill(rotatedPassword);
+      await page.getByRole('button', { name: 'Change password' }).click();
+      await expect(page.getByRole('status')).toContainText('Your password has been changed. Sign in again.');
+
+      await page.goto('/mfa');
+      await expect(page).toHaveURL(/\/login$/u);
+      await stalePage.goto('/mfa');
+      await expect(stalePage).toHaveURL(/\/login$/u);
+
+      await login(page, primaryEmail, primaryPassword);
+      await expect(page.getByRole('alert')).toBeVisible();
+
+      primaryPassword = rotatedPassword;
+      await login(page, primaryEmail, primaryPassword);
+      const freshCode = await waitForDifferentTotp(primaryMfa.secret, primaryLastTotp);
+      await completeMfaChallenge(page, freshCode);
+      primaryLastTotp = freshCode;
+      await expect(page).toHaveURL(/\/$/u);
+    } finally {
+      await staleContext.close();
     }
   });
 
@@ -175,13 +229,12 @@ test.describe('full production-like acceptance', () => {
 
     const foreignContext = await browser.newContext();
     const foreignPage = await foreignContext.newPage();
-    let foreignCharacter;
     try {
       await register(foreignPage, foreignEmail, foreignPassword);
       const foreignBinding = runPhpState('binding', foreignEmail);
       expect(foreignBinding.status).toBe('ready');
       await login(foreignPage, foreignEmail, foreignPassword);
-      foreignCharacter = uniqueCharacterName('Other');
+      const foreignCharacter = uniqueCharacterName('Other');
       await createCharacter(foreignPage, foreignCharacter);
       await expect(foreignPage.getByRole('status')).toContainText(`Character ${foreignCharacter} created.`);
 
@@ -358,7 +411,7 @@ test.describe('full production-like acceptance', () => {
       await login(editorPage, editorEmail, editorPassword);
       editorMfa = await enrollMfa(editorPage, editorPassword);
       editorLastTotp = editorMfa.enrollmentCode;
-      editorIdentityId = runPhpState('binding', editorEmail).identity_id;
+      runPhpState('binding', editorEmail);
     } finally {
       await editorContext.close();
     }
@@ -408,7 +461,17 @@ test.describe('full production-like acceptance', () => {
     await expect(page.getByText('cms.news_updated')).toBeVisible();
     await expect(page.getByText('cms.page_created')).toBeVisible();
     await expect(page.getByText('cms.page_updated')).toBeVisible();
-    await expect(page.locator('body')).toContainText(primaryEmail);
+
+    const newsAuditRow = page.locator('tr').filter({ hasText: 'cms.news_created' }).first();
+    await expect(newsAuditRow).toContainText(primaryEmail);
+    await expect(newsAuditRow).toContainText('news_post');
+    await expect(newsAuditRow).toContainText(newsSlug);
+
+    const pageAuditRow = page.locator('tr').filter({ hasText: 'cms.page_created' }).first();
+    await expect(pageAuditRow).toContainText(primaryEmail);
+    await expect(pageAuditRow).toContainText('managed_page');
+    await expect(pageAuditRow).toContainText(pageSlug);
+
     await expect(page.locator('body')).not.toContainText(primaryPassword);
     await expect(page.locator('body')).not.toContainText(primaryMfa.secret);
     for (const recoveryCode of primaryMfa.recoveryCodes) {
