@@ -1,27 +1,52 @@
-name: Visual UX Acceptance
+name: Acceptance E2E and Visual UX
 
 on:
   pull_request:
     branches:
       - main
+    paths:
+      - 'app/**'
+      - 'bootstrap/**'
+      - 'config/**'
+      - 'database/**'
+      - 'public/**'
+      - 'resources/views/**'
+      - 'routes/**'
+      - 'scripts/acceptance/**'
+      - '.github/workflows/acceptance-validation.yml'
+      - 'composer.json'
+      - 'composer.lock'
+  push:
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      profile:
+        description: Acceptance profile to execute
+        required: true
+        default: full
+        type: choice
+        options:
+          - smoke
+          - full
 
 permissions:
   contents: read
 
 concurrency:
-  group: visual-ux-acceptance-${{ github.workflow }}-${{ github.ref }}
+  group: acceptance-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  validate:
+  acceptance:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       mariadb:
         image: mariadb:11.8
         env:
           MARIADB_ROOT_PASSWORD: acceptance-ci-root-not-a-secret
-          MARIADB_ROOT_HOST: "%"
+          MARIADB_ROOT_HOST: '%'
         ports:
           - 3306:3306
         options: >-
@@ -40,60 +65,65 @@ jobs:
           - 8025:8025
 
     env:
+      ACCEPTANCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       VALIDATION_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      APP_ENV: production
-      APP_DEBUG: "false"
+      ACCEPTANCE_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+      ACCEPTANCE_BASE_URL: http://127.0.0.1:8080
+      ACCEPTANCE_MAILHOG_URL: http://127.0.0.1:8025
+      ACCEPTANCE_OUTPUT_DIR: /tmp/oteryn-visual-acceptance
+      ACCEPTANCE_PROFILE: ${{ github.event_name == 'pull_request' && github.head_ref != 'task/OTERYN-20260721-functional-visual-acceptance' && 'smoke' || github.event_name == 'workflow_dispatch' && inputs.profile || 'full' }}
+      APP_ENV: acceptance
+      APP_DEBUG: 'false'
       APP_URL: http://127.0.0.1:8080
       LOG_CHANNEL: stderr_json
       LOG_LEVEL: info
       SESSION_DRIVER: file
-      SESSION_SECURE_COOKIE: "false"
-      SESSION_HTTP_ONLY: "true"
+      SESSION_SECURE_COOKIE: 'false'
+      SESSION_HTTP_ONLY: 'true'
       CACHE_STORE: file
       QUEUE_CONNECTION: sync
       MAIL_MAILER: smtp
       MAIL_HOST: 127.0.0.1
       MAIL_PORT: 1025
-      MAIL_ENCRYPTION: ""
+      MAIL_ENCRYPTION: ''
       MAIL_FROM_ADDRESS: acceptance@staging.oteryn
       MAIL_FROM_NAME: Oteryn Acceptance
       DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
-      DB_DATABASE: oteryn_platform
+      DB_DATABASE: oteryn_platform_acceptance
       DB_USERNAME: root
       DB_PASSWORD: acceptance-ci-root-not-a-secret
       CANARY_DB_HOST: 127.0.0.1
       CANARY_DB_PORT: 3306
-      CANARY_DB_DATABASE: canary
-      CANARY_DB_USERNAME: oteryn_readonly
+      CANARY_DB_DATABASE: canary_acceptance
+      CANARY_DB_USERNAME: oteryn_acceptance_readonly
       CANARY_DB_PASSWORD: acceptance-ci-readonly-not-a-secret
       CANARY_PROVISIONING_DB_HOST: 127.0.0.1
       CANARY_PROVISIONING_DB_PORT: 3306
-      CANARY_PROVISIONING_DB_DATABASE: canary
-      CANARY_PROVISIONING_DB_USERNAME: root
-      CANARY_PROVISIONING_DB_PASSWORD: acceptance-ci-root-not-a-secret
+      CANARY_PROVISIONING_DB_DATABASE: canary_acceptance
+      CANARY_PROVISIONING_DB_USERNAME: oteryn_acceptance_provisioning
+      CANARY_PROVISIONING_DB_PASSWORD: acceptance-ci-provisioning-not-a-secret
       CANARY_CHARACTER_CREATE_DB_HOST: 127.0.0.1
       CANARY_CHARACTER_CREATE_DB_PORT: 3306
-      CANARY_CHARACTER_CREATE_DB_DATABASE: canary
-      CANARY_CHARACTER_CREATE_DB_USERNAME: root
-      CANARY_CHARACTER_CREATE_DB_PASSWORD: acceptance-ci-root-not-a-secret
+      CANARY_CHARACTER_CREATE_DB_DATABASE: canary_acceptance
+      CANARY_CHARACTER_CREATE_DB_USERNAME: oteryn_acceptance_character_create
+      CANARY_CHARACTER_CREATE_DB_PASSWORD: acceptance-ci-character-not-a-secret
       CANARY_RUNTIME_REDIS_CLIENT: phpredis
       CANARY_RUNTIME_REDIS_SCHEME: tcp
       CANARY_RUNTIME_REDIS_HOST: 127.0.0.1
       CANARY_RUNTIME_REDIS_PORT: 6379
       CANARY_RUNTIME_REDIS_DB: 0
-      CANARY_RUNTIME_REDIS_USERNAME: oteryn_runtime
+      CANARY_RUNTIME_REDIS_USERNAME: oteryn_acceptance_runtime
       CANARY_RUNTIME_REDIS_PASSWORD: acceptance-ci-runtime-not-a-secret
       MARIADB_ROOT_PASSWORD: acceptance-ci-root-not-a-secret
-      ACCEPTANCE_BASE_URL: http://127.0.0.1:8080
-      ACCEPTANCE_OUTPUT_DIR: /tmp/oteryn-visual-acceptance
 
     steps:
       - name: Checkout exact acceptance SHA
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -103,6 +133,11 @@ jobs:
           extensions: pdo_mysql, redis
           tools: composer:v2
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Install acceptance system clients
         run: |
           sudo apt-get update
@@ -111,154 +146,55 @@ jobs:
       - name: Install application dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Generate ephemeral application key
-        run: echo "APP_KEY=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')" >> "$GITHUB_ENV"
-
-      - name: Provision production-like Platform and Canary schemas
-        run: |
-          mariadb --protocol=tcp -h127.0.0.1 -uroot -p"$MARIADB_ROOT_PASSWORD" <<'SQL'
-          CREATE DATABASE IF NOT EXISTS oteryn_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-          CREATE DATABASE IF NOT EXISTS canary CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-          DROP TABLE IF EXISTS canary.cluster_sessions;
-          DROP TABLE IF EXISTS canary.guild_membership;
-          DROP TABLE IF EXISTS canary.guild_ranks;
-          DROP TABLE IF EXISTS canary.guilds;
-          DROP TABLE IF EXISTS canary.channels;
-          DROP TABLE IF EXISTS canary.players;
-          DROP TABLE IF EXISTS canary.accounts;
-
-          CREATE TABLE canary.accounts (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            password VARCHAR(255) NOT NULL,
-            email VARCHAR(255) NOT NULL,
-            creation BIGINT NOT NULL DEFAULT 0
-          );
-
-          CREATE TABLE canary.players (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            account_id BIGINT UNSIGNED NOT NULL,
-            level BIGINT NOT NULL DEFAULT 1,
-            vocation BIGINT NOT NULL DEFAULT 0,
-            deletion BIGINT NOT NULL DEFAULT 0
-          );
-
-          CREATE TABLE canary.guilds (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            ownerid BIGINT UNSIGNED NOT NULL,
-            level BIGINT NOT NULL DEFAULT 1,
-            creationdata BIGINT NOT NULL DEFAULT 0,
-            motd TEXT NOT NULL,
-            residence BIGINT NOT NULL DEFAULT 0,
-            points BIGINT NOT NULL DEFAULT 0
-          );
-
-          CREATE TABLE canary.guild_ranks (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            guild_id BIGINT UNSIGNED NOT NULL,
-            name VARCHAR(255) NOT NULL,
-            level BIGINT NOT NULL DEFAULT 1
-          );
-
-          CREATE TABLE canary.guild_membership (
-            player_id BIGINT UNSIGNED NOT NULL,
-            guild_id BIGINT UNSIGNED NOT NULL,
-            rank_id BIGINT UNSIGNED NOT NULL,
-            nick VARCHAR(255) NOT NULL DEFAULT ''
-          );
-
-          CREATE TABLE canary.channels (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            pvp_type VARCHAR(64) NOT NULL,
-            max_players BIGINT NOT NULL,
-            maintenance TINYINT(1) NOT NULL DEFAULT 0,
-            maintenance_message VARCHAR(500) NULL,
-            enabled TINYINT(1) NOT NULL DEFAULT 1,
-            sort_order BIGINT NOT NULL DEFAULT 0
-          );
-
-          CREATE TABLE canary.cluster_sessions (
-            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-            player_id BIGINT UNSIGNED NOT NULL,
-            channel_id BIGINT UNSIGNED NOT NULL,
-            status VARCHAR(32) NOT NULL,
-            expires_at BIGINT NOT NULL
-          );
-
-          INSERT INTO canary.accounts (id, name, password, email, creation) VALUES
-            (1, 'acceptance-account', 'not-a-user-credential', 'acceptance@example.test', UNIX_TIMESTAMP());
-
-          INSERT INTO canary.players (id, name, account_id, level, vocation, deletion) VALUES
-            (1, 'Acceptance Hero', 1, 703, 9, 0),
-            (2, 'VeryLongCharacterNameWithoutNaturalBreakpointsDesignedToStressMobileWrapping', 1, 612, 4, 0),
-            (3, 'Acceptance Scout', 1, 488, 3, 0);
-
-          INSERT INTO canary.guilds (id, name, ownerid, level, creationdata, motd, residence, points) VALUES
-            (1, 'Acceptance Guild', 1, 12, UNIX_TIMESTAMP(), 'A deliberately long guild message used to verify wrapping, hierarchy, and resilience without production data.', 7, 123456);
-
-          INSERT INTO canary.guild_ranks (id, guild_id, name, level) VALUES
-            (1, 1, 'Leader', 3),
-            (2, 1, 'Member With A Deliberately Long Rank Name For Layout Acceptance', 1);
-
-          INSERT INTO canary.guild_membership (player_id, guild_id, rank_id, nick) VALUES
-            (1, 1, 1, 'Founder'),
-            (2, 1, 2, 'An intentionally long nickname used to stress narrow table layouts');
-
-          INSERT INTO canary.channels (id, name, pvp_type, max_players, maintenance, maintenance_message, enabled, sort_order) VALUES
-            (1, 'Oteryn Alpha', 'open-pvp', 100, 0, NULL, 1, 1),
-            (2, 'ExtremelyLongChannelNameWithoutNaturalBreakpointsForResponsiveAcceptance', 'optional-pvp', 250, 1, 'Scheduled maintenance message used to verify wrapping on narrow screens.', 1, 2);
-
-          INSERT INTO canary.cluster_sessions (player_id, channel_id, status, expires_at) VALUES
-            (1, 1, 'ONLINE', CAST(UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000 AS UNSIGNED) + 600000),
-            (3, 2, 'ONLINE', CAST(UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000 AS UNSIGNED) + 600000);
-
-          CREATE USER IF NOT EXISTS 'oteryn_readonly'@'%' IDENTIFIED BY 'acceptance-ci-readonly-not-a-secret';
-          GRANT SELECT ON canary.* TO 'oteryn_readonly'@'%';
-          FLUSH PRIVILEGES;
-          SQL
-
-      - name: Provision runtime Redis acceptance state
-        run: |
-          redis-cli ACL SETUSER oteryn_runtime on '>acceptance-ci-runtime-not-a-secret' resetkeys '~cluster:channel:*:runtime' -@all +hmget +pttl +ping +select
-          redis-cli HSET cluster:channel:1:runtime channel_id 1 status ONLINE players_online 2
-          redis-cli PEXPIRE cluster:channel:1:runtime 600000
-          redis-cli HSET cluster:channel:2:runtime channel_id 2 status ONLINE players_online 250
-          redis-cli PEXPIRE cluster:channel:2:runtime 600000
-
-      - name: Migrate Platform database and seed deterministic acceptance state
-        run: |
-          php artisan migrate --force --no-interaction
-          php scripts/acceptance/seed.php seed
-
       - name: Install pinned browser harness
         run: |
-          npm install --no-save --ignore-scripts playwright@1.60.0
+          npm --prefix scripts/acceptance install --no-audit --no-fund
+          cd scripts/acceptance
           npx playwright install --with-deps chromium
 
-      - name: Start exact-SHA application
+      - name: Generate ephemeral acceptance application key
+        run: echo "APP_KEY=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')" >> "$GITHUB_ENV"
+
+      - name: Provision isolated production-like dependencies
+        run: bash scripts/acceptance/bootstrap-production-like.sh
+
+      - name: Start exact-SHA Laravel HTTP runtime
         run: |
-          php artisan serve --host=127.0.0.1 --port=8080 > /tmp/oteryn-acceptance-server.log 2>&1 &
-          echo $! > /tmp/oteryn-acceptance-server.pid
+          mkdir -p artifacts/acceptance
+          php artisan serve --host=127.0.0.1 --port=8080 >/tmp/oteryn-acceptance-server.log 2>&1 &
+          echo $! >/tmp/oteryn-acceptance-server.pid
           for attempt in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8080/health >/dev/null; then
               exit 0
             fi
             sleep 1
           done
-          cat /tmp/oteryn-acceptance-server.log
+          echo 'Acceptance HTTP runtime did not become healthy.' >&2
           exit 1
 
-      - name: Capture production-like browser evidence
+      - name: Execute browser acceptance profile
+        id: e2e
+        run: |
+          echo "Exact tested SHA: $ACCEPTANCE_SHA"
+          echo "Acceptance profile: $ACCEPTANCE_PROFILE"
+          if [ "$ACCEPTANCE_PROFILE" = 'smoke' ]; then
+            npm --prefix scripts/acceptance run test:smoke
+          else
+            npm --prefix scripts/acceptance test
+          fi
+
+      - name: Seed deterministic exploratory visual fixtures
+        if: steps.e2e.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
+        run: php scripts/acceptance/seed.php seed >/tmp/oteryn-visual-seed.json
+
+      - name: Execute bounded exploratory visual and accessibility pass
+        id: visual
+        if: steps.e2e.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
         run: node scripts/acceptance/visual-acceptance.js
 
-      - name: Build screenshot contact sheet
-        if: always()
+      - name: Build visual contact sheet
+        if: always() && env.ACCEPTANCE_PROFILE == 'full'
         run: |
-          mkdir -p "$ACCEPTANCE_OUTPUT_DIR"
           if compgen -G "$ACCEPTANCE_OUTPUT_DIR/screenshots/*.png" > /dev/null; then
             montage "$ACCEPTANCE_OUTPUT_DIR"/screenshots/*.png \
               -thumbnail '240x180>' \
@@ -267,19 +203,75 @@ jobs:
               -quality 72 \
               "$ACCEPTANCE_OUTPUT_DIR/contact-sheet.jpg"
           fi
+          if [ -d "$ACCEPTANCE_OUTPUT_DIR" ]; then
+            mkdir -p artifacts/acceptance/visual
+            cp -R "$ACCEPTANCE_OUTPUT_DIR"/. artifacts/acceptance/visual/
+          fi
           if [ -f "$ACCEPTANCE_OUTPUT_DIR/visual-acceptance-summary.md" ]; then
             cat "$ACCEPTANCE_OUTPUT_DIR/visual-acceptance-summary.md" >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Show acceptance server tail on failure
-        if: failure()
-        run: tail -n 200 /tmp/oteryn-acceptance-server.log || true
+      - name: Write durable non-secret acceptance evidence
+        if: always()
+        env:
+          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+          VISUAL_OUTCOME: ${{ steps.visual.outcome }}
+        run: |
+          mkdir -p artifacts/acceptance
+          if [ "$E2E_OUTCOME" = 'success' ] && [ "$ACCEPTANCE_PROFILE" = 'full' ]; then
+            AUTOMATED_E2E='AUTOMATED_E2E_PASS'
+            FUNCTIONAL='FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN'
+          elif [ "$E2E_OUTCOME" = 'success' ]; then
+            AUTOMATED_E2E='AUTOMATED_E2E_SMOKE_PASS'
+            FUNCTIONAL='FULL_ACCEPTANCE_NOT_EXECUTED'
+          else
+            AUTOMATED_E2E='AUTOMATED_E2E_FAIL'
+            FUNCTIONAL='FUNCTIONAL_ACCEPTANCE_NOT_PROVEN'
+          fi
 
-      - name: Upload visual UX evidence
+          if [ "$ACCEPTANCE_PROFILE" = 'full' ] && [ "$VISUAL_OUTCOME" = 'success' ]; then
+            VISUAL_UX='VISUAL_UX_EXPLORATORY_EXECUTED'
+          elif [ "$ACCEPTANCE_PROFILE" = 'full' ]; then
+            VISUAL_UX='VISUAL_UX_ACCEPTANCE_NOT_PROVEN'
+          else
+            VISUAL_UX='VISUAL_UX_NOT_EXECUTED'
+          fi
+
+          cat > artifacts/acceptance/evidence.json <<JSON
+          {
+            "exact_tested_sha": "$ACCEPTANCE_SHA",
+            "run_id": "$ACCEPTANCE_RUN_ID",
+            "profile": "$ACCEPTANCE_PROFILE",
+            "browser": "chromium",
+            "runtime": "real Laravel HTTP",
+            "platform_database": "MariaDB 11.8 isolated acceptance schema",
+            "canary_database": "MariaDB 11.8 isolated acceptance schema with operation-specific principals",
+            "runtime_dependency": "Redis 7.4 with dedicated ACL principal",
+            "mail_dependency": "MailHog SMTP test service",
+            "automated_e2e": "$AUTOMATED_E2E",
+            "functional_acceptance": "$FUNCTIONAL",
+            "visual_ux_acceptance": "$VISUAL_UX",
+            "production_smoke": "PRODUCTION_SMOKE_PENDING",
+            "e2e_result": "$E2E_OUTCOME",
+            "visual_result": "$VISUAL_OUTCOME"
+          }
+          JSON
+
+          {
+            echo '### Oteryn acceptance evidence'
+            echo "- exact tested SHA: \`$ACCEPTANCE_SHA\`"
+            echo "- profile: \`$ACCEPTANCE_PROFILE\`"
+            echo "- automated E2E: \`$AUTOMATED_E2E\`"
+            echo "- functional acceptance: \`$FUNCTIONAL\`"
+            echo "- visual/UX execution: \`$VISUAL_UX\`"
+            echo '- production smoke: `PRODUCTION_SMOKE_PENDING`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload acceptance evidence and failure artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: visual-ux-acceptance-${{ github.run_id }}
-          path: /tmp/oteryn-visual-acceptance
+          name: acceptance-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/acceptance
+          if-no-files-found: error
           retention-days: 14
-          if-no-files-found: warn
