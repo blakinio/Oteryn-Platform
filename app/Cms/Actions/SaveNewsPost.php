@@ -21,7 +21,7 @@ final class SaveNewsPost
     ): NewsPost {
         return DB::transaction(function () use ($actor, $post, $slug, $title, $body, $publishedAt): NewsPost {
             $created = $post === null;
-            $post ??= new NewsPost();
+            $post ??= new NewsPost;
             $post->fill([
                 'slug' => $slug,
                 'title' => $title,
