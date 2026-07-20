@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Accounts\Contracts\CanaryAccountProvisioningGateway;
 use App\CanaryIntegration\CanaryAccountProvisioner;
+use App\CanaryIntegration\CanaryCharacterCreator;
+use App\Characters\Contracts\CanaryCharacterCreationGateway;
 use App\Identity\Mfa\PendingMfaLogin;
 use App\Identity\Support\CanonicalEmail;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -16,6 +18,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(CanaryAccountProvisioningGateway::class, CanaryAccountProvisioner::class);
+        $this->app->bind(CanaryCharacterCreationGateway::class, CanaryCharacterCreator::class);
     }
 
     public function boot(): void
@@ -67,6 +70,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('identity-mfa-disable', function (Request $request): Limit {
+            return Limit::perMinute(5)->by($this->authenticatedIdentitySourceKey($request));
+        });
+
+        RateLimiter::for('character-create', function (Request $request): Limit {
             return Limit::perMinute(5)->by($this->authenticatedIdentitySourceKey($request));
         });
     }
