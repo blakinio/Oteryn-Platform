@@ -14,12 +14,18 @@ Phase status:
 - Phase 3: COMPLETE
 - Phase 4: COMPLETE
 - Phase 5: COMPLETE
-- Phase 6: COMPLETE by closure revalidation; closure PR #46 is pending merge at handover creation time
+- Phase 6: COMPLETE
 - Phase 7: NEXT / PLANNED
+
+Phase 6 closure merged through PR #46 as:
+
+`f25abd8799718ac99acce050ac55018d04fff2de`
+
+There is no active Phase 6 task after post-merge housekeeping.
 
 Source of truth remains live Git/PR/task state. This handover is a continuation aid, not a substitute for live verification.
 
-## Merged Phase 6 implementation
+## Merged Phase 6 work
 
 ### PR #44 — Admin/RBAC foundation
 
@@ -34,14 +40,14 @@ Delivered:
 - no administrator assigned by default;
 - no wildcard or implicit unrestricted-admin authorization path;
 - fail-closed `admin.permission` middleware;
-- current privileged-route composition:
+- privileged-route composition:
 
 `auth` + `mfa.confirmed` + `admin.permission:<exact-permission>`
 
 - first protected `/admin` surface;
 - authorization tests for unauthenticated, missing-MFA, missing-role, missing-permission, unknown-permission and authorized access.
 
-Final merge validation:
+Final validation:
 
 - CI #598: PASS
 - Agent Governance #519: PASS
@@ -69,12 +75,27 @@ Delivered:
 - ADR 0006 explicit RBAC/audit policy;
 - optional Cloudflare Access administrator-gate documentation.
 
-Final merge validation:
+Final validation:
 
 - CI #648: PASS
 - Agent Governance #569: PASS
 
 PR #45 had no comments and no review threads at merge gate.
+
+### PR #46 — Phase 6 closure
+
+Merged commit:
+
+`f25abd8799718ac99acce050ac55018d04fff2de`
+
+Closure revalidated merged `main`, synchronized ROADMAP/PROJECT_STATE/MODULE_CATALOG/ACTIVE_WORK, archived the completed PR #45 task and added this handover.
+
+Final validation:
+
+- CI #659: PASS
+- Agent Governance #580: PASS
+
+PR #46 had no comments and no review threads at merge gate.
 
 ## Phase 6 authorization model
 
@@ -190,7 +211,7 @@ Secrets/production-only configuration:
 
 Cloudflare option: `docs/operations/CLOUDFLARE_ACCESS_ADMIN.md`.
 
-## Phase 6 closure evidence
+## Phase 6 closure result
 
 Closure revalidation against merged `main` proved:
 
@@ -243,21 +264,14 @@ PR #45:
 
 No unresolved Phase 6 blocker remains.
 
-## Current closure task
+## Current continuation state
 
-Task:
+Active tasks: none.
 
-`OTERYN-20260720-phase6-closure`
+Current roadmap position:
 
-Branch:
-
-`task/OTERYN-20260720-phase6-closure`
-
-PR:
-
-#46 — `docs(phase6): close CMS Admin RBAC and audit phase`
-
-The closure PR is documentation-only. After it merges, housekeeping should archive the closure task, leave no active task, preserve Phase 6 COMPLETE / Phase 7 NEXT, and update this handover with the closure merge SHA.
+- Phase 6: COMPLETE
+- Phase 7: NEXT / PLANNED
 
 ## next_action
 
