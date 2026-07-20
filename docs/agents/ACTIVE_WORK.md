@@ -4,7 +4,7 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED ON FINAL PRODUCTION-ONLY EVIDENCE — PR #63 — `task/OTERYN-20260720-phase7-production-evidence-collection`
+- `OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED ON FINAL PRODUCTION-ONLY EVIDENCE — staging-validation PR #63 MERGED as `61f72ddda5c253f26c7d59aa7b6fce3506f120dc`
 
 ## Current project phase
 
@@ -20,22 +20,23 @@ Convenience index only. The individual active task record, live PR and Git state
 - PR #54 / `eb358a245f35fda1865f13e329c07ef0f4850d2f` — CSP and browser security headers.
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded structured request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 continuation handover.
+- PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
 
 ## Production-like Phase 7 validation
 
-PR #63 implemented and successfully executed the controlled production-like validation workflow.
+PR #63 implemented and successfully executed the controlled production-like validation workflow before squash merge.
 
-Evidence snapshot:
+Final PR-head evidence snapshot:
 
-- validation SHA: `b6dcd6ed95c55f400206864ffd6ff799e65aa2b3`;
+- validation SHA: `7842f78ec4ac2d07d3800ffe8bde9809b055822d`;
 - rollback SHA: `b6878c4775eda542738c78ea99fd5d2e19d2b35f`;
-- Phase 7 Production-Like Validation run `29779031870` / #5: PASS;
-- required CI run `29779031976` / #755: PASS;
-- Agent Governance run `29779031673` / #675: PASS;
-- measured controlled restore: `102 ms`, `13/13` tables, `11/11` migrations, validation-SHA probe matched;
+- Phase 7 Production-Like Validation run `29779554130` / #9: PASS;
+- required CI run `29779553687` / #759: PASS;
+- Agent Governance run `29779554188` / #679: PASS;
+- measured controlled restore: `105 ms`, `13/13` tables, `11/11` migrations, validation-SHA probe matched;
 - classification: `STAGING_PROVEN` only.
 
-The controlled validation closes the currently staging-verifiable deployment/rollback, configuration, DB privilege, Redis ACL, SMTP, critical-flow regression, security-smoke and backup/restore work. Detailed evidence and limitations are recorded in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`.
+The controlled validation closes the currently staging-verifiable deployment/rollback, configuration, DB privilege, Redis ACL, SMTP, critical-flow regression, security-smoke and backup/restore work. Detailed durable evidence and limitations are recorded in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`; the final PR body records the exact-head run #9 artifact and digest.
 
 Staging evidence must not be promoted to proof of final production state or production RTO/RPO.
 
