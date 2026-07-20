@@ -42,7 +42,7 @@ It must not contain production secrets, credentials, private keys, copied `.env`
 
 `PROVEN`
 
-- CI validates Composer metadata, installs locked dependencies, runs Pint, PHPStan and the full test suite.
+- CI validates Composer metadata, installs locked dependencies, runs Composer advisory audit, Pint, PHPStan and the full test suite.
 - The current GitHub Actions CI workflow does not deploy the application.
 - Target architecture is provider-neutral.
 
@@ -157,6 +157,7 @@ The repository also contains least-privilege grant templates and effective-grant
 
 - Mail configuration supports SMTP, log and array transports.
 - `.env.example` intentionally uses the in-memory `array` transport and states that production must configure a real transport with credentials injected outside Git.
+- `production:verify-configuration` rejects non-delivery default transports and invalid/reserved-test sender addresses for production configuration.
 
 `UNKNOWN`
 
@@ -170,18 +171,23 @@ The repository also contains least-privilege grant templates and effective-grant
 
 `PROVEN`
 
-- Application logging supports single-file and stderr output.
+- Application logging supports single-file and stderr output plus an optional JSON-to-stderr channel.
 - Security-event and administrator-audit application primitives exist.
+- Every Laravel-handled request receives a fresh server-generated UUID correlation identifier.
+- Normal responses expose that identifier through `X-Request-ID`.
+- The application does not trust inbound `X-Request-ID` as the authoritative request correlation identifier.
+- Request-completion logging is bounded to request ID, HTTP method, route name, response status and duration.
+- Request-completion logging intentionally excludes full URLs, query strings, request bodies, request headers and credential values.
 - Architecture requires no credentials/secrets in logs.
 
 `UNKNOWN`
 
 - actual centralized log sink;
-- structured-log format used in production;
-- correlation/request ID implementation;
+- whether the optional JSON stderr channel is selected in production;
 - metrics backend;
 - alerting/on-call destination;
-- retention and access-control policy.
+- retention and access-control policy;
+- whether request IDs are propagated through any external reverse proxy or downstream services.
 
 ### Backups and restore
 
@@ -213,7 +219,7 @@ Evidence must be non-secret and tied to an environment and date where practical.
 | Sessions/cache | Sanitized effective runtime configuration and scaling model proving whether shared state is required |
 | Queue | Effective queue configuration plus worker/supervision/retry evidence if asynchronous queues are enabled |
 | Mail | Provider/transport and sender-domain readiness summary without credentials |
-| Logs/metrics | Sink/retention/alerting configuration summary and sample redacted event shape |
+| Logs/metrics | Sink/retention/alerting configuration summary plus a sample redacted structured request event showing request ID propagation without query/body/credential data |
 | Backups | Backup policy plus a dated restore-test record containing scope, result and recovery measurements |
 
 A copied production `.env` file is never acceptable evidence because it exposes secrets and mixes configuration facts with credentials.
@@ -222,23 +228,25 @@ A copied production `.env` file is never acceptable evidence because it exposes 
 
 The next Phase 7 work should follow this order unless new evidence changes the dependency graph:
 
-1. **Runtime production-safety guardrails** — add a fail-closed, secret-free verifier for invariant configuration that is provider-independent: production mode, debug disabled, HTTPS application URL, secure session cookies and non-development mail behavior where mail-dependent flows are enabled.
-2. **Edge/origin/database exposure review** — requires actual deployment evidence; do not invent firewall or Cloudflare state.
-3. **Backup/restore contract and operational test record** — requires the selected Platform database/storage topology.
-4. **Logging/monitoring and correlation** — choose provider-neutral application shape first, then bind to the actual sink.
-5. **Dependency/security scanning and security headers/CSP review** — repository-owned and can proceed independently of most provider choices.
-6. **Queue/cache/mail production setup** — only introduce services that the deployed scaling/use-case evidence proves are needed.
-7. **Critical production E2E matrix** — run against exact deployed versions after topology, secrets, game-login bridge and operational dependencies are ready.
+1. **Runtime production-safety guardrails** — repository-owned invariant verification. **COMPLETE**.
+2. **Dependency/security scanning and security headers/CSP** — repository-owned merge/runtime hardening. **COMPLETE**.
+3. **Application request correlation and structured log shape** — provider-neutral application observability primitive. **IN PROGRESS** until PR #55 merges.
+4. **Edge/origin/database exposure review** — requires actual deployment evidence; do not invent firewall or Cloudflare state.
+5. **Backup/restore contract and operational test record** — requires the selected Platform database/storage topology.
+6. **Bind logging/metrics/alerting to the actual production sink** — requires external deployment evidence; application correlation alone is insufficient.
+7. **Queue/cache/mail production setup** — only introduce services that deployed scaling/use-case evidence proves are needed.
+8. **Critical production E2E matrix** — run against exact deployed versions after topology, secrets, game-login bridge and operational dependencies are ready.
 
 ## Current blocker boundary
 
 The repository alone cannot prove the actual deployed production topology.
 
-Therefore Phase 7 may continue with provider-independent repository hardening, but it must not claim any of the following until external deployment evidence exists:
+Therefore Phase 7 may continue with provider-independent repository hardening and operational documentation, but it must not claim any of the following until external deployment evidence exists:
 
 - Cloudflare/WAF/Access is enabled;
 - origin bypass is blocked;
 - databases or Redis are privately isolated;
+- HSTS is safely deployed for the actual hostname/subdomain policy;
 - backups are running or restorable;
 - centralized monitoring/alerting exists;
 - production mail delivery is functional;
