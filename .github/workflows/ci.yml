@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies from lockfile
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Audit Composer dependencies
+        run: composer audit --no-interaction
+
       - name: Check formatting
         run: vendor/bin/pint --test
 
