@@ -27,22 +27,14 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress --quiet
 
-      - name: Capture Pint output
-        id: pint
-        shell: bash
-        run: |
-          set +e
-          vendor/bin/pint --test --no-ansi > phase6-debug.log 2>&1
-          status=$?
-          echo "exit_status=${status}" >> "$GITHUB_OUTPUT"
-          exit 0
+      - name: Format the three reported files
+        run: vendor/bin/pint app/Cms/Actions/SaveManagedPage.php app/Cms/Actions/SaveNewsPost.php routes/console.php --no-ansi
 
-      - name: Upload diagnostic log
+      - name: Upload formatted files
         uses: actions/upload-artifact@v4
         with:
-          name: phase6-pint-debug
-          path: phase6-debug.log
-
-      - name: Fail when Pint failed
-        if: steps.pint.outputs.exit_status != '0'
-        run: exit 1
+          name: phase6-pint-fixed-files
+          path: |
+            app/Cms/Actions/SaveManagedPage.php
+            app/Cms/Actions/SaveNewsPost.php
+            routes/console.php
