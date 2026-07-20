@@ -4,11 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase6-closure` — PR #46 — `task/OTERYN-20260720-phase6-closure`
+None.
 
 ## Current project phase
 
-**Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE (closure revalidated; PR #46 pending merge)**
+**Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 
 **Phase 7 — Production hardening and operations: NEXT / PLANNED**
 
@@ -33,16 +33,17 @@ PR #45 merged as `be25d6ec3e0512bb9615329f99f16fff294d8b1d` and completed the pl
 - ADR 0006 RBAC/audit policy;
 - optional Cloudflare Access deployment documentation.
 
+PR #46 merged as `f25abd8799718ac99acce050ac55018d04fff2de` and closed Phase 6 after merged-main revalidation.
+
 Final exact-head validation before merge:
 
 - PR #44: CI #598 and Agent Governance #519 passed;
-- PR #45: CI #648 and Agent Governance #569 passed.
+- PR #45: CI #648 and Agent Governance #569 passed;
+- PR #46: CI #659 and Agent Governance #580 passed.
 
-## Phase 6 closure result
+## Phase 6 exit gate
 
-Closure revalidation against merged `main` found no remaining Phase 6 exit-gate gap.
-
-The exit gate is satisfied because:
+Satisfied:
 
 - administrator authorization is deny by default and unknown permissions fail closed;
 - every current admin web capability requires Platform authentication, confirmed MFA and an exact explicit permission;
@@ -75,13 +76,13 @@ Expected primary external scope remains `opentibiabr/login-server`; `blakinio/ca
 
 ## Recommended next work
 
-After PR #46 merges and closure housekeeping leaves no active task, start the smallest Phase 7 production-hardening discovery task by proving the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
+Start the smallest Phase 7 production-hardening discovery task by proving the actual deployed application/edge/origin/database/cache/queue/mail topology before making production-readiness changes or claims.
 
 ## Recently completed
 
-- `OTERYN-20260720-phase6-admin-cms-audit` — PR #45 / `be25d6ec3e0512bb9615329f99f16fff294d8b1d`; task archived by Phase 6 closure.
+- `OTERYN-20260720-phase6-closure` — PR #46 / `f25abd8799718ac99acce050ac55018d04fff2de`; task archived by post-merge housekeeping.
+- `OTERYN-20260720-phase6-admin-cms-audit` — PR #45 / `be25d6ec3e0512bb9615329f99f16fff294d8b1d`.
 - `OTERYN-20260720-phase6-admin-rbac-foundation` — PR #44 / `170d52393e543c8033ebd896f42fb43f3fccdf42`.
-- `OTERYN-20260720-phase5-closure` — PR #42 / `3732b29b06addecbd07423ef655489a35001247c`.
 
 ## Coordination rule
 
