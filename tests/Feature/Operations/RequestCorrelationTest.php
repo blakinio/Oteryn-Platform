@@ -44,8 +44,8 @@ final class RequestCorrelationTest extends TestCase
 
         Log::shouldHaveReceived('info')
             ->once()
-            ->withArgs(function (string $message, array $context) use ($requestId): bool {
-                if ($message !== 'http.request.completed') {
+            ->withArgs(function (mixed $message, mixed $context) use ($requestId): bool {
+                if ($message !== 'http.request.completed' || ! is_array($context)) {
                     return false;
                 }
 
@@ -53,12 +53,14 @@ final class RequestCorrelationTest extends TestCase
                     ['request_id', 'method', 'route', 'status', 'duration_ms'],
                     array_keys($context),
                 );
-                self::assertSame($requestId, $context['request_id']);
-                self::assertSame('GET', $context['method']);
-                self::assertSame('home', $context['route']);
-                self::assertSame(200, $context['status']);
-                self::assertIsFloat($context['duration_ms']);
-                self::assertGreaterThanOrEqual(0, $context['duration_ms']);
+                self::assertSame($requestId, $context['request_id'] ?? null);
+                self::assertSame('GET', $context['method'] ?? null);
+                self::assertSame('home', $context['route'] ?? null);
+                self::assertSame(200, $context['status'] ?? null);
+
+                $duration = $context['duration_ms'] ?? null;
+                self::assertIsFloat($duration);
+                self::assertGreaterThanOrEqual(0, $duration);
 
                 return true;
             });
