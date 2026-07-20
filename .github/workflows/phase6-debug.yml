@@ -1,0 +1,43 @@
+name: Phase 6 Debug
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          show-progress: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Check changed PHP syntax
+        run: |
+          php -l routes/console.php
+          php -l routes/web.php
+          php -l app/Admin/AdminRoleManager.php
+          php -l app/Http/Controllers/Admin/AdminNewsController.php
+          php -l app/Http/Controllers/Admin/AdminManagedPageController.php
+          php -l app/Http/Controllers/Admin/AdminRoleController.php
+          php -l app/Http/Controllers/Admin/AdminAuditController.php
+          php -l app/Cms/Actions/SaveNewsPost.php
+          php -l app/Cms/Actions/SaveManagedPage.php
+
+      - name: Install dependencies without scripts
+        run: composer install --no-interaction --prefer-dist --no-progress --quiet --no-scripts
+
+      - name: Run Laravel package discovery explicitly
+        run: php artisan package:discover --ansi
