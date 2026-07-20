@@ -4,7 +4,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 
 ## Last architecture-state update
 
-2026-07-20
+2026-07-21
 
 ## Current phase
 
@@ -15,7 +15,15 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 4 — Public website and read-only game data: COMPLETE**
 - **Phase 5 — Account and character management: COMPLETE**
 - **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
-- **Phase 7 — Production hardening and operations: IN PROGRESS / FINAL PRODUCTION EVIDENCE REQUIRED FOR COMPLETION**
+- **Phase 7 — Production hardening and operations: COMPLETE**
+
+## Operational release state
+
+- **Production Readiness: STAGING_PROVEN**
+- **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
+- **Production Verification: REQUIRED BEFORE GO-LIVE**
+
+ADR 0007 separates Phase 7 engineering/hardening completion from final production go-live verification. Phase 7 completion does not claim that the final production environment is production-ready or `PRODUCTION_PROVEN`.
 
 ## Current architecture state
 
@@ -29,7 +37,7 @@ Existing Canary accounts are not imported or claimed.
 
 Platform web authentication remains separate from the still-unimplemented authoritative game-login bridge.
 
-## Phase 7 repository-owned hardening completed on main
+## Phase 7 engineering/hardening completed
 
 - PR #48 / `676a77590e3ec93bcad0247b3065d203ac209c40` — production topology evidence baseline.
 - PR #49 / `0f876d4f2209399a85cafcff1623d8e6c810b914` — fail-closed provider-independent production configuration verifier.
@@ -38,6 +46,7 @@ Platform web authentication remains separate from the still-unimplemented author
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
+- ADR 0007 — durable separation of Phase 7 engineering completion from the Production Go-Live Gate.
 
 ## Phase 7 controlled production-like validation
 
@@ -56,7 +65,7 @@ Final PR-head staging artifact evidence:
 - source/restored migrations `11/11`;
 - validation-SHA probe matched.
 
-The controlled evidence closes the currently staging-verifiable work for:
+The controlled evidence closes the staging-verifiable engineering/hardening work for:
 
 - clean deployment, migrations, controlled rollback, interrupted-release isolation and redeploy;
 - provider-independent production configuration guardrails and invalid-config fail-closed behavior;
@@ -68,11 +77,13 @@ The controlled evidence closes the currently staging-verifiable work for:
 - running health, CSP/security headers, Secure/HttpOnly cookies, request correlation, JSON request-completion logging and representative sensitive-error/log behavior;
 - real production-like MariaDB backup/clean restore/integrity/restored-environment smoke with measured staging recovery time.
 
-The `105 ms` final-head recovery result and the earlier durable `102 ms` snapshot are staging measurements only. Neither is a production RTO or RPO.
+The `105 ms` final-head recovery result and the earlier `102 ms` staging snapshot are staging measurements only. Neither is a production RTO or RPO.
 
-Detailed durable evidence and the final production-only checklist are maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`; the merged PR #63 description records the exact final-head run artifact and digest.
+Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`.
 
-## Phase 7 final production-only completion evidence
+## Production Go-Live Gate
+
+The authoritative fail-closed gate is `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
 
 Controlled staging cannot prove the final production:
 
@@ -89,9 +100,13 @@ Controlled staging cannot prove the final production:
 - production backup scope/schedule/retention/encryption/access policy and a dated production restore result;
 - final critical production smoke/E2E checks against the exact deployed SHA.
 
-The authoritative Platform game-login bridge remains unresolved if Platform-originated game login is part of launch scope.
+These facts remain `UNKNOWN` until directly proven in the final production environment. `STAGING_PROVEN` or `REPO-PROVEN` evidence does not promote them to `PRODUCTION_PROVEN`.
 
-Therefore Phase 7 must remain incomplete until the applicable final-production evidence gates are satisfied or explicitly risk-accepted where policy permits.
+An eligible owner risk decision, where policy permits, does not fabricate production evidence and cannot be used to claim that an unverified production fact was verified.
+
+The Production Go-Live Gate must remain pending until its mandatory production verification is complete.
+
+The authoritative Platform game-login bridge remains a separately authorized cross-repository requirement. If Platform-originated game login is part of launch scope, the go-live gate remains blocked until that requirement is resolved and proven end to end.
 
 ## Repository-verifiable operations gates
 
@@ -135,21 +150,23 @@ Platform-originated users still require a separately authorized authoritative ga
 
 Expected external scope remains primarily `opentibiabr/login-server`; `blakinio/canary` changes require separate explicit authorization if needed by the selected protocol.
 
-No Canary/login-server repository was modified by Phase 7 work.
+No Canary/login-server repository was modified by Phase 7 work or ADR 0007.
 
 ## Current active task
 
-`OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED only on final production-only evidence after merged staging-validation PR #63.
+None.
+
+The completed staging-evidence task and ADR 0007/go-live separation task are archived under `docs/agents/tasks/archive/`.
 
 ## Recommended next work
 
-When actual production access and deployment authorization are available, execute only the `PRODUCTION_PROVEN` checklist in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md` against the exact deployed SHA(s).
+When actual production access and deployment authorization are available, create a bounded production-verification task and execute only the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
 
-Do not repeat the closed staging validation unless the production candidate code or relevant contracts change, and do not mark Phase 7 COMPLETE from staging evidence alone.
+Do not repeat the closed staging validation unless the production candidate code or relevant contracts change materially, and do not claim production readiness from staging evidence alone.
 
 ## High-priority remaining unknowns
 
-- authoritative Platform game-login assertion/session protocol and rollout;
+- authoritative Platform game-login assertion/session protocol and rollout if required for launch scope;
 - deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
 - production database, mail, session/cache and queue topology;

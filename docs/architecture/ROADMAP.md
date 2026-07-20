@@ -199,42 +199,69 @@ Exit gate — satisfied by closure revalidation:
 
 ## Phase 7 — Production hardening and operations
 
-**Status: IN PROGRESS**
+**Status: COMPLETE**
 
-Current discovery baseline:
+Delivered engineering/hardening scope:
 
-- PR #48 separates repository-proven runtime/deployment capabilities from actual deployed production facts;
-- actual provider, Cloudflare/WAF/Access state, origin ingress restrictions, production DB/Redis endpoints, session/cache backend, queue/worker model, mail provider, monitoring sink, backups and deployment/rollback mechanism remain `UNKNOWN` until non-secret external deployment evidence proves them;
-- local `.env.example` defaults are explicitly not production evidence;
-- `docs/operations/PRODUCTION_TOPOLOGY_EVIDENCE.md` defines the evidence required to promote each boundary from `UNKNOWN` to `PROVEN` and the dependency order for hardening tasks.
+- production topology evidence model that separates repository/staging proof from actual deployed production facts;
+- provider-independent fail-closed production configuration verification;
+- required Composer advisory scanning and bounded dependency-update automation;
+- CSP and browser security headers with regression coverage;
+- server-generated request correlation and structured JSON request-completion logging primitives;
+- production-readiness/go-live checklist plus incident and recovery runbooks;
+- database-enforced generic Canary read-only boundary and fail-closed effective-grant verification for generic, provisioning and character-create principals;
+- controlled production-like deployment, migration, rollback, interrupted-release isolation and redeploy validation;
+- controlled production-like Redis ACL/key/command validation and missing/malformed/unavailable dependency semantics;
+- delivery-capable SMTP validation plus unavailable-mail behavior;
+- exact-SHA critical feature/integration regression coverage across Identity, admin/RBAC/CMS, account/binding, character creation and public game-data flows;
+- live production-like health, CSP/security-header, Secure/HttpOnly cookie, request-correlation, structured-log and representative sensitive-error checks;
+- real production-like MariaDB backup, clean restore, integrity verification and restored-environment smoke with staging-only recovery timing.
 
-Deliverables:
+Phase 7 closure evidence:
 
-- production deployment architecture;
-- Cloudflare/WAF/rate-limit configuration plan;
-- origin/database network restriction;
-- backups and tested restore procedure;
-- structured logging and monitoring;
-- dependency/security scanning;
-- security headers/CSP review;
-- queue/cache/mail production setup where used;
-- runbooks for incident/recovery;
-- end-to-end regression suite for critical account/game-login flows.
+- PR #63 merged as `61f72ddda5c253f26c7d59aa7b6fce3506f120dc`;
+- final PR head `7842f78ec4ac2d07d3800ffe8bde9809b055822d` passed Phase 7 Production-Like Validation #9, required CI #759 and Agent Governance #679;
+- controlled evidence is classified `STAGING_PROVEN` only;
+- final-head controlled restore measured `105 ms` with `13/13` tables, `11/11` migrations and matching validation-SHA probe; this is not production RTO/RPO.
 
-Dependency order after discovery:
+Exit gate — satisfied under ADR 0007:
 
-1. provider-independent runtime production-safety guardrails;
-2. edge/origin/database exposure review when actual deployment evidence exists;
-3. backup/restore contract and operational test;
-4. logging/monitoring and request correlation;
-5. dependency/security scanning and security headers/CSP review;
-6. queue/cache/mail production setup only where evidence proves need;
-7. critical E2E verification against exact deployed versions.
+- required Phase 7 hardening/operations mechanisms are delivered in the repository;
+- required repository CI, including dependency advisory audit, formatting, static analysis and full tests, passed on the exact final staging-validation PR head;
+- controlled production-like validation passed for the staging-verifiable deployment/rollback, configuration, database privilege, Redis, SMTP, critical-flow, security-smoke and backup/restore boundaries;
+- staging evidence remains explicitly separate from final production evidence.
 
-Exit gate:
+Phase 7 completion is an engineering/hardening milestone. It does **not** claim that the final production environment is verified or approved for go-live. ADR 0007 separates the final production verification into the fail-closed Production Go-Live Gate below.
 
-- production readiness checklist complete;
-- known critical/high findings resolved or explicitly risk-accepted by owner.
+## Production Go-Live Gate — operational release gate
+
+**Status: PENDING PRODUCTION VERIFICATION**
+
+**Production Readiness: STAGING_PROVEN**
+
+**Production Verification: REQUIRED BEFORE GO-LIVE**
+
+The authoritative gate is `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
+
+Go-live cannot pass until mandatory final-production facts are directly verified for the selected launch scope. Staging evidence cannot be promoted to `PRODUCTION_PROVEN`.
+
+The gate includes direct production verification of:
+
+- exact deployed Oteryn Platform SHA and relevant Canary/login-server versions;
+- production DNS/Cloudflare/WAF/Access/TLS behavior;
+- direct-origin exposure and ingress firewall/reverse-proxy restrictions;
+- production Platform/Canary DB topology, network isolation and effective grants;
+- production runtime Redis endpoint/ACL/network/TLS state;
+- production session/cache/queue topology and worker behavior where applicable;
+- production mail provider/domain/delivery monitoring;
+- production logging/metrics/alerts/retention/access/on-call routing;
+- actual provider deployment/migration/rollback mechanism and emergency operator authorization;
+- production backup policy/schedule and dated production restore evidence;
+- final production health/readiness and critical smoke/E2E checks against the exact deployed SHA.
+
+If Platform-originated authoritative game login is required for launch scope, the separately authorized game-login bridge must also be resolved before the gate can pass.
+
+An explicit owner risk decision, where policy permits, does not fabricate `PRODUCTION_PROVEN` evidence and cannot be used to claim an unverified production fact was verified.
 
 ## Phase 8 — Payments, coins and shop
 

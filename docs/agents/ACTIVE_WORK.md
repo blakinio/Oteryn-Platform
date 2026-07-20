@@ -4,13 +4,21 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260720-phase7-production-evidence-collection` — BLOCKED ON FINAL PRODUCTION-ONLY EVIDENCE — staging-validation PR #63 MERGED as `61f72ddda5c253f26c7d59aa7b6fce3506f120dc`
+None.
 
 ## Current project phase
 
 **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 
-**Phase 7 — Production hardening and operations: IN PROGRESS / FINAL PRODUCTION EVIDENCE REQUIRED FOR COMPLETION**
+**Phase 7 — Production hardening and operations: COMPLETE**
+
+## Operational release state
+
+- **Production Readiness: STAGING_PROVEN**
+- **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
+- **Production Verification: REQUIRED BEFORE GO-LIVE**
+
+ADR 0007 separates Phase 7 engineering/hardening completion from final production go-live verification. No production-specific `UNKNOWN` is promoted by this status change.
 
 ## Completed Phase 7 repository-owned slices
 
@@ -22,11 +30,11 @@ Convenience index only. The individual active task record, live PR and Git state
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 continuation handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
 
+The staging evidence task `OTERYN-20260720-phase7-production-evidence-collection` and the Phase 7/go-live separation task `OTERYN-20260721-phase7-go-live-gate-separation` are archived under `docs/agents/tasks/archive/`.
+
 ## Production-like Phase 7 validation
 
-PR #63 implemented and successfully executed the controlled production-like validation workflow before squash merge.
-
-Final PR-head evidence snapshot:
+Final PR #63 head evidence:
 
 - validation SHA: `7842f78ec4ac2d07d3800ffe8bde9809b055822d`;
 - rollback SHA: `b6878c4775eda542738c78ea99fd5d2e19d2b35f`;
@@ -36,13 +44,15 @@ Final PR-head evidence snapshot:
 - measured controlled restore: `105 ms`, `13/13` tables, `11/11` migrations, validation-SHA probe matched;
 - classification: `STAGING_PROVEN` only.
 
-The controlled validation closes the currently staging-verifiable deployment/rollback, configuration, DB privilege, Redis ACL, SMTP, critical-flow regression, security-smoke and backup/restore work. Detailed durable evidence and limitations are recorded in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`; the final PR body records the exact-head run #9 artifact and digest.
+The controlled validation closes the staging-verifiable deployment/rollback, configuration, DB privilege, Redis ACL, SMTP, critical-flow regression, security-smoke and backup/restore engineering work.
 
 Staging evidence must not be promoted to proof of final production state or production RTO/RPO.
 
-## Final production-only completion evidence
+## Production Go-Live Gate
 
-Phase 7 now waits only for facts requiring the actual final production environment or separately authorized scope. The minimal pass is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md` and includes:
+The authoritative fail-closed gate is `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
+
+It requires direct production evidence for:
 
 1. exact deployed production SHA(s) and relevant Canary/login-server versions;
 2. production DNS/edge/Cloudflare/TLS/origin/firewall state;
@@ -55,7 +65,13 @@ Phase 7 now waits only for facts requiring the actual final production environme
 9. production backup schedule/policy and dated production restore result;
 10. final production critical smoke/E2E checks against the exact deployed SHA.
 
-Until those facts are proven or eligible risks are explicitly owner-accepted, do not mark Phase 7 COMPLETE.
+These facts remain `UNKNOWN` until directly proven. The gate cannot become `PASS` from `REPO-PROVEN` or `STAGING_PROVEN` evidence alone.
+
+## Next work
+
+When actual production access and deployment authorization are available, create a bounded production-verification task and execute the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
+
+Do not repeat closed staging validation unless the production candidate code or relevant contracts change materially.
 
 ## Repository-verifiable preflight commands
 
@@ -70,7 +86,7 @@ These commands prove only their documented boundaries and the environment in whi
 
 ## Remaining cross-repository dependency
 
-The authoritative Platform game-login bridge remains separate and requires explicit authorization before external repository writes if it is part of launch scope.
+The authoritative Platform game-login bridge remains separate and requires explicit authorization before external repository writes if it is part of launch scope. If required for launch, the Production Go-Live Gate remains blocked until it is resolved and proven.
 
 ## Coordination rule
 

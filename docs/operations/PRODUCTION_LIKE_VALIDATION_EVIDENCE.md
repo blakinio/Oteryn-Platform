@@ -14,38 +14,44 @@ Evidence classifications used here:
 
 A successful staging result may prove that a procedure, guardrail or least-privilege design works under controlled production-like conditions. It does not prove final production DNS, TLS, firewall, network isolation, provider configuration, deployed credentials, backup schedule, monitoring sink or exact deployed production SHA.
 
-## Successful controlled validation
+Under ADR 0007, this evidence closes the Phase 7 engineering/hardening validation boundary but does not satisfy the separate Production Go-Live Gate.
 
-Validation date: `2026-07-20T21:10:06Z`
+## Latest successful exact-head controlled validation
+
+Validation date: `2026-07-20T21:18:07Z`
 
 Workflow: `Phase 7 Production-Like Validation`
 
-Workflow run: `29779031870` / run number `5`
+Workflow run: `29779554130` / run number `9`
 
-Validated Oteryn Platform SHA: `b6dcd6ed95c55f400206864ffd6ff799e65aa2b3`
+Validated Oteryn Platform SHA: `7842f78ec4ac2d07d3800ffe8bde9809b055822d`
 
 Rollback target SHA: `b6878c4775eda542738c78ea99fd5d2e19d2b35f`
 
-Evidence artifact: `phase7-production-like-evidence-29779031870`
+Evidence artifact: `phase7-production-like-evidence-29779554130`
 
-Evidence artifact digest: `sha256:5667b86ed0a8aaeb1d0a269cf2f5ff0a1e8c237ba6a67420c5e16fa35a3248a9`
+Evidence artifact digest: `sha256:e4b272dee3ac26ed789525b3191946b74a41685910f436db41ef8df49d64f96b`
 
-Required repository CI on the same validation SHA: run `29779031976` / CI run number `755` — PASS.
+Required repository CI on the same validation SHA: run `29779553687` / CI run number `759` — PASS.
+
+Agent Governance on the same validation SHA: run `29779554188` / run number `679` — PASS.
 
 The artifact contains only non-secret status values, exact commit identities, timestamp, row-count integrity measurements and restore duration. It intentionally contains no credentials, connection strings, private endpoints or environment dump.
+
+An earlier successful controlled run #5 on SHA `b6dcd6ed95c55f400206864ffd6ff799e65aa2b3` measured a `102 ms` restore. The latest final-PR-head run #9 below measured `105 ms`. Both measurements are staging-only recovery evidence and neither is a production RTO or RPO.
 
 ## Staging evidence matrix
 
 | Boundary | Classification | Evidence |
 |---|---|---|
-| Exact staging validation SHA | `STAGING_PROVEN` | Workflow run 5 validated `b6dcd6ed95c55f400206864ffd6ff799e65aa2b3`. |
+| Exact staging validation SHA | `STAGING_PROVEN` | Workflow run 9 validated final PR #63 head `7842f78ec4ac2d07d3800ffe8bde9809b055822d`. |
 | Clean deployment | `STAGING_PROVEN` | Clean release directory was built from the exact validation SHA and activated through the controlled release pointer. |
 | Migrations | `STAGING_PROVEN` | `php artisan migrate --force --no-interaction` passed against the production-like Platform MariaDB database. |
 | Configuration guardrails | `STAGING_PROVEN` | `php artisan production:verify-configuration` passed; a deliberate `APP_DEBUG=true` mutation failed closed. |
 | Health/readiness | `STAGING_PROVEN` | The deployed release booted and `/health` returned successfully. |
 | Rollback | `STAGING_PROVEN` | Release pointer switched to `b6878c4775eda542738c78ea99fd5d2e19d2b35f`; configuration and migration-state smoke passed. |
 | Interrupted deployment isolation | `STAGING_PROVEN` | An incomplete release directory was created without changing the active release pointer. |
-| Redeploy current SHA | `STAGING_PROVEN` | Release pointer returned to `b6dcd6ed95c55f400206864ffd6ff799e65aa2b3`; migrations/configuration passed again. |
+| Redeploy current SHA | `STAGING_PROVEN` | Release pointer returned to `7842f78ec4ac2d07d3800ffe8bde9809b055822d`; migrations/configuration passed again. |
 | Generic Canary read-only effective grants | `STAGING_PROVEN` | Real MariaDB principal provisioned from the reviewed SQL template; `canary:verify-db-privileges` passed. |
 | Generic Canary write denial | `STAGING_PROVEN` | The read-only principal was denied an `UPDATE` attempt. |
 | Generic Canary excess privilege fail-closed | `STAGING_PROVEN` | Temporary `UPDATE` privilege caused the application verifier to fail; privilege was revoked and the verifier passed again. |
@@ -64,7 +70,7 @@ The artifact contains only non-secret status values, exact commit identities, ti
 | Session runtime path | `STAGING_PROVEN` | Controlled environment used the repository's file-session default; live web middleware produced a Secure and HttpOnly session cookie. This does not prove production multi-instance suitability. |
 | Cache mode | `STAGING_PROVEN` | The controlled environment had no external cache dependency and used the repository's file-cache default; no production shared-cache requirement is inferred from this result. |
 | Queue mode | `STAGING_PROVEN` | The controlled environment used the repository's synchronous queue mode and completed critical flows without an asynchronous worker dependency. Production queue topology remains a separate decision if scope changes. |
-| Full exact-SHA regression suite | `STAGING_PROVEN` | The production-like workflow's isolated test environment completed `composer test`; required CI run 755 independently passed Composer audit, Pint, PHPStan and full tests on the same SHA. |
+| Full exact-SHA regression suite | `STAGING_PROVEN` | The production-like workflow's isolated test environment completed `composer test`; required CI #759 independently passed Composer audit, Pint, PHPStan and full tests on the same SHA. |
 | Registration and Identity↔Canary binding | `STAGING_PROVEN` | Exact-SHA feature coverage validates registration, durable binding intent, ready binding and failure-to-pending behavior; MariaDB integration coverage separately exercises the real provisioning adapter and least-privilege boundary. |
 | Login/logout and session revocation | `STAGING_PROVEN` | Exact-SHA Identity web-session feature coverage passed in the full suite. |
 | Password recovery/change | `STAGING_PROVEN` | Exact-SHA password recovery/change feature coverage passed; the controlled environment separately proved a delivery-capable SMTP path. Final production provider/domain delivery remains `UNKNOWN`. |
@@ -85,7 +91,7 @@ The artifact contains only non-secret status values, exact commit identities, ti
 | Clean restore | `STAGING_PROVEN` | Backup restored into a newly created clean database. |
 | Restore integrity | `STAGING_PROVEN` | Source/restored table counts matched `13/13`; migration counts matched `11/11`; a SHA-tagged restore probe matched the validated SHA. |
 | Restored-environment smoke | `STAGING_PROVEN` | `migrate:status` and production configuration verification passed against the restored database. |
-| Measured staging restore time | `STAGING_PROVEN` | Restore completed in `102 ms` for this controlled dataset on `2026-07-20`; this is **not** a production RTO or RPO. |
+| Measured staging restore time | `STAGING_PROVEN` | Latest final-head restore completed in `105 ms` for this controlled dataset on `2026-07-20`; this is **not** a production RTO or RPO. |
 | HTTPS/TLS termination and reverse-proxy trust | `UNKNOWN` | The controlled run enforces HTTPS application configuration and Secure cookies but does not include the final edge/TLS/reverse-proxy topology. Must be verified in the final environment. |
 | Centralized logging/metrics/alerts/on-call | `UNKNOWN` | Application JSON logging primitive is proven; final production sink, retention, access, alerting and on-call routing require final environment evidence. |
 
@@ -104,13 +110,13 @@ This composition is `STAGING_PROVEN`. It is not a substitute for final productio
 
 ## Recovery evidence interpretation
 
-The measured `102 ms` restore time applies only to the small controlled staging dataset and runner used by workflow run 5. It must not be converted into a production RTO or RPO.
+The measured `105 ms` latest final-head restore time and earlier `102 ms` staging restore apply only to the small controlled datasets and runners used by the corresponding workflows. Neither may be converted into a production RTO or RPO.
 
 The deployment/rollback result proves the controlled release-directory and atomic pointer-switch model works. It does not prove that the final hosting provider uses that model or that provider-specific rollback access is configured correctly.
 
-## Final production verification pass
+## Final Production Go-Live verification pass
 
-The following items remain `UNKNOWN` until directly proven in the final production environment. This is the minimal production-only pass after staging-verifiable work is closed:
+The following items remain `UNKNOWN` until directly proven in the final production environment. This is the minimal production-only pass after Phase 7 engineering/hardening completion:
 
 - [ ] `PRODUCTION_PROVEN` — exact deployed Oteryn Platform SHA and relevant Canary/login-server versions; confirm required CI passed for the exact production candidate.
 - [ ] `PRODUCTION_PROVEN` — production DNS/proxy/Cloudflare/WAF/Access state and actual TLS termination/certificate behavior; make the HSTS decision from the real hostname/TLS policy.
@@ -128,4 +134,11 @@ The following items remain `UNKNOWN` until directly proven in the final producti
 - [ ] `PRODUCTION_PROVEN` — final production health/readiness and critical smoke/E2E checks against the exact deployed SHA, including registration/login/logout/password recovery/MFA/admin/RBAC/CMS/provisioning/binding/character/public reads as applicable to launch scope.
 - [ ] Resolve the separately authorized authoritative game-login bridge if Platform-originated game login is part of launch scope.
 
-Phase 7 must remain IN PROGRESS until the applicable final production-only items are directly proven or an eligible risk is explicitly accepted by the owner under repository policy.
+Under ADR 0007:
+
+- **Phase 7 — COMPLETE**;
+- **Production Readiness — STAGING_PROVEN**;
+- **Production Go-Live Gate — PENDING PRODUCTION VERIFICATION**;
+- **Production Verification — REQUIRED BEFORE GO-LIVE**.
+
+The go-live gate must remain fail closed until its mandatory production evidence is directly proven. No staging evidence is promoted to `PRODUCTION_PROVEN` by Phase 7 completion.
