@@ -6,6 +6,11 @@ import {
   installDiagnostics,
 } from './helpers.mjs';
 
+test.use({
+  trace: 'retain-on-failure',
+  screenshot: 'only-on-failure',
+});
+
 test.beforeEach(async ({ page }) => {
   page.__acceptanceDiagnostics = installDiagnostics(page);
 });
