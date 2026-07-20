@@ -120,9 +120,6 @@ final class CanaryCharacterCreator implements CanaryCharacterCreationGateway
         }
     }
 
-    /**
-     * @return object|null
-     */
     private function findByCanonicalName(ConnectionInterface $connection, string $canonicalName): ?object
     {
         return $connection->table('players')
