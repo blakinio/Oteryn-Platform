@@ -28,4 +28,4 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --quiet
 
       - name: Run focused RBAC test
-        run: php artisan test --filter=test_admin_route_requires_authentication --no-ansi
+        run: php artisan test --filter=test_admin_route_requires_confirmed_mfa_even_when_role_grants_access --no-ansi
