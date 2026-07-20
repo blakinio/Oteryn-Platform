@@ -16,22 +16,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  static-diagnostic:
-    runs-on: ubuntu-latest
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
-    steps:
-      - name: Show concise PHPStan errors on PHP 8.5
-        run: |
-          git init -q repo
-          cd repo
-          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch -q --depth=1 origin "refs/pull/${{ github.event.pull_request.number }}/merge"
-          git checkout -q FETCH_HEAD
-          curl -sS https://getcomposer.org/download/latest-stable/composer.phar -o composer.phar
-          docker pull -q php:8.5-cli >/dev/null
-          docker run --rm -v "$PWD:/app" -w /app php:8.5-cli sh -lc 'apt-get update -qq && apt-get install -y -qq unzip >/dev/null && php composer.phar install --no-interaction --prefer-dist --no-progress --quiet --ignore-platform-reqs && php vendor/bin/phpstan analyse --no-progress --memory-limit=512M --error-format=raw'
-
   test:
     runs-on: ubuntu-latest
     services:
