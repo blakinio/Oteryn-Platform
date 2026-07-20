@@ -42,8 +42,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-20T13:05:00Z
-head: 61b35564cac3aacfa788a692affe1553698f2029
+updated_at: 2026-07-20T13:18:00Z
+head: 8f14651bcb204f405cf5b8c1b9bde679a148a613
 branch: task/OTERYN-20260720-phase7-request-correlation-logging
 pr: 55
 status: validating
@@ -68,17 +68,18 @@ proven:
   - Normal responses receive X-Request-ID and request completion logging is bounded to request_id, method, route, status and duration_ms.
   - Request log context intentionally excludes full URLs, query strings, request bodies, headers and credentials.
   - config/logging.php exposes an optional stderr_json Monolog channel while preserving the existing default logging choice.
-  - The temporary diagnostic workflow captured the exact PHPStan errors and was removed before merge readiness.
-  - Exact diagnostic: PHPStan rejected static Log::shouldHaveReceived() in RequestCorrelationTest; the test now keeps the typed object returned by Log::spy() and asserts on that object instead.
-  - Agent Governance #631 and #632 passed before the temporary debug-workflow checkpoint drift; the final synchronized head still requires fresh validation.
+  - Exact PHPStan diagnostic identified static Log::shouldHaveReceived() in RequestCorrelationTest as the original static-analysis failure; the test now uses a typed in-memory PSR logger through Log::swap().
+  - Exact Pint diagnostic identified one formatting-only difference; the Pint-formatted version was applied.
+  - Both temporary diagnostic workflows were removed before merge readiness and do not remain in the final PR diff.
+  - CI #721 passed Composer advisory audit, Pint, PHPStan and the full test suite on 8f14651bcb204f405cf5b8c1b9bde679a148a613.
 derived:
   - Server-generated correlation is provider-neutral and can be collected by a future centralized sink without trusting client-supplied IDs.
-  - Passing repository tests can prove safe application log shape but cannot prove a deployed centralized log/metrics/alerting service.
+  - Passing repository tests proves the application-side correlation/log shape but does not prove a deployed centralized log, metrics or alerting service.
 unknown: []
 conflicts: []
 first_failure:
   marker: CI #711/#712 Run static analysis
-  evidence: PHPStan reported three errors in RequestCorrelationTest for undefined static Log::shouldHaveReceived() and chained calls on mixed; diagnostic artifact identified the exact lines.
+  evidence: PHPStan reported undefined static Log::shouldHaveReceived() and chained calls on mixed; a focused diagnostic artifact identified the exact lines before the test was rewritten with a typed in-memory PSR logger.
 rejected_hypotheses:
   - Trust inbound X-Request-ID as authoritative correlation: rejected because it is untrusted browser input and can enable spoofed log correlation.
   - Hard-code a specific observability vendor: rejected because actual production logging/metrics topology remains UNKNOWN.
@@ -96,16 +97,25 @@ validation:
     result: FAIL
     evidence: Composer advisory audit and Pint passed; PHPStan failed before tests.
   - command: temporary Phase 7 Correlation Debug workflow run 1
-    result: EXPECTED_FAIL_DIAGNOSTIC
-    evidence: artifact identified static Log::shouldHaveReceived() as the exact PHPStan root cause; workflow removed after use.
-  - command: full CI and Agent Governance after exact fix and debug-workflow removal
+    result: FAIL
+    evidence: intentional diagnostic run captured the exact PHPStan failure artifact and was removed after use.
+  - command: CI #718
+    result: FAIL
+    evidence: PHPStan issue was removed, then Pint exposed one formatting-only difference in the typed test logger.
+  - command: temporary Phase 7 Correlation Format Debug workflow run 1
+    result: PASS
+    evidence: Pint produced the exact formatted test artifact; that output was applied and the workflow was removed.
+  - command: CI #721 on 8f14651bcb204f405cf5b8c1b9bde679a148a613
+    result: PASS
+    evidence: Composer audit, formatting, PHPStan and full tests all passed.
+  - command: final exact-head CI and Agent Governance after documentation synchronization
     result: NOT_RUN
-    evidence: required before documentation synchronization and merge.
+    evidence: required before squash merge.
 blockers:
   - none
-next_action: Run full CI and Agent Governance on the fixed branch; if green, synchronize Phase 7 state/evidence and complete exact-head merge validation.
+next_action: Synchronize Phase 7 project/security/topology documentation, then verify exact-head CI and Agent Governance and squash-merge PR #55 if green.
 ```
 
 ## Notes
 
-No temporary diagnostic workflow remains on the branch. The merged implementation must contain only the provider-neutral request-correlation/logging changes and their tests/documentation.
+No temporary diagnostic workflow remains on the branch. The implementation is provider-neutral and does not claim that a centralized production observability sink is deployed.
