@@ -16,8 +16,8 @@ This catalog defines module responsibilities and dependency boundaries.
 | Characters | AVAILABLE | Contract-approved web-triggered character operations; currently create | Direct undocumented Canary writes; uncontracted rename/delete |
 | PublicGameData | AVAILABLE | Read models/queries for characters, guilds, highscores, online/status | Privileged mutations |
 | CMS | AVAILABLE | Public content reads and permission-scoped Platform content management | Identity policy, game state, rich/upload surfaces without explicit security controls |
-| Admin | IMPLEMENTING | Admin UI, privileged use cases, RBAC integration | Bypassing domain/application invariants |
-| Audit | IMPLEMENTING | Security/admin audit query surface and privileged-action audit | Secrets, raw credentials, business-rule authorization decisions |
+| Admin | AVAILABLE | Admin UI, explicit RBAC/policies, privileged Platform use cases | Bypassing domain/application invariants or granting implicit wildcard authority |
+| Audit | AVAILABLE | Security/admin audit primitives, privileged-action audit and bounded admin audit visibility | Secrets, raw credentials, business-rule authorization decisions |
 | Integration | AVAILABLE | Implemented Canary read/write adapters, schema translation, contract enforcement; future login bridge remains separate | Product policy that belongs in domain modules |
 | Notifications | PLANNED | Email and asynchronous user notifications | Core auth decisions, payment settlement |
 | PlatformAPI | PLANNED | Stable first-party API endpoints and API-specific auth/limits | Duplicating business logic from modules |
@@ -47,7 +47,7 @@ Phase 5 makes Platform Identity the ownership authority for supported greenfield
 - one authoritative Platform Identity policy for supported product users;
 - user credentials never stored reversibly;
 - security-sensitive changes may revoke Platform web sessions;
-- privileged/Admin routes combine authentication, explicit Phase 6 authorization and `mfa.confirmed`;
+- privileged/Admin routes combine authentication, explicit authorization and `mfa.confirmed`;
 - MFA never grants authorization by itself;
 - game-login compatibility/migration remains contract-driven.
 
@@ -137,13 +137,13 @@ Implemented Phase 4 read-only surfaces use explicit field allowlists, bounded pa
 - news/articles;
 - managed pages;
 - publication state;
-- media references when upload security is implemented.
+- media references only if a future explicit upload-security task introduces them.
 
-### Current boundary
+### Current available boundary
 
 Phase 4 provides Platform-owned published-only public news display with deterministic pagination and escaped plain-text rendering.
 
-Phase 6 PR #45 adds the current privileged CMS authoring boundary pending final merge:
+Phase 6 adds:
 
 - news create/update behind `cms.news.manage`;
 - Platform-owned managed-page persistence;
@@ -168,23 +168,19 @@ Rich HTML, media uploads and arbitrary plugin/code upload remain out of scope an
 
 - administration UI;
 - RBAC/policies;
-- security-sensitive account actions approved by product policy;
+- security-sensitive Platform actions approved by product policy;
 - CMS administration;
 - operational visibility safe for the assigned role.
 
-### Current implementation boundary
+### Current available boundary
 
-Merged PR #44 establishes:
+Phase 6 merged through PRs #44 and #45 and provides:
 
-- durable explicit role, permission, role-permission and identity-role assignment persistence;
+- durable explicit role, permission, role-permission and Identity-role assignment persistence;
 - no administrator assignment by default;
 - explicit current permissions with no wildcard authorization shortcut;
 - reusable deny-by-default `admin.permission` middleware;
-- mandatory composition of `auth`, `mfa.confirmed` and an explicit permission on privileged routes;
-- first protected `/admin` surface.
-
-Phase 6 PR #45 adds, pending final merge:
-
+- mandatory composition of `auth`, `mfa.confirmed` and an exact permission on privileged routes;
 - one-time console-only first-admin bootstrap requiring confirmed MFA and no prior administrator assignment;
 - explicit `content_editor`, `security_admin` and `platform_admin` role bundles governed by ADR 0006;
 - audited transactional role assignment/removal behind `admin.roles.manage`;
@@ -198,9 +194,9 @@ Phase 6 PR #45 adds, pending final merge:
 - deny by default;
 - no implicit "admin can do everything" shortcut;
 - `platform_admin` is an explicit current permission bundle, not a wildcard for future permissions;
-- privileged actions audited;
+- privileged state changes are audited where delivered by Phase 6;
 - no arbitrary PHP/code/plugin execution feature;
-- admin access combines explicit authorization with confirmed MFA and may additionally use Cloudflare Access in production.
+- admin web access combines explicit authorization with confirmed MFA and may additionally use Cloudflare Access in production.
 
 ## Audit
 
@@ -211,11 +207,11 @@ Phase 6 PR #45 adds, pending final merge:
 - authentication anomalies and important account security events;
 - actor/target references without secrets.
 
-### Current implementation boundary
+### Current available boundary
 
-Existing Identity security events remain append-oriented security primitives.
+Identity security events remain append-oriented security primitives.
 
-Phase 6 PR #45 adds, pending final merge:
+Phase 6 adds:
 
 - dedicated append-oriented administrator audit storage;
 - audit events for first-admin bootstrap, role assignment/removal and privileged CMS create/update operations;
