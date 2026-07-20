@@ -85,8 +85,19 @@ Potential roles/permissions are not final until an RBAC ADR/task defines them.
 - CSRF protection remains enabled for browser state-changing requests.
 - Escape untrusted output by default.
 - Rich HTML content requires explicit sanitization.
-- Use secure response headers appropriate to the deployed frontend, including a deliberate Content Security Policy when implementation is ready.
 - Never rely only on hidden form fields for authorization.
+
+Phase 7 repository-owned browser security headers are applied to Laravel `web` responses:
+
+- `Content-Security-Policy` with same-origin default/script/style/connect/font boundaries, `form-action 'self'`, `base-uri 'none'`, `frame-ancestors 'none'` and `object-src 'none'`;
+- `X-Content-Type-Options: nosniff`;
+- `X-Frame-Options: DENY` as legacy frame-denial defense in depth;
+- `Referrer-Policy: strict-origin-when-cross-origin`;
+- `Permissions-Policy` disabling camera, geolocation, microphone, payment and USB capabilities by default.
+
+Current first-party public/admin styling is loaded from a same-origin static asset so the enforced CSP does not require `style-src 'unsafe-inline'`. The implemented CSP does not grant `unsafe-eval` or inline-script execution.
+
+HTTP Strict Transport Security is intentionally not hard-coded by the application at this stage. HSTS depends on the actual deployed TLS termination, proxy and hostname/subdomain policy and must be validated as part of the production edge/origin topology review before claiming it is safely deployed.
 
 ## Input and database security
 
@@ -129,6 +140,8 @@ Recommended production direction:
 - database is not publicly exposed;
 - internal services use private/explicit network rules;
 - Canary game TCP protection requires a separate decision because standard HTTP proxying does not automatically protect arbitrary game ports.
+
+These are target directions. Actual deployed Cloudflare, TLS and origin controls remain unproven until the Phase 7 topology evidence requirements are satisfied.
 
 ## Rate limiting and abuse prevention
 
@@ -230,8 +243,8 @@ A production release must not be called security-ready until at least:
 - password reset/revocation behavior is tested;
 - origin/database exposure is reviewed;
 - secrets handling is verified;
-- security headers and TLS deployment are reviewed;
-- critical dependencies are vulnerability-scanned;
-- backups/restore procedure exists;
+- browser security headers are regression-tested and deployed TLS/HSTS posture is reviewed against the actual topology;
+- critical dependencies pass the required vulnerability advisory scan;
+- backups/restore procedure exists and is operationally tested;
 - security-sensitive audit events are available;
 - known critical/high security findings are resolved or explicitly accepted by the owner.
