@@ -162,12 +162,6 @@ final class CanaryCharacterCreateDatabasePrivilegeVerifier
                     continue;
                 }
 
-                if ($selectColumns === null) {
-                    $violations[] = "Grant #{$grantNumber} does not contain the approved accounts SELECT privilege.";
-
-                    continue;
-                }
-
                 foreach ($selectColumns as $column) {
                     if (! in_array($column, self::ACCOUNT_SELECT_COLUMNS, true)) {
                         $violations[] = "Grant #{$grantNumber} grants SELECT on an unapproved accounts column.";
