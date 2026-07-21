@@ -29,32 +29,39 @@ jobs:
           coverage: none
           tools: composer:v2
 
+      - name: Install locked dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
       - name: Lock Laravel Passport 13
         run: composer require laravel/passport:^13.0 --no-interaction --no-progress
+
+      - name: Publish Passport migrations
+        run: php artisan vendor:publish --tag=passport-migrations --force --no-interaction
 
       - name: Validate Composer files
         run: composer validate --strict
 
-      - name: Commit locked Composer files
+      - name: Commit locked Composer files and Passport migrations
         shell: bash
         run: |
-          if git diff --quiet -- composer.json composer.lock; then
-            echo "Composer files are already locked."
+          if git diff --quiet -- composer.json composer.lock database/migrations; then
+            echo "Composer files and Passport migrations are already current."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add composer.json composer.lock
-          git commit -m "build(auth): lock Laravel Passport 13"
+          git add composer.json composer.lock database/migrations
+          git commit -m "build(auth): publish Passport OAuth migrations"
           git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
-      - name: Upload locked Composer files
+      - name: Upload locked Composer files and migrations
         uses: actions/upload-artifact@v4
         with:
           name: native-oauth-composer-lock-${{ github.run_id }}
           path: |
             composer.json
             composer.lock
+            database/migrations/*oauth*.php
           retention-days: 1
           if-no-files-found: error
