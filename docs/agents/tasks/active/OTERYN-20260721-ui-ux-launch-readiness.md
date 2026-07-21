@@ -61,7 +61,8 @@ modules:
   - ErrorPresentation
 dependencies:
   - docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md
-  - acceptance browser harness in PR #67 or its merged successor
+  - merged acceptance browser harness from PR #67
+  - open PR #76 design/architecture documentation, path-disjoint and advisory until merged
   - separate account/provisioning-state task if the required dashboard/status surface cannot be rendered from existing routes/read data
 blockers:
   - account/provisioning status UX may require a separately authorized controller/read-model task; do not add backend/data behavior under this UI task
@@ -94,11 +95,11 @@ cross_repository_tasks: []
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T00:45:00+02:00
-head: 1df15189baddf680c573428061781c25c3045df3
-branch: task/OTERYN-20260721-functional-visual-acceptance
-pr: 67
-status: ready
+updated_at: 2026-07-21T10:06:00+02:00
+head: 904b9286ec22b1ed004c264b733a35a3d9018fef
+branch: task/OTERYN-20260721-ui-ux-launch-readiness
+pr: null
+status: in_progress
 context_routes:
   - web-cms
   - auth-identity
@@ -107,6 +108,7 @@ context_routes:
   - admin-rbac
   - security
   - testing
+  - agent-governance
 owned_paths:
   - resources/views/layouts/**
   - resources/views/game/**
@@ -119,32 +121,33 @@ owned_paths:
   - public/css/app.css
   - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
 proven:
-  - Visual UX Acceptance run 29784023395 completed successfully and produced 71 screenshots on unchanged product UI code relative to main baseline 221a13f6d7fba28ba765d67594a5cce4bf9523c4.
-  - Evidence found 16 document-level horizontal-overflow surface/viewport combinations, zero unlabeled controls, zero sampled low-contrast core surfaces and no detected raw technical exception text.
-  - Public/admin styled surfaces and standalone identity/account surfaces are visually inconsistent.
-  - Product-owned responsive breakpoints and error views are absent in the current delivered UI.
+  - PR #67 is merged and records Functional Acceptance as STAGING_PROVEN while Visual UX Acceptance remains FAIL.
+  - Final integrated acceptance evidence on validated implementation SHA 4c3ec48dc5c13c6b37169291be25e09f3856de4d passed 12 Playwright tests with zero failures and retained the visual blocker set.
+  - Visual evidence found document-level horizontal overflow, fragmented public/auth/account/admin presentation, missing product-owned error recovery, MFA enrollment overflow and weak small-screen admin usability.
+  - Main head at task start is 904b9286ec22b1ed004c264b733a35a3d9018fef.
+  - Open PR #76 owns only docs/design/**, ADR 0008 and its own task record; its implementation guidance is path-disjoint from this task.
 derived:
-  - Visual fixes can be performed independently of functional backend/security contracts for the majority of evidenced blockers.
-  - Account/provisioning status may require a separate bounded non-UI dependency and must not be invented in Blade/CSS.
+  - The presentation fixes can proceed on a dedicated branch without changing backend/security contracts.
+  - Account Overview/provisioning status cannot be invented under this task because no current route/read model delivers those surfaces.
 unknown:
-  - exact final account/provisioning status presentation until the underlying available read state is confirmed
-  - final per-surface classifications after implementation and rerun
+  - final per-surface Visual UX classifications after implementation and exact-head browser rerun
 conflicts: []
 first_failure:
   marker: visual UX launch gate
-  evidence: docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md classifies the current Visual / UX Acceptance result as FAIL
+  evidence: merged docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md classifies Visual UX Acceptance as FAIL
 rejected_hypotheses:
   - Rendering without server errors is sufficient visual acceptance: rejected by responsive, navigation, error-state and design-system evidence.
   - UI task should change provisioning/backend behavior to make the dashboard possible: rejected; backend/read-model work requires a separate bounded task.
+  - The implementation should reuse PR #67 or PR #76 branches: rejected because substantial implementation requires its own dedicated task branch.
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
 validation:
-  - command: execute only after this task begins on its own branch
-    result: NOT_RUN
-    evidence: follow-up task definition only
+  - command: lean live-state preflight against main, merged PR #67 evidence, task checkpoint and overlapping open PR #76
+    result: PASS
+    evidence: main and merged acceptance evidence support NEXT_ACTION; no overlapping product presentation ownership was found
 blockers:
   - separate account/provisioning-state dependency if required by existing product data boundaries
-next_action: Start from the merged acceptance evidence, implement the smallest coherent shared shell/navigation/design-system foundation first, then fix responsive table/long-content/error-state defects in bounded slices while rerunning browser evidence after each slice.
+next_action: Inspect the current shared layouts, stylesheet and highest-blocker views, then implement the smallest coherent shared shell/navigation/responsive foundation without changing routes or backend semantics.
 ```
 
 ## Notes
