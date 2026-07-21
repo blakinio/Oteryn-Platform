@@ -59,10 +59,10 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T20:58:31Z
-head: UNKNOWN
+updated_at: 2026-07-21T21:00:15Z
+head: 8784657e206f84af9824b59dfd80fdf1f0eb3ad9
 branch: task/OTERYN-20260721-e2e-scheduled-evidence
-pr: none
+pr: 116
 status: blocked
 context_routes:
   - testing
@@ -76,6 +76,8 @@ proven:
   - PR #111 merged as 740d9879b341d98e4cf0ef0e7f076b43cd86cdaf and implemented the scheduled/manual stability-repeat and public-soak workflows.
   - PR #113 merged as 0bc273816dcf515cf264652cabe8b8a3c2f95b59 and closed the prior task lifecycle.
   - issue #114 is the dedicated tracker for collecting the first completed scheduled stability and soak runtime evidence.
+  - draft PR #116 is the live handoff/task-record PR on branch task/OTERYN-20260721-e2e-scheduled-evidence.
+  - current main base for PR #116 is 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f; compare reports the task branch ahead and behind 0.
   - acceptance-soak.yml schedules the public soak at cron 41 4 * * 4 with default 300 seconds and zero retries.
   - acceptance-stability.yml schedules three isolated critical iterations at cron 17 3 * * 1 with fail-fast false and zero retries.
   - issue #91 remains the independent Production Go-Live Gate and is not changed by this task.
@@ -93,11 +95,15 @@ rejected_hypotheses:
   - fabricate or infer scheduled evidence before a completed workflow run exists: rejected because evidence must come from actual exact-SHA runtime artifacts.
   - add more browser scenarios while waiting: rejected because the current task is evidence collection and PR #111 already closed the intended implementation scope.
 changed_paths:
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260721-e2e-scheduled-evidence.md
 validation:
   - command: live GitHub state preflight
     result: PASS
-    evidence: main HEAD after cleanup is 0bc273816dcf515cf264652cabe8b8a3c2f95b59; issue #114 is open; no overlapping open PR was found.
+    evidence: issue #114 is open; draft PR #116 exists; no overlapping open PR was found for this evidence-collection ownership.
+  - command: compare main to task/OTERYN-20260721-e2e-scheduled-evidence
+    result: PASS
+    evidence: base 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f; branch ahead 2 and behind 0 before final checkpoint update; changed paths limited to ACTIVE_WORK and the active task record.
   - command: scheduled workflow definition inspection
     result: PASS
     evidence: acceptance-soak.yml and acceptance-stability.yml on main retain the merged PR #111 schedules and zero-retry policies.
