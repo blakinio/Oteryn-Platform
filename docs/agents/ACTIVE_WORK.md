@@ -6,13 +6,14 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 - `OTERYN-20260721-account-overview-provisioning-status`
   - issue: #81
-  - status: implementing
-  - goal: deliver an authenticated Account Overview and safe provisioning/binding status UX backed only by authoritative Platform-owned state.
+  - PR: #86
+  - status: validating for merge
+  - result: Account Overview and provisioning-status candidate PASS; full browser and Visual/Accessibility evidence is green.
 
 - `OTERYN-20260721-functional-visual-acceptance`
   - PR #67 merged as `517968539bdfd7d189677b669bf0899c35fccec1`
   - status: completed; active task record is pending archive by its owning task flow
-  - result: browser Functional Acceptance evidence delivered; baseline Visual / UX Acceptance findings have since been remediated for currently delivered surfaces by merged PR #77.
+  - result: browser Functional Acceptance evidence delivered; baseline Visual / UX Acceptance findings were remediated by merged PR #77 and the remaining missing Account Overview surface is delivered by PR #86 candidate.
 
 ## Closed functional-acceptance follow-ups
 
@@ -31,8 +32,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 - **Production Readiness: STAGING_PROVEN**
 - **Functional Acceptance: STAGING_PROVEN for the currently delivered staging-verifiable functional surface**
-- **Delivered-surface UI / UX Acceptance: PASS based on merged PR #77 exact-SHA production-like browser evidence**
-- **Broader Visual / UX launch gate: BLOCKED by missing Account Overview / provisioning-status surface tracked in issue #81**
+- **Visual / UX Acceptance: PASS for the PR #86 candidate based on composed PR #77 remediation plus full issue #81 production-like browser evidence**
 - **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
 - **Production Verification: REQUIRED BEFORE GO-LIVE**
 
@@ -40,9 +40,7 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-Complete `OTERYN-20260721-account-overview-provisioning-status` / issue #81, then rerun the aggregate Visual / UX launch gate. Production-only smoke remains separate and must run only against the exact final deployed SHA when production access and deployment authorization are available.
-
-The Account Overview/provisioning-status work must preserve existing backend business logic, authentication/session policy, RBAC semantics, database ownership and Canary integration contracts unless a separately evidenced defect requires an explicitly bounded change.
+Merge PR #86 after its current-head checks pass, close issue #81 from merged evidence, archive the completed account-overview task, then keep production-only smoke separate until the exact final deployed SHA and production authorization are available.
 
 ## Remaining cross-repository dependency
 
