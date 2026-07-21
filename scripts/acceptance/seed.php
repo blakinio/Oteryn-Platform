@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Accounts\Actions\ProvisionCanaryAccount;
+use App\Accounts\Models\IdentityCanaryAccount;
 use App\Identity\Mfa\MfaRecoveryCodes;
 use App\Identity\Models\Identity;
 use Illuminate\Contracts\Console\Kernel;
@@ -19,6 +21,54 @@ $command = $argv[1] ?? 'seed';
 if ($command === 'empty-news') {
     DB::table('news_posts')->delete();
     fwrite(STDOUT, "acceptance-state: news emptied\n");
+    exit(0);
+}
+
+if ($command === 'account-state') {
+    $state = $argv[2] ?? '';
+    $identity = Identity::query()->where('email', 'visual.user@example.test')->first();
+
+    if (! $identity instanceof Identity) {
+        fwrite(STDERR, "Visual acceptance identity is unavailable.\n");
+        exit(2);
+    }
+
+    if ($state === 'missing') {
+        IdentityCanaryAccount::query()->whereKey($identity->id)->delete();
+        fwrite(STDOUT, "acceptance-state: account binding missing\n");
+        exit(0);
+    }
+
+    $attributes = [
+        'canary_account_id' => null,
+        'provisioning_name' => 'op'.substr(hash('sha256', 'visual-user-account'), 0, 30),
+        'canary_creation_epoch' => 2_000_000_001,
+        'status' => IdentityCanaryAccount::STATUS_PENDING,
+        'last_failure_code' => null,
+        'last_attempt_at' => now()->subMinute(),
+        'ready_at' => null,
+    ];
+
+    if ($state === 'ready') {
+        $attributes['canary_account_id'] = 4_000_000_001;
+        $attributes['status'] = IdentityCanaryAccount::STATUS_READY;
+        $attributes['ready_at'] = now()->subMinute();
+    } elseif ($state === 'recoverable') {
+        $attributes['last_failure_code'] = ProvisionCanaryAccount::FAILURE_DEPENDENCY_UNAVAILABLE;
+    } elseif ($state === 'conflict') {
+        $attributes['status'] = IdentityCanaryAccount::STATUS_CONFLICT;
+        $attributes['last_failure_code'] = ProvisionCanaryAccount::FAILURE_BINDING_CONFLICT;
+    } elseif ($state !== 'pending') {
+        fwrite(STDERR, "Unknown account acceptance state: {$state}\n");
+        exit(2);
+    }
+
+    IdentityCanaryAccount::query()->updateOrCreate(
+        ['identity_id' => $identity->id],
+        $attributes,
+    );
+
+    fwrite(STDOUT, "acceptance-state: account binding {$state}\n");
     exit(0);
 }
 
@@ -82,6 +132,19 @@ $regular->forceFill([
     'two_factor_confirmed_at' => null,
     'two_factor_last_used_timestep' => null,
 ])->save();
+
+IdentityCanaryAccount::query()->updateOrCreate(
+    ['identity_id' => $regular->id],
+    [
+        'canary_account_id' => 4_000_000_001,
+        'provisioning_name' => 'op'.substr(hash('sha256', 'visual-user-account'), 0, 30),
+        'canary_creation_epoch' => 2_000_000_001,
+        'status' => IdentityCanaryAccount::STATUS_READY,
+        'last_failure_code' => null,
+        'last_attempt_at' => $now->copy()->subMinute(),
+        'ready_at' => $now->copy()->subMinute(),
+    ],
+);
 
 $admin = Identity::query()->updateOrCreate(
     ['email' => 'visual.admin@example.test'],

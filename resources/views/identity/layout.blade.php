@@ -24,6 +24,7 @@
                     <a class="button button-secondary" href="{{ route('identity.register.create') }}">Create account</a>
                 @endunless
             @else
+                <a class="nav-link" href="{{ route('account.overview') }}" @if(request()->routeIs('account.overview')) aria-current="page" @endif>Account</a>
                 <form method="POST" action="{{ route('identity.logout') }}">
                     @csrf
                     <button class="button-ghost" type="submit">Sign out</button>
@@ -36,9 +37,9 @@
 @auth
 <div class="context-nav-wrap">
     <nav class="context-nav" aria-label="Account actions">
+        <a href="{{ route('account.overview') }}" @if(request()->routeIs('account.overview')) aria-current="page" @endif>Overview</a>
         <a href="{{ route('identity.mfa.settings') }}" @if(request()->routeIs('identity.mfa.settings')) aria-current="page" @endif>Security</a>
         <a href="{{ route('identity.password.change.create') }}" @if(request()->routeIs('identity.password.change.*')) aria-current="page" @endif>Password</a>
-        <a href="{{ route('account.characters.create') }}" @if(request()->routeIs('account.characters.*')) aria-current="page" @endif>Create character</a>
     </nav>
 </div>
 @endauth

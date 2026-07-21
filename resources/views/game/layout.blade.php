@@ -28,8 +28,7 @@
                 <a class="nav-link" href="{{ route('identity.login.create') }}" @if(request()->routeIs('identity.login.*')) aria-current="page" @endif>Sign in</a>
                 <a class="button" href="{{ route('identity.register.create') }}">Create account</a>
             @else
-                <a class="nav-link" href="{{ route('identity.mfa.settings') }}">Account security</a>
-                <a class="button button-secondary" href="{{ route('account.characters.create') }}">Create character</a>
+                <a class="button button-secondary" href="{{ route('account.overview') }}">Account</a>
                 <form method="POST" action="{{ route('identity.logout') }}">
                     @csrf
                     <button class="button-ghost" type="submit">Sign out</button>
@@ -49,9 +48,9 @@
                     <a class="nav-link" href="{{ route('identity.login.create') }}">Sign in</a>
                     <a class="nav-link" href="{{ route('identity.register.create') }}">Create account</a>
                 @else
+                    <a class="nav-link" href="{{ route('account.overview') }}">Account overview</a>
                     <a class="nav-link" href="{{ route('identity.mfa.settings') }}">Account security</a>
                     <a class="nav-link" href="{{ route('identity.password.change.create') }}">Change password</a>
-                    <a class="nav-link" href="{{ route('account.characters.create') }}">Create character</a>
                     <form method="POST" action="{{ route('identity.logout') }}">
                         @csrf
                         <button class="button-ghost" type="submit">Sign out</button>

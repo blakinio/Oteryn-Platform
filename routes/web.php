@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Accounts\AccountOverviewController;
 use App\Http\Controllers\Admin\AdminAuditController;
 use App\Http\Controllers\Admin\AdminManagedPageController;
 use App\Http\Controllers\Admin\AdminNewsController;
@@ -81,6 +82,12 @@ Route::put('/password/change', [PasswordChangeController::class, 'update'])
     ->middleware(['auth', 'throttle:identity-password-change'])
     ->name('identity.password.change.update');
 
+Route::get('/account', [AccountOverviewController::class, 'show'])
+    ->middleware('auth')
+    ->name('account.overview');
+Route::post('/account/provisioning/retry', [AccountOverviewController::class, 'retry'])
+    ->middleware(['auth', 'throttle:6,1'])
+    ->name('account.provisioning.retry');
 Route::get('/account/characters/create', [CharacterCreationController::class, 'create'])
     ->middleware('auth')
     ->name('account.characters.create');
