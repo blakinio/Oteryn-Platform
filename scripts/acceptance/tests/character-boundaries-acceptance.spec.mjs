@@ -33,7 +33,8 @@ async function submitCharacter(page, name, injectedAccountId = null) {
   await page.getByLabel('Sex').selectOption('1');
 
   if (injectedAccountId !== null) {
-    await page.locator('form').evaluate((form, accountId) => {
+    const characterForm = page.locator('form').filter({ has: page.getByLabel('Character name') });
+    await characterForm.evaluate((form, accountId) => {
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = 'account_id';
