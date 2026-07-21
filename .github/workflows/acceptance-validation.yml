@@ -71,7 +71,7 @@ jobs:
       ACCEPTANCE_BASE_URL: http://127.0.0.1:8080
       ACCEPTANCE_MAILHOG_URL: http://127.0.0.1:8025
       ACCEPTANCE_OUTPUT_DIR: /tmp/oteryn-visual-acceptance
-      ACCEPTANCE_PROFILE: ${{ github.event_name == 'pull_request' && github.head_ref != 'task/OTERYN-20260721-functional-visual-acceptance' && 'smoke' || github.event_name == 'workflow_dispatch' && inputs.profile || 'full' }}
+      ACCEPTANCE_PROFILE: full
       APP_ENV: acceptance
       APP_DEBUG: 'false'
       APP_URL: http://127.0.0.1:8080
