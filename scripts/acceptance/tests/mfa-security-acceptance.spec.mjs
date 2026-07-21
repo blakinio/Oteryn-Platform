@@ -72,11 +72,12 @@ test('Flow 4 — MFA valid, invalid, replay, recovery single-use, disable and se
 
     const staleResponse = await stalePage.goto('/mfa');
     expect(staleResponse?.status()).toBe(403);
-    await expect(stalePage.getByRole('heading', { name: '403' })).toBeVisible();
+    await expect(stalePage.getByRole('heading', { name: 'You do not have access to this page' })).toBeVisible();
 
     await login(page, email, password);
     await expect(page).toHaveURL(/\/mfa$/u);
-    await expect(page.getByText('MFA is not enabled. Enabling it will require a second factor for future Oteryn Platform web sign ins.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Multi-factor authentication' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'MFA is not enabled' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Complete your sign in' })).toHaveCount(0);
   } finally {
     await staleContext.close();

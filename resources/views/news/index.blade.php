@@ -3,16 +3,23 @@
 @section('title', 'News')
 
 @section('content')
-    <h1>News</h1>
-    <p class="muted">Published Oteryn Platform updates.</p>
+    <div class="page-header">
+        <p class="eyebrow">Updates</p>
+        <h1>News</h1>
+        <p class="muted">Published Oteryn Platform updates.</p>
+    </div>
 
     @forelse ($posts as $post)
         <article class="card">
+            <p class="eyebrow">Published {{ $post->published_at?->format('Y-m-d H:i') }}</p>
             <h2><a href="{{ route('news.show', ['slug' => $post->slug]) }}">{{ $post->title }}</a></h2>
-            <p class="muted">Published {{ $post->published_at?->format('Y-m-d H:i') }}</p>
+            <a href="{{ route('news.show', ['slug' => $post->slug]) }}">Read update</a>
         </article>
     @empty
-        <div class="card">No published news yet.</div>
+        <div class="empty-state">
+            <strong>No published news yet.</strong>
+            <p>Published Oteryn updates will appear here.</p>
+        </div>
     @endforelse
 
     @if ($posts->hasPages())

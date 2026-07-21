@@ -95,7 +95,8 @@ test('Flow 3b — password recovery uses real SMTP, revokes old sessions and rej
   const mfa = await enrollMfa(page, originalPassword);
   let lastTotp = mfa.enrollmentCode;
   await page.goto('/mfa');
-  await expect(page.getByText('MFA is enabled for your Oteryn Platform web sign in.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Multi-factor authentication' })).toBeVisible();
+  await expect(page.getByText('MFA is enabled.')).toBeVisible();
 
   const resetContext = await browser.newContext();
   const resetPage = await resetContext.newPage();
@@ -115,7 +116,7 @@ test('Flow 3b — password recovery uses real SMTP, revokes old sessions and rej
 
     const invalidatedSessionResponse = await page.goto('/mfa');
     expect(invalidatedSessionResponse?.status()).toBe(403);
-    await expect(page.getByRole('heading', { name: '403' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'You do not have access to this page' })).toBeVisible();
 
     await resetPage.getByLabel('Email').fill(email);
     await resetPage.getByLabel('Password').fill(originalPassword);

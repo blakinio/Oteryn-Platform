@@ -1,39 +1,73 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>@yield('title', 'Oteryn Admin')</title>
+    <title>@yield('title', 'Oteryn Admin') · {{ config('app.name') }}</title>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
 </head>
-<body>
-    <header>
-        <h1><a href="{{ route('admin.dashboard') }}">Oteryn Admin</a></h1>
-        <nav aria-label="Administrator navigation">
-            <a href="{{ route('admin.news.index') }}">News</a>
-            <a href="{{ route('admin.pages.index') }}">Pages</a>
-            <a href="{{ route('admin.roles.index') }}">Roles</a>
-            <a href="{{ route('admin.audit.index') }}">Audit</a>
-            <a href="{{ route('home') }}">Public site</a>
-        </nav>
-    </header>
-
-    @if (session('status'))
-        <p role="status">{{ session('status') }}</p>
-    @endif
-
-    @if ($errors->any())
-        <div role="alert">
-            <ul>
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
+<body class="admin-body">
+<a class="skip-link" href="#main-content">Skip to content</a>
+<header class="admin-topbar">
+    <div class="header-inner">
+        <a class="brand" href="{{ route('admin.dashboard') }}" aria-label="Oteryn Admin dashboard">
+            <span class="brand-mark" aria-hidden="true">OA</span>
+            <span class="brand-label">Oteryn Admin</span>
+        </a>
+        <div class="account-actions">
+            <a class="nav-link" href="{{ route('home') }}">Public site</a>
+            <form method="POST" action="{{ route('identity.logout') }}">
+                @csrf
+                <button class="button-ghost" type="submit">Sign out</button>
+            </form>
         </div>
-    @endif
+    </div>
+</header>
 
-    <main>
+<div class="admin-shell">
+    <aside class="admin-sidebar" aria-label="Administrator sections">
+        <nav class="admin-nav">
+            <p class="admin-nav-group">Overview</p>
+            <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Dashboard</a>
+            <p class="admin-nav-group">Content</p>
+            <a href="{{ route('admin.news.index') }}" @if(request()->routeIs('admin.news.*')) aria-current="page" @endif>News</a>
+            <a href="{{ route('admin.pages.index') }}" @if(request()->routeIs('admin.pages.*')) aria-current="page" @endif>Managed pages</a>
+            <p class="admin-nav-group">Access</p>
+            <a href="{{ route('admin.roles.index') }}" @if(request()->routeIs('admin.roles.*')) aria-current="page" @endif>Roles</a>
+            <p class="admin-nav-group">Operations</p>
+            <a href="{{ route('admin.audit.index') }}" @if(request()->routeIs('admin.audit.*')) aria-current="page" @endif>Audit</a>
+        </nav>
+    </aside>
+
+    <main id="main-content" class="admin-main">
+        <details class="admin-mobile-nav">
+            <summary>Administrator navigation</summary>
+            <nav class="admin-nav" aria-label="Administrator navigation">
+                <a href="{{ route('admin.dashboard') }}" @if(request()->routeIs('admin.dashboard')) aria-current="page" @endif>Dashboard</a>
+                <a href="{{ route('admin.news.index') }}" @if(request()->routeIs('admin.news.*')) aria-current="page" @endif>News</a>
+                <a href="{{ route('admin.pages.index') }}" @if(request()->routeIs('admin.pages.*')) aria-current="page" @endif>Managed pages</a>
+                <a href="{{ route('admin.roles.index') }}" @if(request()->routeIs('admin.roles.*')) aria-current="page" @endif>Roles</a>
+                <a href="{{ route('admin.audit.index') }}" @if(request()->routeIs('admin.audit.*')) aria-current="page" @endif>Audit</a>
+            </nav>
+        </details>
+
+        @if (session('status'))
+            <div class="alert alert-success" role="status">{{ session('status') }}</div>
+        @endif
+
+        @if ($errors->any())
+            <div class="alert alert-danger" role="alert">
+                <p><strong>The request could not be completed.</strong></p>
+                <ul>
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
         @yield('content')
     </main>
+</div>
 </body>
 </html>

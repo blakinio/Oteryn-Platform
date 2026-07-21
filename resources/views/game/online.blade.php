@@ -3,19 +3,26 @@
 @section('title', 'Online characters')
 
 @section('content')
-    <h1>Online characters</h1>
-    <p class="notice">This cluster-wide list includes only fresh ONLINE character leases that have not expired at read time.</p>
+    <div class="page-header">
+        <p class="eyebrow">Live world</p>
+        <h1>Online characters</h1>
+        <p class="muted">This cluster-wide list includes only fresh ONLINE character leases that have not expired at read time.</p>
+    </div>
 
-    @forelse ($characters as $character)
-        <article class="card">
-            <h2>{{ $character->name }}</h2>
-            <p><strong>Level:</strong> {{ $character->level }}</p>
-            <p><strong>Vocation:</strong> {{ $character->vocation }}</p>
-            <p><strong>Channel:</strong> {{ $character->channel_name }} (ID {{ $character->channel_id }})</p>
-        </article>
-    @empty
-        <div class="card">No characters are currently online.</div>
-    @endforelse
+    <div class="card-grid">
+        @forelse ($characters as $character)
+            <article class="card">
+                <h2><a href="{{ route('game.characters.show', ['name' => $character->name]) }}">{{ $character->name }}</a></h2>
+                <dl>
+                    <dt>Level:</dt><dd>{{ $character->level }}</dd>
+                    <dt>Vocation:</dt><dd>{{ $character->vocation }}</dd>
+                    <dt>Channel:</dt><dd>{{ $character->channel_name }} (ID {{ $character->channel_id }})</dd>
+                </dl>
+            </article>
+        @empty
+            <div class="empty-state">No characters are currently online.</div>
+        @endforelse
+    </div>
 
     @if ($characters->hasPages())
         <nav class="pagination" aria-label="Online character pages">
