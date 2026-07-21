@@ -1,0 +1,40 @@
+name: Temporary Pint Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pint-diagnostic:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Apply Pint in diagnostic workspace
+        run: vendor/bin/pint
+
+      - name: Capture formatter patch
+        run: git diff --binary > pint-format.patch
+
+      - name: Upload formatter patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: pint-format-${{ github.event.pull_request.head.sha }}
+          path: pint-format.patch
+          if-no-files-found: error
+          retention-days: 1
