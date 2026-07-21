@@ -40,7 +40,7 @@ Implement Phase 1 of ADR 0009 as a Platform-only, non-public foundation: game-au
 - [x] Config defaults define protocol v1, audience `oteryn-game-gateway`, and 60-second ticket TTL without secrets.
 - [x] Audit events contain no raw ticket/session/OAuth/password material.
 - [x] No new public route/controller is added.
-- [ ] Relevant focused tests, full CI, governance and required production-like workflows pass on final head.
+- [x] Relevant focused tests, full CI, governance, DB-outage, production-like and acceptance workflows pass on the validated checkpoint head before the final checkpoint commit.
 
 ## Ownership
 
@@ -83,11 +83,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T22:44:00Z
-head: 32bf473c76bbd703b231db595748a1cc16a0e768
+updated_at: 2026-07-21T22:42:35Z
+head: 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d
 branch: task/OTERYN-20260722-game-auth-domain-foundation
 pr: 118
-status: validating
+status: ready
 context_routes:
   - auth-identity
   - architecture
@@ -115,17 +115,21 @@ owned_paths:
 proven:
   - Phase 0 architecture PR 117 was squash-merged to main as 78bc9f839b98b96ff9e5e3fcf43680104a5e27fa.
   - No open Oteryn Platform PR overlapped game-auth ticket, World Registry, or game-auth generation scope at Phase 1 start.
-  - IdentityCredentialUpdater now revokes independent game authorization generation for password change and password reset inside existing domain transactions.
-  - ResetIdentityMfa and DisableIdentityMfa now revoke independent game authorization generation inside their security-sensitive transaction boundaries.
+  - IdentityCredentialUpdater revokes independent game authorization generation for password change and password reset inside existing domain transactions.
+  - ResetIdentityMfa and DisableIdentityMfa revoke independent game authorization generation inside their security-sensitive transaction boundaries.
   - Game Login Ticket storage contains only SHA-256 lookup material plus bounded authorization metadata; there is no plaintext-ticket column.
   - Ticket generation uses 32 bytes from random_bytes before base64url encoding.
   - Ticket issue requires an enabled Identity and exact ready Identity-to-Canary binding.
   - Ticket redeem uses a database transaction and lockForUpdate on the exact stored ticket before audience, expiry, reuse, current Identity generation/disabled state, and exact ready binding are revalidated.
-  - World Registry storage is selected as the Platform-owned game_worlds database table and remains empty by default; no production hostname/port is seeded.
+  - World Registry storage is the Platform-owned game_worlds database table and remains empty by default; no production hostname/port is seeded.
   - DatabaseWorldRegistry returns only online, login-enabled, syntactically routable worlds for a positive Canary account ID behind an account-aware interface.
   - Game Session remains an interface/value boundary only; no Canary account_sessions write or other Canary adapter exists in this task.
-  - Temporary diagnostic workflow exposed exact PHPStan/test failures and was removed after diagnosis; it is absent from the current PR changed-file inventory.
-  - CI run 29874328249 succeeded after the exact static-analysis and stale-constructor failures were fixed on code head 5de58a7ab2367ed6cdffb0fe62bf2c168c62914c.
+  - Temporary diagnostic workflow exposed exact PHPStan/test failures and was removed after diagnosis; it is absent from the PR changed-file inventory.
+  - CI run 29874507061 succeeded on checkpoint head 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d.
+  - Agent Governance run 29874507173 succeeded on checkpoint head 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d.
+  - Platform DB Outage Validation run 29874507079 succeeded on checkpoint head 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d.
+  - Phase 7 Production-Like Validation run 29874507065 succeeded on checkpoint head 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d, including the exact-SHA critical regression suite.
+  - Acceptance E2E and Visual UX run 29874507100 succeeded on checkpoint head 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d.
 derived:
   - Platform MariaDB is the first authoritative ticket store because Identity, binding, generation and ticket state can participate in controlled transactional locking while plaintext credentials remain absent from storage.
   - The initial World Registry account policy is universal for positive redeemed Canary account IDs, while future account-specific entitlements can replace this behind the existing account-aware interface.
@@ -165,22 +169,31 @@ changed_paths:
 validation:
   - command: GitHub list PR 118 changed filenames
     result: PASS
-    evidence: current changed paths are within declared ownership and the temporary diagnostic workflow is absent from the diff
+    evidence: changed paths are within declared ownership and the temporary diagnostic workflow is absent from the diff
   - command: diagnostic PHPStan/test capture on run 29874155874
     result: PASS
     evidence: diagnostic artifact provided exact actionable errors; no failure was hidden or guessed
-  - command: GitHub Actions CI run 29874328249 on 5de58a7ab2367ed6cdffb0fe62bf2c168c62914c
+  - command: GitHub Actions CI run 29874507061
     result: PASS
-    evidence: Composer validation/audit, Pint, PHPStan and full composer test completed successfully
+    evidence: Composer validation/audit, Pint, PHPStan and full composer test completed successfully on 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d
+  - command: GitHub Actions Agent Governance run 29874507173
+    result: PASS
+    evidence: checkpoint/ownership governance completed successfully on 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d
+  - command: GitHub Actions Platform DB Outage Validation run 29874507079
+    result: PASS
+    evidence: fail-closed database outage and recovery validation completed successfully on 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d
+  - command: GitHub Actions Phase 7 Production-Like Validation run 29874507065
+    result: PASS
+    evidence: production-like migration, privilege, outage, Redis, SMTP, configuration, critical regression, runtime, backup/restore and upgrade/rollback validation completed successfully on 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d
+  - command: GitHub Actions Acceptance E2E and Visual UX run 29874507100
+    result: PASS
+    evidence: required bounded acceptance profiles and durable evidence completed successfully on 32af1ecdf800c570a2ddda3408e0b52ee1e1cb4d
   - command: true independent-connection concurrent ticket consume proof
     result: NOT_RUN
     evidence: intentionally deferred to the Phase 3 atomic redeem production gate; this task does not claim concurrent replay proof
-  - command: final-head governance, CI, DB-outage, Phase 7 and acceptance workflows
-    result: NOT_RUN
-    evidence: final validation will run after this implementation checkpoint
 blockers:
   - none
-next_action: Verify all required workflows on the new checkpoint head, then write one final ready checkpoint and rerun exact-final-head validation before merge.
+next_action: Verify the same required workflows pass on the final checkpoint commit, then merge PR 118 if review/merge gates remain satisfied.
 ```
 
 ## Notes
