@@ -16,6 +16,8 @@ final class SecurityEventRecorder
 
     public const IDENTITY_WEB_SESSION_REJECTED = 'identity.web_session_rejected';
 
+    public const IDENTITY_GAME_AUTHORIZATIONS_REVOKED = 'identity.game_authorizations_revoked';
+
     public const IDENTITY_PASSWORD_CHANGED = 'identity.password_changed';
 
     public const IDENTITY_PASSWORD_RESET_COMPLETED = 'identity.password_reset_completed';
@@ -27,6 +29,10 @@ final class SecurityEventRecorder
     public const IDENTITY_MFA_RECOVERY_CODE_USED = 'identity.mfa_recovery_code_used';
 
     public const IDENTITY_MFA_DISABLED = 'identity.mfa_disabled';
+
+    public const GAME_LOGIN_TICKET_ISSUED = 'game_auth.ticket_issued';
+
+    public const GAME_LOGIN_TICKET_REDEEMED = 'game_auth.ticket_redeemed';
 
     public const CANARY_ACCOUNT_PROVISIONING_REQUESTED = 'identity.canary_account_provisioning_requested';
 
@@ -61,6 +67,11 @@ final class SecurityEventRecorder
         $this->record($identityId, self::IDENTITY_WEB_SESSION_REJECTED);
     }
 
+    public function recordIdentityGameAuthorizationsRevoked(int $identityId): void
+    {
+        $this->record($identityId, self::IDENTITY_GAME_AUTHORIZATIONS_REVOKED);
+    }
+
     public function recordIdentityPasswordChanged(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_PASSWORD_CHANGED);
@@ -89,6 +100,16 @@ final class SecurityEventRecorder
     public function recordIdentityMfaDisabled(int $identityId): void
     {
         $this->record($identityId, self::IDENTITY_MFA_DISABLED);
+    }
+
+    public function recordGameLoginTicketIssued(int $identityId): void
+    {
+        $this->record($identityId, self::GAME_LOGIN_TICKET_ISSUED);
+    }
+
+    public function recordGameLoginTicketRedeemed(int $identityId): void
+    {
+        $this->record($identityId, self::GAME_LOGIN_TICKET_REDEEMED);
     }
 
     public function recordCanaryAccountProvisioningRequested(int $identityId): void
