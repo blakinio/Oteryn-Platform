@@ -58,6 +58,51 @@ final class AdminCmsManagementTest extends TestCase
         ]);
     }
 
+    public function test_content_editor_can_unpublish_existing_news_and_hide_it_from_public_reads(): void
+    {
+        $actor = $this->createIdentity('news-unpublish-editor@example.com');
+        $this->assignRole($actor, AdminRoleManager::CONTENT_EDITOR);
+        $this->actingAsCurrent($actor);
+
+        $post = NewsPost::query()->create([
+            'slug' => 'published-then-hidden',
+            'title' => 'Published then hidden',
+            'body' => 'Visible before unpublish',
+            'published_at' => now()->subMinute(),
+        ]);
+
+        $this->get(route('news.show', ['slug' => $post->slug]))
+            ->assertOk()
+            ->assertSeeText('Published then hidden');
+        $this->get(route('news.index'))
+            ->assertOk()
+            ->assertSeeText('Published then hidden');
+
+        $this->put(route('admin.news.update', $post), [
+            'slug' => $post->slug,
+            'title' => 'Published then hidden',
+            'body' => 'Visible before unpublish',
+            'published_at' => null,
+        ])->assertRedirect(route('admin.news.edit', $post));
+
+        $post->refresh();
+        self::assertNull($post->published_at);
+        $this->get(route('news.show', ['slug' => $post->slug]))->assertNotFound();
+        $this->get(route('news.index'))
+            ->assertOk()
+            ->assertDontSeeText('Published then hidden');
+        $this->assertDatabaseHas('admin_audit_events', [
+            'actor_identity_id' => $actor->id,
+            'action' => 'cms.news_updated',
+            'target_type' => 'news_post',
+            'target_id' => (string) $post->id,
+            'metadata' => json_encode([
+                'slug' => $post->slug,
+                'published' => false,
+            ], JSON_THROW_ON_ERROR),
+        ]);
+    }
+
     public function test_content_editor_can_manage_published_plain_text_page_with_escaped_output_and_audit(): void
     {
         $actor = $this->createIdentity('page-editor@example.com');
@@ -85,6 +130,48 @@ final class AdminCmsManagementTest extends TestCase
             'action' => 'cms.page_created',
             'target_type' => 'managed_page',
             'target_id' => (string) $page->id,
+        ]);
+    }
+
+    public function test_content_editor_can_edit_and_unpublish_existing_managed_page(): void
+    {
+        $actor = $this->createIdentity('page-update-editor@example.com');
+        $this->assignRole($actor, AdminRoleManager::CONTENT_EDITOR);
+        $this->actingAsCurrent($actor);
+
+        $page = ManagedPage::query()->create([
+            'slug' => 'editable-page',
+            'title' => 'Original title',
+            'body' => 'Original body',
+            'published_at' => now()->subMinute(),
+        ]);
+
+        $this->get(route('pages.show', ['slug' => $page->slug]))
+            ->assertOk()
+            ->assertSeeText('Original title')
+            ->assertSeeText('Original body');
+
+        $this->put(route('admin.pages.update', $page), [
+            'slug' => $page->slug,
+            'title' => 'Updated title',
+            'body' => 'Updated body',
+            'published_at' => null,
+        ])->assertRedirect(route('admin.pages.edit', $page));
+
+        $page->refresh();
+        self::assertSame('Updated title', $page->title);
+        self::assertSame('Updated body', $page->body);
+        self::assertNull($page->published_at);
+        $this->get(route('pages.show', ['slug' => $page->slug]))->assertNotFound();
+        $this->assertDatabaseHas('admin_audit_events', [
+            'actor_identity_id' => $actor->id,
+            'action' => 'cms.page_updated',
+            'target_type' => 'managed_page',
+            'target_id' => (string) $page->id,
+            'metadata' => json_encode([
+                'slug' => $page->slug,
+                'published' => false,
+            ], JSON_THROW_ON_ERROR),
         ]);
     }
 
