@@ -57,8 +57,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T19:44:50Z
-head: d2df6e730b6b502bde68e23c249da01bbbd0378c
+updated_at: 2026-07-21T19:58:00Z
+head: 734601f9f7ee3ada809195ea7a51751647f86b4f
 branch: task/OTERYN-20260721-full-production-like-e2e-simulation
 pr: 115
 status: validating
@@ -77,40 +77,47 @@ proven:
   - no open pull request overlapped this validation task at preflight
   - the repository already provides exact-SHA production-like acceptance, Phase 7, resilience, accessibility, portability, responsive and soak harnesses
   - draft PR #115 targets main from the dedicated task branch
-  - CI run 29862494021 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
-  - Agent Governance run 29862493873 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
-  - Platform DB Outage Validation run 29862493825 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
-  - Phase 7 Production-Like Validation run 29862494061 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
-  - first temporary soak run failed before product assertions because the validation-only workflow generated an empty APP_KEY from invalid escaped PHP syntax
-  - the temporary APP_KEY orchestration defect is corrected on branch head d2df6e730b6b502bde68e23c249da01bbbd0378c
+  - CI, Agent Governance, Platform DB Outage Validation and Phase 7 Production-Like Validation all passed on validation head 0b46bda79fabda043f79be2b68ce645e17c2b634
+  - comprehensive run 29862854364 passed full Chromium, zero-retry Chromium/Firefox/WebKit portability, desktop/tablet/mobile responsive, dependency failure-restoration-recovery, keyboard-focus accessibility and exploratory visual/accessibility execution
+  - run 29862854364 produced 15 full Chromium tests, 12 portability tests, 9 responsive tests, 2 resilience tests and 3 accessibility tests with zero test failures in their JUnit evidence
+  - visual evidence from run 29862854364 contains 71 screenshots with zero status mismatches, horizontal-overflow surfaces, unlabeled-control surfaces, sampled low-contrast surfaces, focus-not-observed surfaces or raw technical-message surfaces
+  - artifact 8508221344 from run 29862854364 has digest sha256:de0d86a8b7c1749c3f23c036bf3599860428adbafa9e2c01875555cef4f962a8
+  - first temporary soak attempt failed before product assertions because the validation-only workflow generated an empty APP_KEY from invalid escaped PHP syntax
+  - second temporary combined-job design completed all functional and visual profiles but its in-job dependency reset before soak failed; soak therefore did not produce valid calibration evidence
+  - soak orchestration is now isolated into a fresh independent job with fresh MariaDB, Redis, MailHog, Laravel runtime and corrected ephemeral APP_KEY generation
   - production execution and external Canary/login-server writes are outside this task
   - repository writes are limited to blakinio/Oteryn-Platform
 derived:
-  - the initial homepage HTTP 500 in the temporary soak job was a validation-harness defect and is not evidence of a product regression
+  - neither temporary orchestration failure is evidence of an Oteryn product regression
+  - fresh-job soak isolation avoids coupling soak evidence to state mutated by resilience and exploratory visual scenarios
 unknown:
-  - outcome of the corrected fresh comprehensive validation run
+  - outcome of the final fresh-job 300-second soak on the current validation head
 conflicts: []
 first_failure:
-  marker: temporary full-production-like-e2e-simulation APP_KEY generation
-  evidence: run 29862494074 job 88742473925 returned HTTP 500 for /; artifact 8507887932 showed 2-second soak failure; invalid php -r escaping reproduced with exit 255 and corrected in commit d2df6e730b6b502bde68e23c249da01bbbd0378c
+  marker: temporary validation orchestration defects
+  evidence: run 29862494074 exposed malformed APP_KEY generation; run 29862854364 later proved all functional/visual profiles green but recorded soak_reset_outcome=failure and soak_outcome=failure before valid soak metrics
 rejected_hypotheses:
-  - product homepage regression: the failure path used an empty APP_KEY caused by the temporary validation workflow before application behavior could be meaningfully assessed
+  - product homepage regression: the initial HTTP 500 used an empty APP_KEY caused by the temporary workflow
+  - functional or visual regression on 0b46bda79fabda043f79be2b68ce645e17c2b634: comprehensive run 29862854364 passed every executed functional, cross-browser, responsive, resilience, accessibility and visual profile
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260721-full-production-like-e2e-simulation.md
   - .github/workflows/full-production-like-e2e-simulation.yml
 validation:
-  - command: CI / Agent Governance / Platform DB Outage / Phase 7 on 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
+  - command: CI / Agent Governance / Platform DB Outage / Phase 7 on 0b46bda79fabda043f79be2b68ce645e17c2b634
     result: PASS
-    evidence: runs 29862494021 / 29862493873 / 29862493825 / 29862494061
-  - command: temporary comprehensive simulation run 29862494074
+    evidence: runs 29862854727 / 29862854386 / 29862854558 / 29862854491
+  - command: comprehensive browser and visual simulation run 29862854364
+    result: PASS
+    evidence: all functional and visual steps passed; artifact 8508221344, digest sha256:de0d86a8b7c1749c3f23c036bf3599860428adbafa9e2c01875555cef4f962a8
+  - command: combined-job soak reset in run 29862854364
     result: FAIL
-    evidence: harness-only APP_KEY generation defect; product result not classified from this run
-  - command: corrected comprehensive simulation workflow
+    evidence: artifact records soak_reset_outcome=failure and no soak-runtime-metrics.json; soak moved to fresh isolated job
+  - command: final fresh-job comprehensive plus 300-second soak validation
     result: NOT_RUN
-    evidence: corrected orchestration committed at d2df6e730b6b502bde68e23c249da01bbbd0378c; exact-head rerun pending
+    evidence: fresh-job orchestration committed at 734601f9f7ee3ada809195ea7a51751647f86b4f; exact-head run pending
 blockers:
   - none
-next_action: inspect the corrected PR #115 exact-head workflow runs and classify the first product or harness failure, or record passing evidence
+next_action: inspect PR #115 exact-head comprehensive and independent 300-second soak jobs and record their final artifacts and metrics
 ```
 
 ## Notes
