@@ -46,7 +46,7 @@ Platform web authentication remains separate from the still-unimplemented author
 - PR #48 / `676a77590e3ec93bcad0247b3065d203ac209c40` — production topology evidence baseline.
 - PR #49 / `0f876d4f2209399a85cafcff1623d8e6c810b914` — fail-closed provider-independent production configuration verifier.
 - PR #50 / `3973774727c35aea22d0a646f479a0ff079042cc` — required Composer advisory scanning and bounded Dependabot updates.
-- PR #54 / `eb358a245f35fda1865f2e2f163ffb7d731e35cec` — CSP and browser security headers without unsafe inline/eval allowances.
+- PR #54 / `eb358a245f35aea22d0a646f479a0ff079042cc` — CSP and browser security headers without unsafe inline/eval allowances.
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
