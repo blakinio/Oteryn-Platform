@@ -32,13 +32,9 @@ final class AccountOverviewReadModel
         $binding = IdentityCanaryAccount::query()->whereKey($identity->id)->first();
 
         if ($binding === null) {
-            return [
-                'state' => self::STATE_UNAVAILABLE,
-                'label' => 'Support required',
-                'message' => 'We cannot confirm your game account setup right now. Character creation remains unavailable. Contact support if this persists.',
-                'retry_allowed' => false,
-                'character_creation_allowed' => false,
-            ];
+            return $this->unavailableState(
+                'We cannot confirm your game account setup right now. Character creation remains unavailable. Contact support if this persists.',
+            );
         }
 
         if ($binding->isReady()) {
@@ -74,10 +70,36 @@ final class AccountOverviewReadModel
             ];
         }
 
+        if ($binding->status === IdentityCanaryAccount::STATUS_PENDING) {
+            return [
+                'state' => self::STATE_PENDING,
+                'label' => 'Setup in progress',
+                'message' => 'Your game account setup is still in progress. Character creation will become available after setup completes.',
+                'retry_allowed' => false,
+                'character_creation_allowed' => false,
+            ];
+        }
+
+        return $this->unavailableState(
+            'We cannot confirm a valid game account setup state. Character creation remains unavailable. Contact support for assistance.',
+        );
+    }
+
+    /**
+     * @return array{
+     *     state: string,
+     *     label: string,
+     *     message: string,
+     *     retry_allowed: bool,
+     *     character_creation_allowed: bool
+     * }
+     */
+    private function unavailableState(string $message): array
+    {
         return [
-            'state' => self::STATE_PENDING,
-            'label' => 'Setup in progress',
-            'message' => 'Your game account setup is still in progress. Character creation will become available after setup completes.',
+            'state' => self::STATE_UNAVAILABLE,
+            'label' => 'Support required',
+            'message' => $message,
             'retry_allowed' => false,
             'character_creation_allowed' => false,
         ];
