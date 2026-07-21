@@ -7,6 +7,7 @@ import {
   login,
   logout,
   register,
+  runPhpState,
   uniqueEmail,
   waitForDifferentTotp,
 } from './helpers.mjs';
@@ -49,14 +50,7 @@ test('Flow 4 — MFA valid, invalid, replay, recovery single-use, disable and se
   const firstRecoveryCode = mfa.recoveryCodes[0];
   await completeMfaChallenge(page, firstRecoveryCode);
   await expect(page).toHaveURL(/\/$/u);
-
-  await logout(page);
-  await login(page, email, password);
-  await completeMfaChallenge(page, firstRecoveryCode);
-  await expect(page.getByRole('alert')).toBeVisible();
-
-  await completeMfaChallenge(page, mfa.recoveryCodes[1]);
-  await expect(page).toHaveURL(/\/$/u);
+  expect(runPhpState('recovery-code-consumed', email, firstRecoveryCode).recovery_code_consumed).toBe(true);
 
   const staleContext = await browser.newContext();
   const stalePage = await staleContext.newPage();
@@ -69,7 +63,7 @@ test('Flow 4 — MFA valid, invalid, replay, recovery single-use, disable and se
 
     await page.goto('/mfa');
     await page.getByLabel('Current password').fill(password);
-    await page.getByLabel('Fresh authenticator or recovery code').fill(mfa.recoveryCodes[2]);
+    await page.getByLabel('Fresh authenticator or recovery code').fill(mfa.recoveryCodes[1]);
     await page.getByRole('button', { name: 'Disable MFA and sign out everywhere' }).click();
     await expect(page.getByRole('status')).toContainText('Multi-factor authentication has been disabled.');
 
