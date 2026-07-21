@@ -67,8 +67,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T21:54:31Z
-head: c30760195dee451ec78e2b5a6b5cd1e3c3ee9cb6
+updated_at: 2026-07-21T21:58:00Z
+head: e506b8d63665d6c4a5ac821174ad9280c35d3e6c
 branch: task/OTERYN-20260721-game-auth-architecture-foundation
 pr: 117
 status: validating
@@ -88,7 +88,6 @@ owned_paths:
   - docs/contracts/OTCLIENT_GAME_AUTH_CONTRACT.md
   - docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md
   - docs/contracts/GAME_SESSION_CANARY_CONTRACT.md
-  - docs/contracts/OTCLIENT_GAME_AUTH_CONTRACT.md
   - docs/contracts/WORLD_REGISTRY_CONTRACT.md
 proven:
   - Oteryn Platform Phase 0 branch started from main 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f.
@@ -114,8 +113,8 @@ unknown:
 conflicts:
   - Existing broad auth contract documents parallel password/session paths whose semantics are incompatible with the target single authoritative Identity policy until legacy bypass closure.
 first_failure:
-  marker: none
-  evidence: none
+  marker: Agent Governance run 29871822896 checkpoint-validation
+  evidence: checkpoint used unsupported validation result PENDING; governance contract permits PASS, FAIL, BLOCKED, or NOT_RUN only
 rejected_hypotheses:
   - Custom OAuth authorization protocol is unnecessary because the current Laravel ecosystem provides a standards-based PKCE-capable authorization server.
   - Current 24-hour replayable account_sessions is not accepted as the Game Login Ticket.
@@ -134,12 +133,15 @@ validation:
   - command: GitHub list PR 117 changed filenames
     result: PASS
     evidence: exactly nine changed paths, all within declared owned_paths; no runtime/cross-repository writes
-  - command: GitHub commit status on c30760195dee451ec78e2b5a6b5cd1e3c3ee9cb6
-    result: PENDING
-    evidence: no commit statuses reported yet; do not claim CI success
+  - command: GitHub Actions Agent Governance run 29871822896
+    result: FAIL
+    evidence: checkpoint validator rejected unsupported result PENDING; root cause corrected in this commit
+  - command: GitHub CI and Phase 7 Production-Like Validation
+    result: NOT_RUN
+    evidence: runs 29871822847 and 29871822976 were still in progress when this checkpoint was written
 blockers:
   - none
-next_action: Verify PR 117 workflow runs on the checkpoint commit, inspect any failures, and repair before readiness.
+next_action: Verify workflow runs on the new head, inspect any remaining failures, and repair before merge.
 ```
 
 ## Notes
