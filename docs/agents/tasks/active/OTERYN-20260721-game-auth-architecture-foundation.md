@@ -67,11 +67,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T21:58:00Z
-head: e506b8d63665d6c4a5ac821174ad9280c35d3e6c
+updated_at: 2026-07-21T21:59:00Z
+head: 499b4ba1e63760ec032e7843bae26e94c2365c8d
 branch: task/OTERYN-20260721-game-auth-architecture-foundation
 pr: 117
-status: validating
+status: ready
 context_routes:
   - architecture
   - auth-identity
@@ -100,6 +100,10 @@ proven:
   - ADR 0009 selects Oteryn Identity as sole reusable-credential authority, Passport-based Authorization Code plus PKCE, opaque one-time Game Login Tickets, a separately deployable Go Game Gateway, independent Game Sessions, and World Registry.
   - Threat model, sequence diagrams, rollout plan, and four cross-component contracts are present on PR 117.
   - PR 117 changed-file inventory contains exactly the nine declared documentation/task owned paths and no runtime or external-repository changes.
+  - Agent Governance run 29871969696 succeeded on 499b4ba1e63760ec032e7843bae26e94c2365c8d.
+  - CI run 29871969743 succeeded on 499b4ba1e63760ec032e7843bae26e94c2365c8d.
+  - Platform DB Outage Validation run 29871969755 succeeded on 499b4ba1e63760ec032e7843bae26e94c2365c8d.
+  - Phase 7 Production-Like Validation run 29871969760 completed all validation steps successfully on 499b4ba1e63760ec032e7843bae26e94c2365c8d.
 derived:
   - The target native authorization layer uses Laravel Passport rather than a custom OAuth protocol, with a narrowly scoped short-lived access token used only to request a Game Login Ticket.
   - Game Login Ticket issuance and Game Session creation are separate lifecycles; neither reuses Platform web sessions or Canary account sink credentials.
@@ -114,7 +118,7 @@ conflicts:
   - Existing broad auth contract documents parallel password/session paths whose semantics are incompatible with the target single authoritative Identity policy until legacy bypass closure.
 first_failure:
   marker: Agent Governance run 29871822896 checkpoint-validation
-  evidence: checkpoint used unsupported validation result PENDING; governance contract permits PASS, FAIL, BLOCKED, or NOT_RUN only
+  evidence: checkpoint used unsupported validation result PENDING; governance contract permits PASS, FAIL, BLOCKED, or NOT_RUN only; corrected and subsequent governance run succeeded
 rejected_hypotheses:
   - Custom OAuth authorization protocol is unnecessary because the current Laravel ecosystem provides a standards-based PKCE-capable authorization server.
   - Current 24-hour replayable account_sessions is not accepted as the Game Login Ticket.
@@ -133,15 +137,24 @@ validation:
   - command: GitHub list PR 117 changed filenames
     result: PASS
     evidence: exactly nine changed paths, all within declared owned_paths; no runtime/cross-repository writes
-  - command: GitHub Actions Agent Governance run 29871822896
-    result: FAIL
-    evidence: checkpoint validator rejected unsupported result PENDING; root cause corrected in this commit
-  - command: GitHub CI and Phase 7 Production-Like Validation
+  - command: GitHub Actions Agent Governance run 29871969696
+    result: PASS
+    evidence: checkpoint-validation completed successfully after correcting the invalid validation-result value
+  - command: GitHub Actions CI run 29871969743
+    result: PASS
+    evidence: Composer validation/audit, formatting, static analysis and test job completed successfully on 499b4ba1e63760ec032e7843bae26e94c2365c8d
+  - command: GitHub Actions Platform DB Outage Validation run 29871969755
+    result: PASS
+    evidence: workflow completed successfully on 499b4ba1e63760ec032e7843bae26e94c2365c8d
+  - command: GitHub Actions Phase 7 Production-Like Validation run 29871969760
+    result: PASS
+    evidence: exact-SHA deployment, migrations, privilege boundaries, fail-closed scenarios, Redis ACL, SMTP/configuration, critical regressions, runtime behavior, backup/restore and upgrade/rollback validation all completed successfully
+  - command: local repository validation
     result: NOT_RUN
-    evidence: runs 29871822847 and 29871822976 were still in progress when this checkpoint was written
+    evidence: no local repository checkout/runtime command surface is available in this connector session; exact-SHA GitHub workflows provide the executable validation evidence
 blockers:
   - none
-next_action: Verify workflow runs on the new head, inspect any remaining failures, and repair before merge.
+next_action: Verify all required GitHub workflows pass on the final checkpoint head and merge PR 117 if the merge gate remains satisfied.
 ```
 
 ## Notes
