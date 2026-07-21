@@ -62,7 +62,7 @@ modules:
 dependencies:
   - docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md
   - merged acceptance browser harness from PR #67
-  - open PR #76 design/architecture documentation, path-disjoint and advisory until merged
+  - merged UI architecture and design-system contract from PR #76
   - separate account/provisioning-state task if the required dashboard/status surface cannot be rendered from existing routes/read data
 blockers:
   - account/provisioning status UX may require a separately authorized controller/read-model task; do not add backend/data behavior under this UI task
@@ -95,10 +95,10 @@ cross_repository_tasks: []
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T10:06:00+02:00
-head: 904b9286ec22b1ed004c264b733a35a3d9018fef
+updated_at: 2026-07-21T10:28:00+02:00
+head: 8baea5e3da9368b274808685642113e2e39a10c1
 branch: task/OTERYN-20260721-ui-ux-launch-readiness
-pr: null
+pr: 77
 status: in_progress
 context_routes:
   - web-cms
@@ -123,31 +123,67 @@ owned_paths:
 proven:
   - PR #67 is merged and records Functional Acceptance as STAGING_PROVEN while Visual UX Acceptance remains FAIL.
   - Final integrated acceptance evidence on validated implementation SHA 4c3ec48dc5c13c6b37169291be25e09f3856de4d passed 12 Playwright tests with zero failures and retained the visual blocker set.
-  - Visual evidence found document-level horizontal overflow, fragmented public/auth/account/admin presentation, missing product-owned error recovery, MFA enrollment overflow and weak small-screen admin usability.
-  - Main head at task start is 904b9286ec22b1ed004c264b733a35a3d9018fef.
-  - Open PR #76 owns only docs/design/**, ADR 0008 and its own task record; its implementation guidance is path-disjoint from this task.
+  - PR #76 merged the authoritative UI architecture, design-system and responsive-strategy documentation before implementation validation.
+  - PR #77 now contains a shared public shell, identity/account-operation shell, administrator console shell, responsive design-system CSS, bounded MFA provisioning presentation, contained table/long-content strategies and product-owned 403/404/503 views.
+  - Platform DB Outage Validation run 29814137245 passed on implementation head ce078ed68d46bc9b92a26d7ee21e51d377819596.
 derived:
-  - The presentation fixes can proceed on a dedicated branch without changing backend/security contracts.
+  - The presentation fixes remain path-bounded and do not require changes to backend/security contracts.
   - Account Overview/provisioning status cannot be invented under this task because no current route/read model delivers those surfaces.
 unknown:
-  - final per-surface Visual UX classifications after implementation and exact-head browser rerun
+  - final per-surface Visual UX classifications after exact-head full browser rerun
 conflicts: []
 first_failure:
-  marker: visual UX launch gate
-  evidence: merged docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md classifies Visual UX Acceptance as FAIL
+  marker: exact-head implementation validation
+  evidence: CI run 29814137476 and Acceptance E2E smoke run 29814137424 failed after the first implementation pass; acceptance failure was an outdated home landmark heading expectation and the heading has been restored for the next rerun
 rejected_hypotheses:
   - Rendering without server errors is sufficient visual acceptance: rejected by responsive, navigation, error-state and design-system evidence.
   - UI task should change provisioning/backend behavior to make the dashboard possible: rejected; backend/read-model work requires a separate bounded task.
   - The implementation should reuse PR #67 or PR #76 branches: rejected because substantial implementation requires its own dedicated task branch.
 changed_paths:
+  - public/css/app.css
+  - resources/views/game/layout.blade.php
+  - resources/views/home.blade.php
+  - resources/views/game/highscores.blade.php
+  - resources/views/game/guild.blade.php
+  - resources/views/game/online.blade.php
+  - resources/views/game/servers.blade.php
+  - resources/views/news/index.blade.php
+  - resources/views/identity/layout.blade.php
+  - resources/views/identity/login.blade.php
+  - resources/views/identity/register.blade.php
+  - resources/views/identity/forgot-password.blade.php
+  - resources/views/identity/reset-password.blade.php
+  - resources/views/identity/change-password.blade.php
+  - resources/views/identity/mfa/challenge.blade.php
+  - resources/views/identity/mfa/settings.blade.php
+  - resources/views/identity/mfa/recovery-codes.blade.php
+  - resources/views/characters/create.blade.php
+  - resources/views/admin/layout.blade.php
+  - resources/views/admin/dashboard.blade.php
+  - resources/views/admin/news/index.blade.php
+  - resources/views/admin/news/form.blade.php
+  - resources/views/admin/pages/index.blade.php
+  - resources/views/admin/pages/form.blade.php
+  - resources/views/admin/roles/index.blade.php
+  - resources/views/admin/audit/index.blade.php
+  - resources/views/errors/layout.blade.php
+  - resources/views/errors/403.blade.php
+  - resources/views/errors/404.blade.php
+  - resources/views/errors/503.blade.php
   - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
 validation:
-  - command: lean live-state preflight against main, merged PR #67 evidence, task checkpoint and overlapping open PR #76
+  - command: lean live-state preflight against main, merged PR #67 evidence and overlapping design work
     result: PASS
-    evidence: main and merged acceptance evidence support NEXT_ACTION; no overlapping product presentation ownership was found
+    evidence: no overlapping presentation implementation ownership was found; PR #76 merged design-only guidance before final validation
+  - command: automatic PR exact-head Platform DB outage validation on ce078ed68d46bc9b92a26d7ee21e51d377819596
+    result: PASS
+    evidence: workflow run 29814137245 completed successfully
+  - command: automatic PR acceptance smoke on ce078ed68d46bc9b92a26d7ee21e51d377819596
+    result: FAIL
+    evidence: run 29814137424 failed only the first public-surface heading locator because the home H1 had changed from Oteryn Platform to Explore Oteryn; the accepted landmark heading has been restored
 blockers:
   - separate account/provisioning-state dependency if required by existing product data boundaries
-next_action: Inspect the current shared layouts, stylesheet and highest-blocker views, then implement the smallest coherent shared shell/navigation/responsive foundation without changing routes or backend semantics.
+next_action: Rerun the exact-head CI, governance, production-like and acceptance smoke gates after the home landmark and checkpoint fixes, then inspect any remaining first failure before requesting full visual evidence.
 ```
 
 ## Notes
