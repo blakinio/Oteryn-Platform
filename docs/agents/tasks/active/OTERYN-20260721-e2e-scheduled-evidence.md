@@ -59,8 +59,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T21:00:15Z
-head: 8784657e206f84af9824b59dfd80fdf1f0eb3ad9
+updated_at: 2026-07-21T21:03:34Z
+head: bab66b3ef8c8a9f18d58a5db6789284857364e94
 branch: task/OTERYN-20260721-e2e-scheduled-evidence
 pr: 116
 status: blocked
@@ -75,9 +75,11 @@ owned_paths:
 proven:
   - PR #111 merged as 740d9879b341d98e4cf0ef0e7f076b43cd86cdaf and implemented the scheduled/manual stability-repeat and public-soak workflows.
   - PR #113 merged as 0bc273816dcf515cf264652cabe8b8a3c2f95b59 and closed the prior task lifecycle.
-  - issue #114 is the dedicated tracker for collecting the first completed scheduled stability and soak runtime evidence.
-  - draft PR #116 is the live handoff/task-record PR on branch task/OTERYN-20260721-e2e-scheduled-evidence.
-  - current main base for PR #116 is 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f; compare reports the task branch ahead and behind 0.
+  - PR #115 merged as 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f and corrected the reusable public-soak runtime assertion before scheduled evidence collection.
+  - issue #114 remains open as the dedicated tracker for collecting the first completed scheduled stability and soak runtime evidence.
+  - draft PR #116 is open and mergeable on branch task/OTERYN-20260721-e2e-scheduled-evidence at head bab66b3ef8c8a9f18d58a5db6789284857364e94.
+  - current main is 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f; compare main to PR #116 head reports ahead 3 behind 0 with only docs/agents/ACTIVE_WORK.md and this active task record changed.
+  - exact PR #116 head bab66b3ef8c8a9f18d58a5db6789284857364e94 passed Agent Governance run 29868206967, CI run 29868206587, Platform DB Outage Validation run 29868206520 and Phase 7 Production-Like Validation run 29868206381.
   - acceptance-soak.yml schedules the public soak at cron 41 4 * * 4 with default 300 seconds and zero retries.
   - acceptance-stability.yml schedules three isolated critical iterations at cron 17 3 * * 1 with fail-fast false and zero retries.
   - issue #91 remains the independent Production Go-Live Gate and is not changed by this task.
@@ -90,7 +92,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: none
-  evidence: no scheduled runtime result is available to classify yet
+  evidence: no completed scheduled runtime result is available to classify yet
 rejected_hypotheses:
   - fabricate or infer scheduled evidence before a completed workflow run exists: rejected because evidence must come from actual exact-SHA runtime artifacts.
   - add more browser scenarios while waiting: rejected because the current task is evidence collection and PR #111 already closed the intended implementation scope.
@@ -98,15 +100,18 @@ changed_paths:
   - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260721-e2e-scheduled-evidence.md
 validation:
-  - command: live GitHub state preflight
+  - command: live GitHub task/PR/issue preflight
     result: PASS
-    evidence: issue #114 is open; draft PR #116 exists; no overlapping open PR was found for this evidence-collection ownership.
-  - command: compare main to task/OTERYN-20260721-e2e-scheduled-evidence
+    evidence: issue #114 open; PR #116 open draft and mergeable at bab66b3ef8c8a9f18d58a5db6789284857364e94; no new implementation scope required.
+  - command: compare main 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f to PR #116 head bab66b3ef8c8a9f18d58a5db6789284857364e94
     result: PASS
-    evidence: base 09450e6f96638ae2dbf6d18c9585e7ccc5f6d24f; branch ahead 2 and behind 0 before final checkpoint update; changed paths limited to ACTIVE_WORK and the active task record.
+    evidence: ahead 3 behind 0; changed paths limited to ACTIVE_WORK and the active task record.
+  - command: required PR #116 checks on bab66b3ef8c8a9f18d58a5db6789284857364e94
+    result: PASS
+    evidence: Agent Governance 29868206967; CI 29868206587; Platform DB Outage 29868206520; Phase 7 29868206381 all successful.
   - command: scheduled workflow definition inspection
     result: PASS
-    evidence: acceptance-soak.yml and acceptance-stability.yml on main retain the merged PR #111 schedules and zero-retry policies.
+    evidence: acceptance-soak.yml and acceptance-stability.yml on main retain the merged PR #111 schedules and zero-retry policies after PR #115.
 blockers:
   - first completed scheduled public-soak run is not yet available; nominal first post-merge schedule is 2026-07-23T04:41:00Z.
 next_action: After the first completed scheduled Acceptance E2E Public Soak run exists, inspect its exact-SHA run, job and artifacts and record the first non-secret soak baseline evidence without introducing thresholds.
