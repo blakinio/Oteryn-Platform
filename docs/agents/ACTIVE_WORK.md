@@ -4,13 +4,9 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260721-production-go-live-verification-prep`
-  - issue: #91
-  - PR: #92
-  - status: implementing
-  - goal: prepare a fail-closed non-secret production verification evidence packet and deterministic handoff without performing production deployment or production mutation smoke.
+None.
 
-## Closed acceptance follow-ups
+## Closed acceptance and release-preparation follow-ups
 
 - PR #67 / `517968539bdfd7d189677b669bf0899c35fccec1` — issues #68-#70 closed with exact-SHA production-like browser acceptance evidence classified `STAGING_PROVEN`.
 - PR #73 / `06d8d94aafd73de996eb4ea93705e8a45fbadafb` — issue #71 closed with controlled Platform DB outage evidence classified `STAGING_PROVEN` for that staging failure path only.
@@ -18,6 +14,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 - PR #75 / `4fc6fcccea00bdd8d7679595b92d189cb572dd35` — final Functional Acceptance matrix reconciliation merged; FAV-01 through FAV-05 are closed for the delivered staging-verifiable scope.
 - PR #77 / `1e6e21f0963406d4e58c39b347a49cfa4529bd1c` — delivered-surface UI/UX remediation merged with clean browser Visual/Accessibility evidence.
 - PR #86 / `5d3628f8c6ba2e454246f24947ebe08ca93cf684` — issue #81 closed; authenticated Account Overview and provisioning-status UX delivered with full production-like browser evidence.
+- PR #92 / `c18432df6b387932aa04e1eb269677c9078d9063` — fail-closed non-secret Production Go-Live verification evidence packet prepared; actual production execution remains issue #91.
 
 ## Current project phase
 
@@ -37,7 +34,7 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-Complete PR #92 repository-only verification preparation, then keep issue #91 blocked until the exact final deployed production SHA and explicit production access/deployment authorization are available. Execute the authoritative Production Go-Live Gate only against that exact deployment.
+Issue #91 is the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record results in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployment.
 
 ## Remaining cross-repository dependency
 
