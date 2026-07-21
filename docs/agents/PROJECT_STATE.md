@@ -108,6 +108,8 @@ PR #99 merged as `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` and closed issue #98
 
 The bootstrap implementation had `11 -> 11` migrations because PR #99 added validation infrastructure rather than a Platform schema migration. This proves the mechanism without fabricating a schema delta; future migration-bearing candidates traverse the same exact-base/exact-head path.
 
+PR #102 merged as `ee235cbbdd379a5047fede98ff79a0e35e22ce76` and closed issue #101. The Phase 7 running-HTTP path now also proves that one concrete application-generated response `X-Request-ID` maps to exactly one structured `http.request.completed` JSON log event with the same `request_id` and expected `GET` / `200` method-status pair. The request identifier itself is not persisted in durable evidence, and the result remains `STAGING_PROVEN` for the controlled production-like runtime only.
+
 Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
 
 All continuous-hardening evidence remains staging/repository evidence. It does not change the Production Go-Live Gate.
@@ -189,11 +191,11 @@ No Canary/login-server repository was modified by Phase 7 work, production-verif
 
 None.
 
-Repository/staging E2E hardening is currently closed through PR #99. Issue #91 remains the separate production execution tracker.
+Repository/staging E2E hardening is currently closed through PR #102. Issue #91 remains the separate production execution tracker.
 
 ## Recommended next work
 
-Start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers. Remaining candidates are P1 resilience/evidence correlation and deeper accessibility interaction, or P2 repeated-run/soak work.
+Start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers. Remaining candidates are P1 resilience and deeper accessibility interaction, or P2 repeated-run/soak work.
 
 Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record direct evidence in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployed release.
 
