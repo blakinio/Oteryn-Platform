@@ -73,9 +73,9 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T09:22:50+02:00
-head: 4c3ec48dc5c13c6b37169291be25e09f3856de4d
-branch: task/OTERYN-20260721-functional-visual-acceptance
+updated_at: 2026-07-21T09:47:56+02:00
+head: 517968539bdfd7d189677b669bf0899c35fccec1
+branch: main
 pr: 67
 status: ready
 context_routes:
@@ -105,9 +105,10 @@ proven:
   - No product views, CSS, controllers, Canary code or login-server code changed in this task; visual findings were not masked by product fixes.
   - Credential-bearing full flows do not retain raw Playwright traces; sanitized diagnostics are used while non-secret smoke flows retain failure trace and screenshot evidence.
   - Acceptance data uses synthetic users and credentials only and commits no production secrets.
+  - PR #67 was squash-merged into main with expected head 2a8b341d197e94346b01da9a0ee2181034e39322 as merge commit 517968539bdfd7d189677b669bf0899c35fccec1.
 derived:
   - AUTOMATED_E2E_PASS is achieved for exact implementation SHA 4c3ec48dc5c13c6b37169291be25e09f3856de4d.
-  - FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN is supported by composed production-like evidence; aggregate durable matrix reconciliation should occur after PR #67 merges without duplicating docs/testing ownership in this PR.
+  - FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN is supported by composed production-like evidence; aggregate durable matrix reconciliation can now proceed in the separately owned acceptance-closure work after PR #67 merged.
   - VISUAL_UX_ACCEPTANCE remains FAIL and launch remains blocked by the bounded OTERYN-20260721-ui-ux-launch-readiness defect task.
   - PRODUCTION_SMOKE_PENDING remains the correct production status because staging evidence is not production proof.
   - Loopback browser acceptance uses SESSION_SECURE_COOKIE=false only because php artisan serve does not terminate TLS; secure-cookie behavior remains independently covered by Phase 7 staging evidence.
@@ -146,12 +147,15 @@ validation:
   - command: Visual UX Acceptance run 29784023395
     result: PASS
     evidence: independent exploratory evidence collection completed successfully; the acceptance classification itself remains FAIL because documented UX blockers were found
+  - command: Squash-merge PR #67 with expected head 2a8b341d197e94346b01da9a0ee2181034e39322
+    result: PASS
+    evidence: GitHub merge result merged=true, merge commit 517968539bdfd7d189677b669bf0899c35fccec1
 blockers:
   - Visual UX launch gate remains blocked by OTERYN-20260721-ui-ux-launch-readiness.
   - Production smoke remains pending and must not be inferred from staging.
-next_action: Squash-merge PR #67 into main.
+next_action: Archive this completed task record under docs/agents/tasks/archive/OTERYN-20260721-functional-visual-acceptance.md.
 ```
 
 ## Notes
 
-PR #67 delivers the durable production-like browser E2E harness and acceptance evidence. The Functional Acceptance Matrix and production smoke checklist remain owned under `docs/testing/**` outside this PR; their aggregate status should be reconciled after merge using the now-complete FAV-01 through FAV-05 evidence. The independent Visual / UI / UX Acceptance result remains FAIL, and product fixes belong in `OTERYN-20260721-ui-ux-launch-readiness`. Final production proof remains separate from staging and production-like acceptance.
+PR #67 delivered the durable production-like browser E2E harness and acceptance evidence and was squash-merged to `main` as `517968539bdfd7d189677b669bf0899c35fccec1`. The Functional Acceptance Matrix and production smoke checklist remain owned under `docs/testing/**` outside this task; their aggregate status can now be reconciled by the separately owned acceptance-closure work using the complete FAV-01 through FAV-05 evidence. The independent Visual / UI / UX Acceptance result remains FAIL, and product fixes belong in `OTERYN-20260721-ui-ux-launch-readiness`. Final production proof remains separate from staging and production-like acceptance.
