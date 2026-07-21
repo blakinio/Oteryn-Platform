@@ -65,7 +65,7 @@ test('Flow 4 — MFA valid, invalid, replay, recovery single-use, disable and se
     await page.getByLabel('Current password').fill(password);
     await page.getByLabel('Fresh authenticator or recovery code').fill(mfa.recoveryCodes[1]);
     await page.getByRole('button', { name: 'Disable MFA and sign out everywhere' }).click();
-    await expect(page.getByRole('status')).toContainText('Multi-factor authentication has been disabled.');
+    await expect(page).toHaveURL(/\/$/u);
 
     await page.goto('/mfa');
     await expect(page).toHaveURL(/\/login$/u);
@@ -73,6 +73,10 @@ test('Flow 4 — MFA valid, invalid, replay, recovery single-use, disable and se
     const staleResponse = await stalePage.goto('/mfa');
     expect(staleResponse?.status()).toBe(403);
     await expect(stalePage.getByRole('heading', { name: '403' })).toBeVisible();
+
+    await login(page, email, password);
+    await expect(page).toHaveURL(/\/$/u);
+    await expect(page.getByRole('heading', { name: 'Complete your sign in' })).toHaveCount(0);
   } finally {
     await staleContext.close();
   }
