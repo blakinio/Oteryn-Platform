@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-None.
+- `OTERYN-20260721-e2e-observability-correlation` — issue #101; add bounded production-like correlation proving a concrete response `X-Request-ID` matches the same `request_id` in its structured `http.request.completed` JSON log event.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -17,6 +17,7 @@ None.
 - PR #92 / `c18432df6b387932aa04e1eb269677c9078d9063` — fail-closed non-secret Production Go-Live verification evidence packet prepared; actual production execution remains issue #91.
 - PR #94 / `26ff602696c597aac0833415b0a47af5d427a52d` — risk-based E2E architecture plus required bounded Chromium/Firefox/WebKit portability, desktop/tablet/mobile responsive and representative browser-security coverage merged.
 - PR #99 / `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` — issue #98 closed; existing Phase 7 release validation now includes isolated synthetic existing-data upgrade, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy smoke with durable `STAGING_PROVEN` evidence.
+- PR #100 / `8a4fd46db04d2476b6fea7fb47fdd58443548ac3` — archived the completed migration/rollback validation task and closed its governance lifecycle.
 
 ## Current project phase
 
@@ -38,13 +39,11 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-No repository/staging E2E hardening task is currently active.
+The active repository/staging task is the bounded issue #101 observability-correlation slice. It must add exact response-to-structured-log correlation without changing runtime observability semantics or claiming production log-shipping evidence.
 
-Further resilience, observability, accessibility-interaction, repeated-run and soak slices remain optional incremental work under ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`. Start only a bounded task that adds unique evidence beyond existing browser, Phase 7, Platform DB outage, feature and integration coverage.
+Further resilience, accessibility-interaction, repeated-run and soak slices remain optional incremental work under ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`. Start only bounded work that adds unique evidence beyond existing browser, Phase 7, Platform DB outage, feature and integration coverage.
 
 Issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
-
-The repository/staging hardening track must not claim production proof and does not block waiting for production access.
 
 ## Remaining cross-repository dependency
 

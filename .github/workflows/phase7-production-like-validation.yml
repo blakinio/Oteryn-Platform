@@ -421,9 +421,20 @@ jobs:
           ! grep -qi 'stack trace' /tmp/notfound.body
           ! grep -Fq "$APP_KEY" /tmp/notfound.body
 
+          HOME_REQUEST_ID="$(awk 'BEGIN { IGNORECASE=1 } /^X-Request-ID:/ { gsub("\r", "", $2); print $2 }' /tmp/home.headers)"
+          test -n "$HOME_REQUEST_ID"
+
           sleep 1
           grep -q 'http.request.completed' /tmp/phase7-server.log
+          php scripts/phase7/assert-request-log-correlation.php /tmp/phase7-server.log "$HOME_REQUEST_ID" GET 200
           ! grep -Fq "$APP_KEY" /tmp/phase7-server.log
+
+          {
+            echo "### Phase 7 request/log correlation evidence"
+            echo "- response_request_id_to_structured_log: PASS"
+            echo "- correlated_method_status: GET/200"
+            echo "- classification: STAGING_PROVEN"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate backup, clean restore, integrity and restored smoke
         run: |
@@ -538,6 +549,7 @@ jobs:
             "smtp_delivery_and_failure_semantics": "PASS",
             "critical_regression_suite": "PASS",
             "live_security_headers_cookies_correlation": "PASS",
+            "request_id_log_correlation": "PASS",
             "backup_restore_integrity": "PASS",
             "restore_ms": ${RESTORE_MS},
             "source_table_count": ${SOURCE_TABLES},
