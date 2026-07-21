@@ -5,14 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title') · {{ config('app.name') }}</title>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/portal.css') }}">
 </head>
-<body>
+<body class="public-body">
 <a class="skip-link" href="#main-content">Skip to content</a>
 <header class="site-header">
     <div class="header-inner">
-        <a class="brand" href="{{ route('home') }}" aria-label="Oteryn Platform home">
-            <span class="brand-mark" aria-hidden="true">OT</span>
-            <span class="brand-label">Oteryn Platform</span>
+        <a class="brand portal-brand" href="{{ route('home') }}" aria-label="Oteryn Platform home">
+            <img class="brand-sigil" src="{{ asset('images/oteryn-sigil.svg') }}" alt="" aria-hidden="true">
+            <span class="brand-wordmark">
+                <span class="brand-name">Oteryn</span>
+                <span class="brand-subtitle">World portal</span>
+            </span>
         </a>
 
         <nav class="primary-nav desktop-only" aria-label="Public navigation">
