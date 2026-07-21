@@ -96,19 +96,26 @@ PR #94 merged as `26ff602696c597aac0833415b0a47af5d427a52d` and delivered:
 - browser-visible session rotation/cookie and foreign-ownership manipulation checks;
 - secret-safe exact-SHA evidence while preserving the full primary Chromium acceptance baseline.
 
-PR #99 merged as `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` and closed issue #98. The existing Phase 7 release-validation path now also includes:
+PR #99 merged as `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` and closed issue #98. The existing Phase 7 release-validation path now also includes representative existing-data migration, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy smoke with separate durable `STAGING_PROVEN` evidence.
 
-- an isolated synthetic Identity + published-news existing-data dataset built from actual `BASE_SHA` migrations;
-- exact-candidate migration execution against that persisted state;
-- persisted-data fingerprint validation;
-- candidate smoke;
-- old-code rollback smoke against the post-upgrade database through the existing release symlink;
-- candidate redeploy plus repeated migration/smoke;
-- separate durable non-secret `STAGING_PROVEN` evidence.
+PR #102 merged as `ee235cbbdd379a5047fede98ff79a0e35e22ce76` and closed issue #101. The Phase 7 running-HTTP path now also proves that one concrete application-generated response `X-Request-ID` maps to exactly one structured `http.request.completed` JSON log event with the same `request_id` and expected `GET` / `200` pair.
 
-The bootstrap implementation had `11 -> 11` migrations because PR #99 added validation infrastructure rather than a Platform schema migration. This proves the mechanism without fabricating a schema delta; future migration-bearing candidates traverse the same exact-base/exact-head path.
+PR #106 / issue #105 is the active P1 resilience slice. Its first implementation head `7f21ac65bad1da9514d0e1d6ade48a2da9ee8918` passed:
 
-PR #102 merged as `ee235cbbdd379a5047fede98ff79a0e35e22ce76` and closed issue #101. The Phase 7 running-HTTP path now also proves that one concrete application-generated response `X-Request-ID` maps to exactly one structured `http.request.completed` JSON log event with the same `request_id` and expected `GET` / `200` method-status pair. The request identifier itself is not persisted in durable evidence, and the result remains `STAGING_PROVEN` for the controlled production-like runtime only.
+- Acceptance E2E and Visual UX run `29847628355`;
+- CI run `29847629469`;
+- Agent Governance run `29847629232`;
+- Phase 7 Production-Like Validation run `29847629405`;
+- Platform DB Outage Validation run `29847628752`.
+
+The new `resilience-chromium` profile proves browser-visible restoration and recovery for:
+
+- Canary public online reads after controlled read-grant denial and restoration;
+- Redis runtime state after controlled removal and restoration of the acceptance runtime user's `HMGET` permission.
+
+The first run measured `3 s` wall-clock for the zero-retry resilience profile. The required pull-request `critical` profile now composes smoke + portability + responsive + resilience. The `full` profile requires both the full primary Chromium functional baseline and resilience before it can claim `FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN` or run the visual/accessibility collector.
+
+Durable evidence is `docs/testing/E2E_PUBLIC_DEPENDENCY_RECOVERY_EVIDENCE.md`.
 
 Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
 
@@ -189,23 +196,21 @@ No Canary/login-server repository was modified by Phase 7 work, production-verif
 
 ## Current active task
 
-None.
-
-Repository/staging E2E hardening is currently closed through PR #102. Issue #91 remains the separate production execution tracker.
+`OTERYN-20260721-e2e-public-dependency-recovery` on branch `task/OTERYN-20260721-e2e-public-dependency-recovery`, draft PR #106 / issue #105.
 
 ## Recommended next work
 
-Start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers. Remaining candidates are P1 resilience and deeper accessibility interaction, or P2 repeated-run/soak work.
+Finish PR #106 by validating the documentation-updated exact head through all required checks and merge only if the merge gate remains satisfied.
 
-Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record direct evidence in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployed release.
+After #106, start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers. Remaining candidates are deeper accessibility interaction or P2 repeated-run/soak work; additional resilience scenarios require a distinct recovery gap.
 
-Do not repeat closed staging validation without a new risk/assertion, and do not claim production readiness from staging evidence alone.
+Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
 ## High-priority remaining unknowns
 
 - authoritative Platform game-login assertion/session protocol and rollout if required for launch scope;
 - long-term repeated-run Firefox/WebKit flakiness beyond current bounded measurements;
-- which proposed dependency-interruption scenarios add unique evidence beyond existing Phase 7/outage validation;
+- whether additional dependency-interruption scenarios add unique recovery evidence beyond current Canary/Redis plus Phase 7/outage validation;
 - deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
 - production database, mail, session/cache and queue topology;

@@ -31,6 +31,7 @@ on:
           - full
           - portability
           - responsive
+          - resilience
           - critical
 
 permissions:
@@ -251,13 +252,31 @@ jobs:
           fi
           exit "$STATUS"
 
+      - name: Execute bounded public dependency resilience profile
+        id: resilience
+        if: env.ACCEPTANCE_PROFILE == 'resilience' || env.ACCEPTANCE_PROFILE == 'critical' || env.ACCEPTANCE_PROFILE == 'full'
+        run: |
+          echo "Exact tested SHA: $ACCEPTANCE_SHA"
+          echo "Acceptance profile: resilience"
+          STARTED_AT="$(date +%s)"
+          set +e
+          npm --prefix scripts/acceptance run test:resilience
+          STATUS=$?
+          set -e
+          DURATION_SECONDS="$(( $(date +%s) - STARTED_AT ))"
+          echo "RESILIENCE_DURATION_SECONDS=$DURATION_SECONDS" >> "$GITHUB_ENV"
+          if [ -f artifacts/acceptance/junit.xml ]; then
+            cp artifacts/acceptance/junit.xml artifacts/acceptance/junit-resilience.xml
+          fi
+          exit "$STATUS"
+
       - name: Seed deterministic exploratory visual fixtures
-        if: steps.full.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
+        if: steps.full.outcome == 'success' && steps.resilience.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
         run: php scripts/acceptance/seed.php seed >/tmp/oteryn-visual-seed.json
 
       - name: Execute bounded exploratory visual and accessibility pass
         id: visual
-        if: steps.full.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
+        if: steps.full.outcome == 'success' && steps.resilience.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
         run: node scripts/acceptance/visual-acceptance.js
 
       - name: Build visual contact sheet
@@ -285,6 +304,7 @@ jobs:
           SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
           PORTABILITY_OUTCOME: ${{ steps.portability.outcome }}
           RESPONSIVE_OUTCOME: ${{ steps.responsive.outcome }}
+          RESILIENCE_OUTCOME: ${{ steps.resilience.outcome }}
           FULL_OUTCOME: ${{ steps.full.outcome }}
           VISUAL_OUTCOME: ${{ steps.visual.outcome }}
         run: |
@@ -315,22 +335,34 @@ jobs:
               BROWSER_SUMMARY='chromium'
               VIEWPORT_PROFILES='["desktop-1440x1000","tablet-820x1180","mobile-390x844"]'
               ;;
+            resilience)
+              E2E_OUTCOME="$RESILIENCE_OUTCOME"
+              AUTOMATED_PASS='AUTOMATED_E2E_RESILIENCE_PASS'
+              PROJECTS='["resilience-chromium"]'
+              BROWSERS='["chromium"]'
+              BROWSER_SUMMARY='chromium'
+              VIEWPORT_PROFILES='["desktop-1440x1000"]'
+              ;;
             critical)
-              if [ "$SMOKE_OUTCOME" = 'success' ] && [ "$PORTABILITY_OUTCOME" = 'success' ] && [ "$RESPONSIVE_OUTCOME" = 'success' ]; then
+              if [ "$SMOKE_OUTCOME" = 'success' ] && [ "$PORTABILITY_OUTCOME" = 'success' ] && [ "$RESPONSIVE_OUTCOME" = 'success' ] && [ "$RESILIENCE_OUTCOME" = 'success' ]; then
                 E2E_OUTCOME='success'
               else
                 E2E_OUTCOME='failure'
               fi
               AUTOMATED_PASS='AUTOMATED_E2E_CRITICAL_PASS'
-              PROJECTS='["chromium-primary","portability-chromium","portability-firefox","portability-webkit","responsive-desktop","responsive-tablet","responsive-mobile"]'
+              PROJECTS='["chromium-primary","portability-chromium","portability-firefox","portability-webkit","responsive-desktop","responsive-tablet","responsive-mobile","resilience-chromium"]'
               BROWSERS='["chromium","firefox","webkit"]'
               BROWSER_SUMMARY='chromium,firefox,webkit'
               VIEWPORT_PROFILES='["desktop-1440x1000","tablet-820x1180","mobile-390x844"]'
               ;;
             full)
-              E2E_OUTCOME="$FULL_OUTCOME"
+              if [ "$FULL_OUTCOME" = 'success' ] && [ "$RESILIENCE_OUTCOME" = 'success' ]; then
+                E2E_OUTCOME='success'
+              else
+                E2E_OUTCOME='failure'
+              fi
               AUTOMATED_PASS='AUTOMATED_E2E_PASS'
-              PROJECTS='["chromium-primary"]'
+              PROJECTS='["chromium-primary","resilience-chromium"]'
               BROWSERS='["chromium"]'
               BROWSER_SUMMARY='chromium'
               VIEWPORT_PROFILES='["desktop-1440x1000"]'
@@ -370,6 +402,7 @@ jobs:
           SMOKE_DURATION_JSON="${SMOKE_DURATION_SECONDS:-null}"
           PORTABILITY_DURATION_JSON="${PORTABILITY_DURATION_SECONDS:-null}"
           RESPONSIVE_DURATION_JSON="${RESPONSIVE_DURATION_SECONDS:-null}"
+          RESILIENCE_DURATION_JSON="${RESILIENCE_DURATION_SECONDS:-null}"
           FULL_DURATION_JSON="${FULL_DURATION_SECONDS:-null}"
 
           cat > artifacts/acceptance/evidence.json <<JSON
@@ -385,6 +418,7 @@ jobs:
             "smoke_duration_seconds": $SMOKE_DURATION_JSON,
             "portability_duration_seconds": $PORTABILITY_DURATION_JSON,
             "responsive_duration_seconds": $RESPONSIVE_DURATION_JSON,
+            "resilience_duration_seconds": $RESILIENCE_DURATION_JSON,
             "full_duration_seconds": $FULL_DURATION_JSON,
             "runtime": "real Laravel HTTP",
             "platform_database": "MariaDB 11.8 isolated acceptance schema",
@@ -399,6 +433,7 @@ jobs:
             "smoke_result": "$SMOKE_OUTCOME",
             "portability_result": "$PORTABILITY_OUTCOME",
             "responsive_result": "$RESPONSIVE_OUTCOME",
+            "resilience_result": "$RESILIENCE_OUTCOME",
             "full_result": "$FULL_OUTCOME",
             "visual_result": "$VISUAL_OUTCOME"
           }
@@ -414,6 +449,7 @@ jobs:
             echo "- smoke duration seconds: \`$SMOKE_DURATION_JSON\`"
             echo "- portability duration seconds: \`$PORTABILITY_DURATION_JSON\`"
             echo "- responsive duration seconds: \`$RESPONSIVE_DURATION_JSON\`"
+            echo "- resilience duration seconds: \`$RESILIENCE_DURATION_JSON\`"
             echo "- automated E2E: \`$AUTOMATED_E2E\`"
             echo "- functional acceptance: \`$FUNCTIONAL\`"
             echo "- visual/UX execution: \`$VISUAL_UX\`"

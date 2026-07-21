@@ -9,6 +9,7 @@ const primaryIgnore = [
   '**/full-acceptance.spec.mjs',
   '**/portability-critical.spec.mjs',
   '**/responsive-critical.spec.mjs',
+  '**/resilience-critical.spec.mjs',
 ];
 
 export default defineConfig({
@@ -97,6 +98,14 @@ export default defineConfig({
         viewport: mobileViewport,
         hasTouch: true,
         isMobile: true,
+      },
+    },
+    {
+      name: 'resilience-chromium',
+      testMatch: '**/resilience-critical.spec.mjs',
+      use: {
+        browserName: 'chromium',
+        viewport: desktopViewport,
       },
     },
   ],
