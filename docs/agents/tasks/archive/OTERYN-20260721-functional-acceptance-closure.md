@@ -59,9 +59,9 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T12:26:46+02:00
-head: 4e6998cf6488a8eced7a76ad8aee637d9132ade5
-branch: task/OTERYN-20260721-functional-acceptance-archive
+updated_at: 2026-07-21T12:28:31+02:00
+head: ce1bdfaec1bf00aaa4db3ab7bf14a6398f3c3d95
+branch: main
 pr: 82
 status: ready
 context_routes:
@@ -88,11 +88,11 @@ proven:
   - PR #75 checkpoint-only final head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33 passed CI run 29813862152 / #877, Agent Governance run 29813862283 / #797, Phase 7 Production-Like Validation run 29813862211 / #117 and Platform DB Outage Validation run 29813862315 / #47.
   - PR #75 was marked ready and squash-merged with expected head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33 as merge commit 4fc6fcccea00bdd8d7679595b92d189cb572dd35.
   - Main ACTIVE_WORK was checkpointed after merge at commit 22dc3ec18e3a730917413178f40324ba39ae9369 and records this task as completed pending archive.
-  - Current main is 054bfc0223e93566db1e9fb08a13ffdbcf604f03; relative to 22dc3ec18e3a730917413178f40324ba39ae9369 it contains only a checkpoint update for this completed task and archival of the independent UI architecture task, so the accepted functional, visual and production classifications are unchanged.
+  - Current main before archival was 054bfc0223e93566db1e9fb08a13ffdbcf604f03; relative to 22dc3ec18e3a730917413178f40324ba39ae9369 it contained only a checkpoint update for this completed task and archival of the independent UI architecture task, so the accepted functional, visual and production classifications were unchanged.
   - PR #75 remains merged and closed with merge commit 4fc6fcccea00bdd8d7679595b92d189cb572dd35.
   - No open pull request was found claiming Functional Acceptance Matrix ownership or matching its repository path during the pre-archive overlap check.
   - The still-active OTERYN-20260721-functional-visual-acceptance record explicitly excludes docs/testing/FUNCTIONAL_ACCEPTANCE_MATRIX.md ownership and consumes the functional gate as an independent result; its owned paths are acceptance workflow/scripts/docs and visual task records.
-  - PR #82 is the archival-only follow-up from main@054bfc0223e93566db1e9fb08a13ffdbcf604f03; its diff only moves this completed task to archive and removes its stale Active Work entry.
+  - PR #82 was squash-merged as ce1bdfaec1bf00aaa4db3ab7bf14a6398f3c3d95; it archived this completed task record, removed the active copy and removed the stale Active Work entry without changing functional, visual or production classifications.
   - Issues #68 through #72 are closed and no remaining functional-acceptance staging gap is known for the currently delivered scope.
   - Visual / UI / UX Acceptance remains a separate FAIL gate and was not promoted by this functional closure.
   - This task changed documentation/governance state only; no runtime application, authentication, authorization, session, database, Canary or login-server code was changed.
@@ -111,7 +111,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: none
-  evidence: functional acceptance closure remains merged and live pre-archive state introduces no ownership or classification conflict
+  evidence: completed task record is archived on main and no functional-acceptance ownership or classification conflict remains
 rejected_hypotheses:
   - Aggregate Functional Acceptance must remain UNKNOWN after PR #67 merge: rejected by merged exact-SHA browser acceptance plus PR #73 and PR #74 focused evidence.
   - STAGING_PROVEN implies production readiness: rejected; production-only facts remain UNKNOWN and the Production Go-Live Gate remains pending.
@@ -157,12 +157,12 @@ validation:
   - command: active task overlap inspection
     result: PASS
     evidence: functional-visual-acceptance explicitly does not own docs/testing/FUNCTIONAL_ACCEPTANCE_MATRIX.md and keeps the visual gate independent
-  - command: create PR #82 for archival-only move and Active Work cleanup
+  - command: squash-merge PR #82 with expected archival head d7b70703982da8cf8fc71b7ece6ec49fa5d557e1
     result: PASS
-    evidence: base main@054bfc0223e93566db1e9fb08a13ffdbcf604f03; archival PR created with only documentation/governance changes
+    evidence: merged=true; merge commit ce1bdfaec1bf00aaa4db3ab7bf14a6398f3c3d95
 blockers:
   - none
-next_action: Merge PR #82 after its required checks pass; then this task is complete.
+next_action: Continue the independent OTERYN-20260721-ui-ux-launch-readiness task; keep production smoke separate and do not change the STAGING_PROVEN functional classification without new evidence.
 ```
 
 ## Notes
