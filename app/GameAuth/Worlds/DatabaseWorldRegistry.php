@@ -4,6 +4,9 @@ namespace App\GameAuth\Worlds;
 
 final class DatabaseWorldRegistry implements WorldRegistry
 {
+    /**
+     * @return list<GameWorldRoute>
+     */
     public function forAccount(int $canaryAccountId): array
     {
         if ($canaryAccountId < 1) {
