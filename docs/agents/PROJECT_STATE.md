@@ -85,6 +85,8 @@ Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_E
 
 The authoritative fail-closed gate is `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
 
+PR #92 prepares `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md` as the non-secret execution record for issue #91. The evidence record does not itself prove production; every production-specific fact starts as `UNKNOWN` until directly verified against the exact deployed release.
+
 Controlled staging cannot prove the final production:
 
 - exact deployed Oteryn Platform SHA and relevant Canary/login-server versions;
@@ -150,17 +152,17 @@ Platform-originated users still require a separately authorized authoritative ga
 
 Expected external scope remains primarily `opentibiabr/login-server`; `blakinio/canary` changes require separate explicit authorization if needed by the selected protocol.
 
-No Canary/login-server repository was modified by Phase 7 work or ADR 0007.
+No Canary/login-server repository was modified by Phase 7 work or the production-verification preparation task.
 
 ## Current active task
 
-None.
+`OTERYN-20260721-production-go-live-verification-prep` / PR #92.
 
-The completed staging-evidence task and ADR 0007/go-live separation task are archived under `docs/agents/tasks/archive/`.
+Repository-only scope: prepare a fail-closed non-secret production verification evidence packet for issue #91. It does not perform production deployment, production mutation smoke or cross-repository writes.
 
 ## Recommended next work
 
-When actual production access and deployment authorization are available, create a bounded production-verification task and execute only the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
+Complete and merge PR #92, then leave issue #91 blocked until the exact final deployed production SHA, explicit production deployment/verification authorization and production evidence access are available. At that point execute only the authoritative Production Go-Live Gate and final production smoke against the exact deployed release.
 
 Do not repeat the closed staging validation unless the production candidate code or relevant contracts change materially, and do not claim production readiness from staging evidence alone.
 
