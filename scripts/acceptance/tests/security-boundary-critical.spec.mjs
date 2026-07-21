@@ -3,6 +3,7 @@ import {
   attachDiagnostics,
   installDiagnostics,
   login,
+  register,
   runBinary,
   runPhpState,
   uniqueCharacterName,
@@ -81,8 +82,8 @@ test('@smoke @security-boundary login rotates the browser session and preserves 
 test('@smoke @security-boundary injected foreign account ownership is ignored by character creation', async ({ page }) => {
   const actorEmail = uniqueEmail('security-owner');
   const foreignEmail = uniqueEmail('security-foreign');
-  seedReadyAccount(actorEmail);
-  seedReadyAccount(foreignEmail);
+  await register(page, actorEmail, regularPassword);
+  await register(page, foreignEmail, regularPassword);
 
   const actorBinding = runPhpState('binding', actorEmail);
   const foreignBinding = runPhpState('binding', foreignEmail);
