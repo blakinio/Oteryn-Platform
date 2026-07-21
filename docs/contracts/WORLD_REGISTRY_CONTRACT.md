@@ -2,27 +2,62 @@
 
 ## Status
 
-`TARGET CONTRACT — SINGLE-WORLD MVP / MULTIWORLD-READY`
+`PHASE 1 FOUNDATION IMPLEMENTED — PUBLIC GATEWAY USE NOT YET IMPLEMENTED`
 
-This contract defines the authoritative world-routing model consumed by Oteryn Game Gateway.
+This contract defines the authoritative world-routing model consumed by the future Oteryn Game Gateway.
 
-The first implementation may contain exactly one world, but no API/domain contract may permanently assume a singleton.
+Phase 1 implements the Platform-owned persistence and domain boundary. It does **not** yet expose world data through a public Gateway API, create Game Sessions, or prove a production world route.
+
+The first deployment may contain exactly one world, but no API/domain contract may permanently assume a singleton.
+
+## Phase 1 implementation status
+
+Implemented in Oteryn Platform:
+
+- `game_worlds` database table with non-singleton primary keys and unique slugs;
+- `GameWorld` model;
+- normalized `GameWorldStatus` vocabulary;
+- account-aware `WorldRegistry` interface;
+- fail-closed `DatabaseWorldRegistry` implementation;
+- sanitized `GameWorldRoute` projection;
+- no seeded world and no invented production hostname or port.
+
+Current Phase 1 policy:
+
+```text
+positive redeemed Canary account ID
+    -> all worlds where status=online
+    -> AND login_enabled=true
+    -> AND route fields are syntactically valid
+```
+
+This is an MVP authorization policy behind an account-aware interface. It is not a claim that every future account may access every future world.
+
+Not implemented yet:
+
+- Game Gateway consumption of the registry;
+- character-to-world persistence for true multiworld;
+- account/world entitlement policy beyond the single-world-ready MVP;
+- world-scoped Canary Game Session enforcement;
+- runtime health integration;
+- world administration UI;
+- production route configuration.
 
 ## Ownership
 
-Oteryn Platform logically owns World Registry configuration and policy.
+Oteryn Platform owns World Registry configuration and policy.
 
 Game Gateway consumes World Registry through a narrow interface.
 
 Canary remains the runtime owner of each game world/process.
 
-OTClient consumes only the sanitized routing data returned by Gateway.
+OTClient consumes only sanitized routing data returned by Gateway.
 
 ## Goals
 
 - one authoritative source for world names, regions and login routes;
 - support one world immediately without singleton coupling;
-- future multiworld/multiregion expansion without changing the login architecture;
+- future multiworld/multiregion expansion without changing login architecture;
 - world-scoped Game Session semantics;
 - explicit maintenance/login availability;
 - no client-controlled game endpoint routing;
@@ -30,7 +65,7 @@ OTClient consumes only the sanitized routing data returned by Gateway.
 
 ## Non-goals
 
-First release does not implement:
+The first release does not implement:
 
 - gameplay-state synchronization across Canary instances;
 - channel allocation;
@@ -40,8 +75,6 @@ First release does not implement:
 - production DNS/load-balancer management.
 
 ## World identity
-
-Each world has a stable internal identifier and stable slug.
 
 Minimum logical record:
 
@@ -56,24 +89,30 @@ game_host
 game_port
 ```
 
-Recommended semantics:
+Semantics:
 
 ```text
-world_id      immutable numeric/UUID-style primary identity selected by implementation
-slug          immutable or carefully migrated stable machine identifier
-name          player-facing display name
-region        normalized region code such as EU / NA
-status        operational presentation state
-login_enabled authoritative gate for issuing/routing new Game Sessions
-game_host     authoritative client routing hostname
- game_port     authoritative client routing port
+world_id       stable database primary identity
+slug           unique stable machine identifier
+name           player-facing display name
+region         normalized region metadata
+status         operational presentation state
+login_enabled  authoritative gate for new login/session routing
+game_host      authoritative client routing hostname or IP
+game_port      authoritative client routing TCP port
 ```
 
-Whitespace before `game_port` above is presentation only; actual schema field is `game_port`.
+Phase 1 persistence is the Platform database table:
 
-## Initial world example
+```text
+game_worlds
+```
 
-Illustrative configuration:
+No production world row is seeded by the application. Deployment configuration must supply an exact verified route before a world can become login-available.
+
+## Illustrative world only
+
+The following remains an example and is **not** production evidence:
 
 ```yaml
 world_id: 1
@@ -86,13 +125,11 @@ game_host: game-eu.oteryn.com
 game_port: 7172
 ```
 
-Hostnames/ports are examples until deployment configuration is directly verified.
-
 No production endpoint should be inferred from this document.
 
 ## Status vocabulary
 
-Initial normalized values:
+Implemented values:
 
 ```text
 online
@@ -103,52 +140,45 @@ unknown
 
 Semantics:
 
-- `online`: registry expects the world to accept service, subject to real runtime reachability;
-- `maintenance`: intentionally unavailable/degraded for player entry;
+- `online`: registry expects the world to be operational, subject to real runtime reachability;
+- `maintenance`: intentionally unavailable/degraded for new player entry;
 - `offline`: intentionally unavailable;
 - `unknown`: authoritative runtime status cannot be determined.
 
-`status` is presentation/operational state.
+`status` is operational/presentation state.
 
 `login_enabled` is the explicit authorization/routing gate for new Game Session creation.
 
-A world with `login_enabled=false` must not receive a new Game Session even if `status=online` due to stale/inconsistent status data.
+A world with `login_enabled=false` must not receive a new Game Session even if `status=online`.
 
-## Fail-closed rule
+Phase 1 `DatabaseWorldRegistry` returns only `online` + `login_enabled` worlds with syntactically routable host/port data.
+
+## Fail-closed rules
 
 For new login routing:
 
 ```text
-missing world -> deny
-unknown authorization -> deny
-login_enabled = false -> deny
-invalid/missing route -> deny
+invalid account identifier -> no worlds
+missing world             -> deny
+unknown authorization     -> deny
+status != online          -> deny in Phase 1 registry projection
+login_enabled = false     -> deny
+invalid/missing route     -> deny
 ```
 
-`status=unknown` policy:
-
-- default: deny new session creation unless an explicit product/operations policy says registry status is advisory and another authoritative health source permits entry;
-- first implementation should prefer fail closed.
-
-The exact operational-health integration can be added later without changing world identity.
+The exact future relationship between runtime health and persisted `status` remains an implementation decision. Phase 1 prefers fail closed.
 
 ## World authorization
-
-Gateway returns only worlds the redeemed account may access.
 
 Logical interface:
 
 ```text
-ListAuthorizedWorlds(canary_account_id) -> []World
+WorldRegistry::forAccount(canary_account_id) -> list<GameWorldRoute>
 ```
 
-First single-world MVP may implement:
+The interface is account-aware from the first implementation.
 
-```text
-all supported ready accounts -> Oteryn world
-```
-
-but the interface remains account-aware so future policies can support:
+Current MVP behavior accepts only a positive Canary account ID and then projects all eligible worlds. Future policy may narrow results for:
 
 - test/preview access;
 - tournament eligibility;
@@ -160,34 +190,36 @@ Client input cannot grant world access.
 
 ## Character association
 
-Every Gateway-returned character must resolve to a World Registry world.
+Every Gateway-returned character must eventually resolve to a World Registry world.
 
-Logical character projection:
+Logical projection:
 
 ```text
 character_name
 world_id
 ```
 
-For a single shared Canary database where existing `players` records do not encode world identity, the MVP may derive all current characters as belonging to the one configured world.
+For a single shared Canary database where existing `players` records do not encode world identity, a later single-world adapter may derive all current characters as belonging to the one configured world.
 
-That is an explicit single-world adapter behavior, not a permanent claim that `players` intrinsically stores `world_id`.
+That would be explicit adapter behavior, not a claim that `players` intrinsically stores `world_id`.
 
-Before multiworld implementation, the persistence/ownership model for character-to-world association must be explicitly contracted.
+Before true multiworld rollout, character-to-world persistence/ownership must be explicitly contracted and tested.
 
 ## Game Session world binding
 
 Every target Game Session is logically bound to one `world_id`.
 
-Gateway must create/return routing only for the bound world.
+The Phase 1 Game Session value/interface contract carries `worldId`, but no Canary persistence adapter is implemented yet.
+
+Gateway must eventually create/return routing only for the bound world.
 
 OTClient cannot transform a session into authorization for another world by editing host/port.
 
-The exact enforcement mechanism depends on the selected Game Session↔Canary adapter and is currently an implementation gate.
+Exact enforcement depends on the selected Game Session↔Canary adapter and remains an implementation gate.
 
-## Gateway response projection
+## Sanitized Gateway projection
 
-Sanitized public projection:
+Target public projection:
 
 ```json
 {
@@ -201,58 +233,55 @@ Sanitized public projection:
 }
 ```
 
+The example values are illustrative.
+
 Do not expose:
 
-- private/internal hostnames when separate from public route;
+- private/internal hostnames when separate from the public route;
 - database connection data;
 - management ports;
 - health-check secrets;
 - Canary service credentials;
-- private channel/process identifiers not required by client.
+- private channel/process identifiers not required by the client.
 
-## Registry storage
+## Registry storage decision
 
-Accepted first implementation options:
+Phase 1 selects **Platform database storage**.
 
-### Option A — Platform database
-
-Advantages:
+Reasons:
 
 - durable normalized model;
-- future admin/audit workflow possible;
-- easy multiworld expansion.
+- natural multiworld expansion;
+- Platform-owned write boundary;
+- future audit/admin workflows can be added without changing world identity;
+- no need to hard-code singleton routing in Gateway.
 
 Requirements:
 
-- migration is backward compatible/reversible;
-- writes are Platform-owned;
-- no direct Gateway generic DB access if a narrow API/repository boundary is preferred by deployment architecture.
+- migrations remain backward-compatible/reversible;
+- writes remain Platform-owned;
+- Gateway must consume through the `WorldRegistry` boundary rather than receive generic database authority;
+- no route is treated as production-valid merely because it appears in documentation.
 
-### Option B — trusted static configuration
-
-Acceptable for initial one-world deployment if:
-
-- configuration is versioned/deployed safely;
-- runtime validation fails closed on malformed/missing route;
-- Gateway can consume it without hard-coded singleton logic;
-- later database migration has an explicit plan.
-
-ADR 0009 selects World Registry as a domain boundary, not a mandatory storage engine in Phase 0.
-
-Phase 1 must select storage based on existing Platform conventions and deployment needs.
+Trusted static configuration is no longer the selected Phase 1 persistence mechanism.
 
 ## Route validation
 
-At configuration/load time validate:
+Persisted schema enforces:
 
-- `slug` non-empty and normalized;
-- `name` non-empty;
-- `region` from accepted vocabulary or validated normalized code;
-- `status` from allowed enum;
-- `login_enabled` boolean;
-- `game_host` syntactically valid expected hostname/IP form;
-- `game_port` integer in valid TCP port range;
-- uniqueness of `world_id` and `slug`.
+- unique world primary identity;
+- unique `slug`;
+- bounded database field types;
+- boolean `login_enabled`;
+- unsigned port storage.
+
+Registry projection additionally fails closed unless:
+
+- `slug`, `name`, `region`, and `game_host` are non-empty;
+- `game_host` is a syntactically valid IP or hostname;
+- `game_port` is in `1..65535`;
+- `status=online`;
+- `login_enabled=true`.
 
 Do not allow arbitrary URL schemes/paths where only host+port are expected.
 
@@ -267,7 +296,7 @@ OTClient is not authoritative for:
 - region;
 - access policy.
 
-Game Gateway uses Registry values, not client-provided routing.
+Game Gateway must use Registry values, not client-provided routing.
 
 A future admin UI editing worlds is a privileged operation requiring:
 
@@ -284,16 +313,16 @@ Admin editing is not required for the MVP.
 Registry availability and Canary reachability are distinct.
 
 ```text
-Registry login_enabled=true
+status=online AND login_enabled=true
 ```
 
-means Gateway may issue/rout a new session according to registry policy.
+means the registry considers the world eligible for new routing under current policy.
 
-It does not guarantee the Canary endpoint will be reachable milliseconds later.
+It does not guarantee the Canary endpoint will still be reachable milliseconds later.
 
-A future health/availability subsystem may feed `status` or an additional readiness field.
+A future health/availability subsystem may update `status` or add a separate readiness source.
 
-Do not infer authoritative world outage solely from a single failed client connection.
+Do not infer an authoritative world outage solely from one failed client connection.
 
 ## Multiworld evolution
 
@@ -336,7 +365,7 @@ The first release must not make client geolocation or latency measurements autho
 
 ## Future channel extension
 
-Future shape may add a routing result:
+Future routing may add:
 
 ```text
 world_id
@@ -354,7 +383,12 @@ Channel allocation must not be implemented by overloading `world_id`.
 Authentication remains:
 
 ```text
-Identity -> Ticket -> Gateway -> world authorization -> optional future channel allocation -> Game Session
+Identity
+-> Ticket
+-> Gateway
+-> world authorization
+-> optional future channel allocation
+-> Game Session
 ```
 
 Gameplay-state synchronization between channels is outside this contract.
@@ -373,51 +407,63 @@ Effects:
 - no new Game Sessions;
 - Gateway does not return the world as login-available;
 - existing player connections are governed by separate operational/Canary policy;
-- no automatic forced disconnect is implied by Registry alone.
+- Registry alone does not imply forced disconnect.
 
 ## Endpoint changes
 
 Changing `game_host`/`game_port` affects new routing responses.
 
-The system must define behavior for already issued Game Sessions if endpoint changes during their lifetime.
-
 Recommended safe operational sequence:
 
-1. disable new login for world;
+1. disable new login for the world;
 2. wait/revoke outstanding short-lived entry sessions as policy requires;
 3. change route;
 4. validate target readiness;
 5. re-enable login.
 
-Exact deployment automation is out of Phase 0 scope.
+Exact deployment automation remains outside Phase 1.
 
-## Required MVP tests
+## Phase 1 tests
 
-- one world loads successfully through Registry abstraction;
-- missing registry record fails closed;
-- duplicate slug/ID rejected by persistence/config validation;
-- invalid host/port rejected;
+Implemented focused tests prove:
+
+- registry is empty by default;
+- no production world route is invented/seeded;
+- invalid account identifier returns no worlds;
+- only online + login-enabled worlds are projected;
+- malformed host is excluded;
+- invalid port is excluded;
+- sanitized route contains only approved route fields.
+
+Additional persistence uniqueness is enforced by the database schema.
+
+## Required future Gateway/MVP tests
+
+Before public Gateway use, prove:
+
+- one configured world loads through the Gateway registry boundary;
+- missing world fails closed;
 - `login_enabled=false` prevents Game Session creation;
-- unauthorized account/world combination omitted/denied;
-- Gateway response uses registry route rather than client input;
-- character references resolvable world;
-- single-world adapter assigns current characters to configured world without claiming intrinsic `players.world_id`;
-- registry data projection does not expose private configuration fields.
+- unauthorized account/world combination is omitted/denied once entitlement policy exists;
+- Gateway response uses Registry route rather than client input;
+- character references resolve to a known world;
+- single-world character adapter does not claim intrinsic `players.world_id`;
+- public projection does not expose private configuration fields.
 
 ## Required multiworld tests before Phase 9 completion
 
 - account sees only authorized worlds;
 - character lists preserve correct world association;
-- session for world A cannot be used for world B according to selected Canary adapter;
+- session for world A cannot be used for world B according to the selected Canary adapter;
 - maintenance world denies new sessions;
 - one world outage does not corrupt other world routing;
-- region/routing fields returned correctly;
+- region/routing fields are returned correctly;
 - duplicate/ambiguous character/world mapping fails closed;
-- dynamic endpoint routing uses exact selected world.
+- dynamic endpoint routing uses the exact selected world.
 
 ## Versioning
 
-Initial registry/API projection is part of game auth:
+Initial registry/API projection belongs to:
 
 ```text
 protocol_version = 1
@@ -429,11 +475,11 @@ Changing the meaning of `world_id`, session world binding, or routing authority 
 
 ## Remaining unknowns
 
-1. Phase 1 storage choice: Platform DB vs trusted configuration for the first one-world implementation.
-2. Exact production Oteryn world public hostname/port.
-3. Character-to-world persistence model for true multiworld.
-4. Exact Game Session world-scope enforcement in Canary.
-5. Future runtime health source and how it affects `status` vs `login_enabled`.
-6. Future admin/world-management surface.
+1. Exact production Oteryn world public hostname/port.
+2. Character-to-world persistence model for true multiworld.
+3. Exact Game Session world-scope enforcement in Canary.
+4. Future runtime health source and how it affects persisted `status` versus live readiness.
+5. Future admin/world-management surface and its privileged write workflow.
+6. Future per-account world entitlement persistence/policy beyond the current single-world-ready MVP.
 
-These are not blockers for defining the single-world-ready domain boundary, but must be resolved before the corresponding functionality is implemented or claimed.
+These are not blockers for the implemented Phase 1 registry foundation, but they must be resolved before the corresponding functionality is implemented or claimed.

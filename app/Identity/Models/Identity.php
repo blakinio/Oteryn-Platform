@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
  * @property string $email
  * @property string $password
  * @property int $web_session_generation
+ * @property int $game_auth_generation
  * @property Carbon|null $disabled_at
  * @property string|null $two_factor_secret
  * @property array<int, string>|null $two_factor_recovery_codes
@@ -55,6 +56,7 @@ final class Identity extends Authenticatable implements CanResetPasswordContract
     {
         return [
             'web_session_generation' => 'integer',
+            'game_auth_generation' => 'integer',
             'disabled_at' => 'datetime',
             'two_factor_secret' => 'encrypted',
             'two_factor_recovery_codes' => 'encrypted:array',

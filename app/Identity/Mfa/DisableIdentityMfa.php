@@ -3,6 +3,7 @@
 namespace App\Identity\Mfa;
 
 use App\Audit\SecurityEventRecorder;
+use App\Identity\Actions\RevokeIdentityGameAuthorizations;
 use App\Identity\Actions\RevokeIdentityWebSessions;
 use App\Identity\Models\Identity;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,7 @@ final class DisableIdentityMfa
     public function __construct(
         private readonly MfaCodeConsumer $codes,
         private readonly RevokeIdentityWebSessions $webSessions,
+        private readonly RevokeIdentityGameAuthorizations $gameAuthorizations,
         private readonly SecurityEventRecorder $securityEvents,
     ) {}
 
@@ -43,6 +45,7 @@ final class DisableIdentityMfa
             ])->save();
 
             $this->webSessions->execute($lockedIdentity);
+            $this->gameAuthorizations->execute($lockedIdentity);
             $this->securityEvents->recordIdentityMfaDisabled($lockedIdentity->id);
         });
     }
