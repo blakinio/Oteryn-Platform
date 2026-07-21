@@ -37,10 +37,8 @@
         <div class="secure-information" aria-labelledby="manual-mfa-heading">
             <h2 id="manual-mfa-heading">Manual authenticator setup</h2>
             <p class="muted">Use the manual secret when your authenticator app supports key entry. The provisioning URI is provided for apps that accept URI import.</p>
-            <p><strong>Manual secret</strong></p>
-            <code>{{ $identity->two_factor_secret }}</code>
-            <p><strong>Provisioning URI</strong></p>
-            <code>{{ $provisioningUri }}</code>
+            <p><strong>Manual secret:</strong> <code>{{ $identity->two_factor_secret }}</code></p>
+            <p><strong>Provisioning URI:</strong> <code>{{ $provisioningUri }}</code></p>
         </div>
 
         <form class="form-stack" method="POST" action="{{ route('identity.mfa.confirm') }}">
