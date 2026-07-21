@@ -112,11 +112,11 @@ The screenshots were visually reviewed through the generated contact sheet and r
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T11:48:00+02:00
+updated_at: 2026-07-21T12:05:00+02:00
 head: f40cf02de39f9908416c80b91d1007d589fe0b5b
 branch: task/OTERYN-20260721-ui-ux-launch-readiness
 pr: 77
-status: complete
+status: ready
 context_routes:
   - web-cms
   - auth-identity
@@ -224,7 +224,7 @@ validation:
     evidence: run 29818968552; artifact 8490681703; 71 screenshots; 0 measured visual blockers
 blockers:
   - issue #81 — authenticated Account Overview and provisioning-status UX requires separate read-model/controller work before broader launch-scope Visual/UX closure
-next_action: Review and merge PR #77 independently of issue #81, then execute issue #81 as the remaining launch-scope UX dependency and rerun the aggregate Visual/UX gate before production go-live verification.
+next_action: Merge PR #77 after current-head checks pass, then archive this task record and continue issue #81 as the separate launch-scope UX dependency.
 ```
 
 ## Notes
