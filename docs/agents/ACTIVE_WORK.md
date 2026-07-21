@@ -4,7 +4,11 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-None.
+- `OTERYN-20260721-platform-db-outage-validation`
+  - branch: `task/OTERYN-20260721-platform-db-outage-validation`
+  - draft PR: #73
+  - issue: #71
+  - goal: prove fail-closed Platform DB outage behavior through an isolated production-like running-release HTTP mutation without overlapping PR #67 acceptance paths.
 
 ## Current project phase
 
@@ -25,7 +29,7 @@ ADR 0007 separates Phase 7 engineering/hardening completion from final productio
 - PR #48 / `676a77590e3ec93bcad0247b3065d203ac209c40` — production topology evidence baseline.
 - PR #49 / `0f876d4f2209399a85cafcff1623d8e6c810b914` — provider-independent `production:verify-configuration` guardrails.
 - PR #50 / `3973774727c35aea22d0a646f479a0ff079042cc` — required Composer advisory audit and bounded Dependabot updates.
-- PR #54 / `eb358a245f35fda1865f13e329c07ef0f4850d2f` — CSP and browser security headers.
+- PR #54 / `eb358a245f35aea22d0a646f479a0ff079042cc` — CSP and browser security headers.
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded structured request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 continuation handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
@@ -69,7 +73,9 @@ These facts remain `UNKNOWN` until directly proven. The gate cannot become `PASS
 
 ## Next work
 
-When actual production access and deployment authorization are available, create a bounded production-verification task and execute the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
+Complete `OTERYN-20260721-platform-db-outage-validation` / issue #71 first. Issues #68-#70 are being covered on the separate active acceptance path in PR #67 and must not be duplicated here.
+
+When all staging functional-acceptance gaps are closed and actual production access plus deployment authorization are available, create a bounded production-verification task and execute the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
 
 Do not repeat closed staging validation unless the production candidate code or relevant contracts change materially.
 
