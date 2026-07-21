@@ -4,14 +4,10 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260721-ui-ux-launch-readiness`
-  - status: separate presentation-layer follow-up
-  - goal: resolve evidenced Visual / UI / UX launch blockers without changing backend/security/data contracts.
-
 - `OTERYN-20260721-functional-visual-acceptance`
   - PR #67 merged as `517968539bdfd7d189677b669bf0899c35fccec1`
   - status: completed; active task record is pending archive by its owning task flow
-  - result: browser Functional Acceptance evidence delivered; Visual / UX Acceptance remains FAIL.
+  - result: browser Functional Acceptance evidence delivered; baseline Visual / UX Acceptance findings have since been remediated for currently delivered surfaces by merged PR #77.
 
 ## Closed functional-acceptance follow-ups
 
@@ -30,7 +26,8 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 - **Production Readiness: STAGING_PROVEN**
 - **Functional Acceptance: STAGING_PROVEN for the currently delivered staging-verifiable functional surface**
-- **Visual / UX Acceptance: FAIL; dedicated UI/UX launch-readiness work remains required**
+- **Delivered-surface UI / UX Acceptance: PASS based on merged PR #77 exact-SHA production-like browser evidence**
+- **Broader Visual / UX launch gate: BLOCKED by missing Account Overview / provisioning-status surface tracked in issue #81**
 - **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
 - **Production Verification: REQUIRED BEFORE GO-LIVE**
 
@@ -38,9 +35,9 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-Continue the independent Visual / UI / UX launch-readiness task on its owned presentation paths. Production-only smoke remains separate and must run only against the exact final deployed SHA when production access and deployment authorization are available.
+Execute issue #81 as a separate bounded account read-model/controller plus presentation task, then rerun the aggregate Visual / UX launch gate. Production-only smoke remains separate and must run only against the exact final deployed SHA when production access and deployment authorization are available.
 
-The UI/UX task must not change backend business logic, authentication/session policy, RBAC semantics, database ownership or Canary integration contracts merely to make the visual gate pass.
+The Account Overview/provisioning-status work must preserve existing backend business logic, authentication/session policy, RBAC semantics, database ownership and Canary integration contracts unless a separately evidenced defect requires an explicitly bounded change.
 
 ## Remaining cross-repository dependency
 
