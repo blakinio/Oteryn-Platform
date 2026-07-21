@@ -53,6 +53,7 @@ owned_paths:
   - app/GameAuth/
   - app/Identity/Actions/RevokeIdentityGameAuthorizations.php
   - app/Identity/Credentials/IdentityCredentialUpdater.php
+  - app/Identity/Mfa/DisableIdentityMfa.php
   - app/Identity/Mfa/ResetIdentityMfa.php
   - app/Identity/Models/Identity.php
   - config/game-auth.php
@@ -82,11 +83,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T22:01:42Z
-head: 78bc9f839b98b96ff9e5e3fcf43680104a5e27fa
+updated_at: 2026-07-21T22:18:00Z
+head: 0cd655322bacdf82e32200f273d134682042733d
 branch: task/OTERYN-20260722-game-auth-domain-foundation
-pr: none
-status: investigating
+pr: 118
+status: implementing
 context_routes:
   - auth-identity
   - architecture
@@ -102,6 +103,7 @@ owned_paths:
   - app/GameAuth/
   - app/Identity/Actions/RevokeIdentityGameAuthorizations.php
   - app/Identity/Credentials/IdentityCredentialUpdater.php
+  - app/Identity/Mfa/DisableIdentityMfa.php
   - app/Identity/Mfa/ResetIdentityMfa.php
   - app/Identity/Models/Identity.php
   - config/game-auth.php
@@ -114,18 +116,23 @@ proven:
   - Phase 0 architecture PR 117 was squash-merged to main as 78bc9f839b98b96ff9e5e3fcf43680104a5e27fa.
   - No open Oteryn Platform PR overlaps game auth ticket, world registry, or game-auth generation scope at Phase 1 start.
   - Existing web-session revocation uses a dedicated unsigned bigint generation and transactional atomic increment.
-  - IdentityCredentialUpdater owns password change/reset domain transactions and invokes web-session revocation there.
-  - ResetIdentityMfa owns MFA reset transaction and invokes web-session revocation there.
-  - Platform SecurityEventRecorder writes bounded event type plus identity ID and timestamp only.
+  - IdentityCredentialUpdater owns password change/reset domain transactions and now invokes independent game-auth revocation there.
+  - ResetIdentityMfa and DisableIdentityMfa own their security-sensitive MFA transaction boundaries and now invoke independent game-auth revocation there.
+  - Platform SecurityEventRecorder writes bounded event type plus identity ID and timestamp only; new game-auth audit methods preserve that shape.
+  - Game Login Ticket storage contains only SHA-256 lookup material plus bounded authorization metadata; there is no plaintext-ticket column.
+  - Ticket generation uses 32 bytes from random_bytes before base64url encoding.
+  - Ticket redeem uses a database transaction and lockForUpdate on the exact stored ticket before current Identity generation/disabled state and ready binding are revalidated.
+  - World Registry is represented by a non-singleton Platform database table and a fail-closed database-backed registry implementation; no world row or production endpoint is seeded.
+  - Game Session remains an interface/value boundary only; no Canary account_sessions write or other Canary adapter exists in this task.
 derived:
-  - game_auth_generation should mirror the independent generation pattern rather than reuse web_session_generation.
-  - Password and MFA security events should call a game-auth revocation action from domain services, not controllers.
-  - Platform MariaDB is the simplest first authoritative ticket store because Identity and binding state already live transactionally in the same Platform database; ticket plaintext still must never be persisted.
-  - World Registry should use a Platform database table/model in Phase 1 but remain empty by default until an exact deployment world endpoint is configured, avoiding invented production routing data.
+  - game_auth_generation mirrors the independent generation pattern rather than reusing web_session_generation.
+  - Password and MFA security events call game-auth revocation from domain services, not controllers.
+  - Platform MariaDB is the first authoritative ticket store because Identity and binding state already live transactionally in the same Platform database; ticket plaintext is never persisted.
+  - The initial World Registry account policy is universal for positive redeemed Canary account IDs, while only online, login-enabled, syntactically routable worlds are returned; future account-specific entitlements can replace this behind the existing account-aware interface.
 unknown:
-  - Exact production world hostname and port remain unproven and will not be seeded by this task.
+  - Exact production world hostname and port remain unproven and are not seeded by this task.
   - Final Game Session-to-Canary persistence adapter and active-session revocation remain Phase 6 UNKNOWNs.
-  - Reliable independent-connection concurrent consume testing may require a dedicated MariaDB integration test rather than the normal transaction-wrapped test harness.
+  - A real independent-connection concurrent consume test has not yet been executed; lockForUpdate is implemented, while concurrent proof remains a Phase 3 gate unless a reliable MariaDB test can be added in this task.
 conflicts:
   - none
 first_failure:
@@ -134,15 +141,34 @@ first_failure:
 rejected_hypotheses:
   - Reusing web_session_generation for game authorization is rejected because web and game credential lifecycles have different revocation semantics.
   - Seeding an illustrative game-eu.oteryn.com endpoint is rejected because production routing is UNKNOWN.
+  - Treating lockForUpdate implementation alone as proof of concurrent exactly-once behavior is rejected; concurrency requires executable multi-connection evidence.
 changed_paths:
+  - app/Audit/SecurityEventRecorder.php
+  - app/GameAuth/
+  - app/Identity/Actions/RevokeIdentityGameAuthorizations.php
+  - app/Identity/Credentials/IdentityCredentialUpdater.php
+  - app/Identity/Mfa/DisableIdentityMfa.php
+  - app/Identity/Mfa/ResetIdentityMfa.php
+  - app/Identity/Models/Identity.php
+  - config/game-auth.php
+  - database/migrations/2026_07_22_000100_add_game_auth_generation_to_identities_table.php
+  - database/migrations/2026_07_22_000200_create_game_login_tickets_table.php
+  - database/migrations/2026_07_22_000300_create_game_worlds_table.php
   - docs/agents/tasks/active/OTERYN-20260722-game-auth-domain-foundation.md
+  - docs/agents/tasks/archive/OTERYN-20260721-game-auth-architecture-foundation.md
+  - tests/Feature/GameAuth/
+  - tests/Feature/Identity/Recovery/PasswordChangeTest.php
+  - tests/Feature/Identity/Recovery/PasswordRecoveryTest.php
 validation:
-  - command: not-run
+  - command: GitHub list PR 118 changed filenames
+    result: PASS
+    evidence: all current changed paths are within declared ownership after adding the MFA disable domain path
+  - command: focused and repository test workflows
     result: NOT_RUN
-    evidence: implementation has not started
+    evidence: first implementation validation has not been triggered yet
 blockers:
   - none
-next_action: Archive the merged Phase 0 task record, open the Phase 1 draft PR, then implement migrations/domain primitives and focused tests.
+next_action: Trigger first PR validation, inspect formatting/static-analysis/test failures, repair, then update World Registry contract implementation status and final checkpoint.
 ```
 
 ## Notes
