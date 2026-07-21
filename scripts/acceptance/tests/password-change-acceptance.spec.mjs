@@ -75,7 +75,8 @@ test('Flow 3c — authenticated password change revokes existing sessions and re
     const freshCode = await waitForDifferentTotp(mfa.secret, lastTotp);
     await completeMfaChallenge(page, freshCode);
     lastTotp = freshCode;
-    await expect(page).toHaveURL(/\/$/u);
+    await expect(page).toHaveURL(/\/mfa$/u);
+    await expect(page.getByText('MFA is enabled for your Oteryn Platform web sign in.')).toBeVisible();
     expect(lastTotp).not.toBe(mfa.enrollmentCode);
   } finally {
     await staleContext.close();
