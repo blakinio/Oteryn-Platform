@@ -32,6 +32,7 @@ final class PasswordChangeTest extends TestCase
         $fresh = Identity::query()->findOrFail($identity->id);
         self::assertTrue(Hash::check('Correct-Horse-9!Battery', $fresh->password));
         self::assertSame(0, $fresh->web_session_generation);
+        self::assertSame(0, $fresh->game_auth_generation);
         $this->assertAuthenticatedAs($identity, 'web');
     }
 
@@ -51,6 +52,7 @@ final class PasswordChangeTest extends TestCase
         self::assertTrue(Hash::check('New-Correct-8!Password', $fresh->password));
         self::assertFalse(Hash::check('Correct-Horse-9!Battery', $fresh->password));
         self::assertSame(1, $fresh->web_session_generation);
+        self::assertSame(1, $fresh->game_auth_generation);
         $this->assertDatabaseHas('identity_security_events', [
             'identity_id' => $identity->id,
             'event_type' => SecurityEventRecorder::IDENTITY_PASSWORD_CHANGED,
@@ -58,6 +60,10 @@ final class PasswordChangeTest extends TestCase
         $this->assertDatabaseHas('identity_security_events', [
             'identity_id' => $identity->id,
             'event_type' => SecurityEventRecorder::IDENTITY_WEB_SESSIONS_REVOKED,
+        ]);
+        $this->assertDatabaseHas('identity_security_events', [
+            'identity_id' => $identity->id,
+            'event_type' => SecurityEventRecorder::IDENTITY_GAME_AUTHORIZATIONS_REVOKED,
         ]);
 
         $this->post('/login', [
@@ -98,6 +104,7 @@ final class PasswordChangeTest extends TestCase
         $fresh = Identity::query()->findOrFail($identity->id);
         self::assertTrue(Hash::check('Correct-Horse-9!Battery', $fresh->password));
         self::assertSame(0, $fresh->web_session_generation);
+        self::assertSame(0, $fresh->game_auth_generation);
     }
 
     public function test_password_change_is_rate_limited(): void
