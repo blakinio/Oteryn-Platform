@@ -50,6 +50,7 @@ owned_paths:
   - docs/agents/tasks/active/OTERYN-20260722-game-auth-domain-foundation.md
   - composer.json
   - composer.lock
+  - database/migrations/
   - app/Console/Commands/
   - app/GameAuth/OAuth/
   - app/Identity/Models/Identity.php
@@ -81,11 +82,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T22:50:00Z
-head: fc6b70fa11f3bb9958b405fc76d8918c49381668
+updated_at: 2026-07-21T22:55:00Z
+head: 9d0a5ccaf074fb29844473f58934150963bc29c6
 branch: task/OTERYN-20260722-native-oauth-pkce
-pr: none
-status: investigating
+pr: 119
+status: implementing
 context_routes:
   - auth-identity
   - architecture
@@ -98,6 +99,7 @@ owned_paths:
   - docs/agents/tasks/active/OTERYN-20260722-game-auth-domain-foundation.md
   - composer.json
   - composer.lock
+  - database/migrations/
   - app/Console/Commands/
   - app/GameAuth/OAuth/
   - app/Identity/Models/Identity.php
@@ -111,6 +113,7 @@ owned_paths:
 proven:
   - Phase 1 PR 118 was squash-merged to main as fc6b70fa11f3bb9958b405fc76d8918c49381668.
   - No open Oteryn Platform PR overlaps Passport/OAuth/PKCE scope at task start.
+  - Laravel Passport v13.7.5 is locked in Composer on the Phase 2 branch.
   - Current Laravel 13 Passport documentation requires HasApiTokens plus OAuthenticatable on the user model and a passport API guard.
   - Passport provides Authorization Code Grant with PKCE for public clients.
   - Passport default access tokens are long-lived unless explicitly configured, so Oteryn must override lifetimes.
@@ -134,13 +137,17 @@ rejected_hypotheses:
   - Shipping a confidential client secret in OTClient is rejected because native clients cannot keep such a secret.
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260722-native-oauth-pkce.md
+  - docs/agents/tasks/archive/OTERYN-20260722-game-auth-domain-foundation.md
+  - composer.json
+  - composer.lock
+  - .github/workflows/native-oauth-dependency-bootstrap.yml
 validation:
-  - command: not-run
-    result: NOT_RUN
-    evidence: implementation has not started
+  - command: Native OAuth Dependency Bootstrap run 29875339112
+    result: PASS
+    evidence: Composer locked Laravel Passport v13.7.5 and validated composer.json/composer.lock successfully
 blockers:
   - none
-next_action: Archive the merged Phase 1 task, open the Phase 2 draft PR, then lock Passport into Composer using a temporary branch-only dependency bootstrap workflow.
+next_action: Publish Passport migrations into application ownership, remove the temporary dependency bootstrap workflow, then implement Identity/guard/TTL/scope/native-client/authorization-view integration.
 ```
 
 ## Notes
