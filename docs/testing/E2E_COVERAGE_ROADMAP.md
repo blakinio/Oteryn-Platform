@@ -81,13 +81,34 @@ The bounded portability/responsive specs configure zero retries. The corrected e
 
 An earlier critical run (`29837186868`) exposed deterministic test-state coupling: a reused regular identity consumed the real 5-per-minute identity-scoped MFA enrollment limiter by the sixth enrollment request, causing the WebKit project to receive HTTP 429. The fix was to isolate disposable identities per project and proactively isolate privileged MFA identities as well; no retry, sleep, cache clear or limiter bypass was introduced. Therefore the failure is classified as harness fixture coupling, not a WebKit product incompatibility.
 
-Deferred after this slice:
+PR #94 subsequently added a bounded required browser-security slice proving browser session rotation/observable cookie attributes and server-owned character binding despite a browser-injected foreign `account_id`. Durable evidence is recorded in `docs/testing/E2E_SECURITY_BOUNDARY_EVIDENCE.md`.
+
+Deferred after the PR #94 slice:
 
 - broader browser multiplication of the full secret-sensitive acceptance suite;
-- repeated-run flakiness/soak evidence beyond the single corrected run;
-- remaining P0 browser-visible session/cookie and security-boundary cases not already uniquely proven by this slice;
-- representative existing-data migration/rollback browser smoke integrated with Phase 7;
+- repeated-run flakiness/soak evidence beyond the corrected exact-SHA runs;
 - P1 resilience, concurrency UX, observability correlation and deeper accessibility interaction work.
+
+## Implemented P0 existing-data upgrade/rollback slice
+
+PR #99 integrates representative existing-data upgrade and rollback validation directly into the existing `Phase 7 Production-Like Validation` release harness.
+
+The slice:
+
+- creates an isolated `oteryn_upgrade` database;
+- migrates it using the previous known-good `BASE_SHA` release;
+- seeds a deterministic synthetic Identity plus published news row without production data;
+- applies exact-candidate `VALIDATION_SHA` migrations to the existing dataset;
+- verifies migration-count monotonicity and an in-memory representative-data fingerprint;
+- runs bounded candidate `/health` and public-news smoke;
+- switches the existing release symlink to `BASE_SHA` while retaining the post-upgrade database and reruns bounded smoke;
+- verifies the persisted representative dataset remains intact;
+- redeploys `VALIDATION_SHA`, reruns migrations idempotently and reruns smoke;
+- emits a separate non-secret exact-SHA evidence JSON alongside the existing Phase 7 evidence artifact.
+
+First implementation evidence is `STAGING_PROVEN` from Phase 7 run `29844031564` on candidate `45ce658f54cbbe78652b7e8710e0cd25c7e85a2a` with rollback/base `26ff602696c597aac0833415b0a47af5d427a52d`. Base and candidate both had 11 migrations because PR #99 itself introduced validation infrastructure rather than a schema migration; the harness therefore proves the upgrade/rollback mechanism without inventing a schema delta. Future migration-bearing candidates execute the same required path against data created from their actual PR base.
+
+Durable evidence and interpretation are recorded in `docs/testing/E2E_MIGRATION_ROLLBACK_EVIDENCE.md`.
 
 ## Layering rule
 
@@ -187,7 +208,7 @@ Avoid multiplying the full 71-screen collector across every browser/viewport unl
 
 ### P0.3 Browser-visible security boundary checks
 
-Status: **partially implemented**. The bounded slice includes unauthenticated protected-admin denial in smoke, MFA-confirmed non-admin denial in portability and representative CSRF fail-closed smoke. Remaining unique session/cookie and ownership-manipulation cases require separate bounded assessment against existing feature/security evidence.
+Status: **implemented for the first bounded representative slice**. Existing smoke/portability covers protected-route and permission denial; PR #94 additionally proves authentication session rotation/observable cookie attributes and server-owned character binding despite a browser-injected foreign `account_id`. Broader abuse cases remain additive only where they provide unique evidence beyond feature/security tests.
 
 Add only scenarios where the browser/system boundary adds evidence beyond existing feature tests.
 
@@ -204,6 +225,8 @@ Do not persist cookies, reset links, TOTP secrets or recovery codes in artifacts
 
 ### P0.4 Existing-data migration and rollback validation
 
+Status: **implemented in the existing Phase 7 production-like release-validation path through PR #99**. Evidence is recorded in `docs/testing/E2E_MIGRATION_ROLLBACK_EVIDENCE.md`.
+
 Build a deterministic representative pre-upgrade dataset using fixtures/seeders, never production data.
 
 Validation sequence:
@@ -216,7 +239,7 @@ Validation sequence:
 6. perform controlled rollback only where the repository's migration/deployment contract supports it safely;
 7. verify expected data/application state and bounded smoke after rollback.
 
-This slice should integrate with existing Phase 7 deployment/rollback validation rather than create a competing release mechanism.
+This slice integrates with existing Phase 7 deployment/rollback validation rather than creating a competing release mechanism. It is required release validation for PRs traversing this workflow and remains `STAGING_PROVEN`; it does not establish production migration duration, production rollback behavior or production RTO/RPO.
 
 ## P1 — resilience and evidence correlation
 
@@ -342,18 +365,18 @@ Failure evidence should prefer:
 
 ## CI profile model
 
-Implemented profiles:
+Implemented profiles and release-validation slices:
 
 - `smoke` — fast primary-browser smoke;
 - `full` — full primary-browser production-like functional acceptance plus visual/accessibility collector;
 - `portability` — bounded critical subset across Chromium/Firefox/WebKit;
 - `responsive` — bounded critical subset across representative viewport classes;
-- `critical` — pull-request composition of smoke + portability + responsive without the full visual collector.
+- `critical` — pull-request composition of smoke + portability + responsive without the full visual collector;
+- Phase 7 existing-data upgrade/rollback — isolated representative persisted-state validation integrated with the existing exact-SHA deployment/rollback workflow.
 
 Deferred profiles:
 
 - `resilience` — controlled deterministic failure/recovery scenarios;
-- `migration` — representative existing-data upgrade/rollback validation;
 - `repeat` — repeated-run flakiness detection;
 - `soak` — scheduled/manual long-duration validation.
 
