@@ -13,22 +13,29 @@ final class DatabaseWorldRegistry implements WorldRegistry
             return [];
         }
 
-        return GameWorld::query()
+        $routes = [];
+        $worlds = GameWorld::query()
             ->where('login_enabled', true)
             ->where('status', GameWorldStatus::Online->value)
             ->orderBy('id')
-            ->get()
-            ->filter(fn (GameWorld $world): bool => $this->isRoutable($world))
-            ->map(fn (GameWorld $world): GameWorldRoute => new GameWorldRoute(
+            ->get();
+
+        foreach ($worlds as $world) {
+            if (! $this->isRoutable($world)) {
+                continue;
+            }
+
+            $routes[] = new GameWorldRoute(
                 id: $world->id,
                 slug: $world->slug,
                 name: $world->name,
                 region: $world->region,
                 host: $world->game_host,
                 port: $world->game_port,
-            ))
-            ->values()
-            ->all();
+            );
+        }
+
+        return $routes;
     }
 
     private function isRoutable(GameWorld $world): bool
