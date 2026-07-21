@@ -66,7 +66,7 @@ test('Flow 3c — authenticated password change revokes existing sessions and re
 
     const staleSessionResponse = await stalePage.goto('/mfa');
     expect(staleSessionResponse?.status()).toBe(403);
-    await expect(stalePage.getByRole('heading', { name: '403' })).toBeVisible();
+    await expect(stalePage.getByRole('heading', { name: 'You do not have access to this page' })).toBeVisible();
 
     await login(page, email, originalPassword);
     await expect(page.getByRole('alert')).toBeVisible();
@@ -76,7 +76,8 @@ test('Flow 3c — authenticated password change revokes existing sessions and re
     await completeMfaChallenge(page, freshCode);
     lastTotp = freshCode;
     await expect(page).toHaveURL(/\/mfa$/u);
-    await expect(page.getByText('MFA is enabled for your Oteryn Platform web sign in.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Multi-factor authentication' })).toBeVisible();
+    await expect(page.getByText('MFA is enabled.')).toBeVisible();
     expect(lastTotp).not.toBe(mfa.enrollmentCode);
   } finally {
     await staleContext.close();
