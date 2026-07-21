@@ -29,6 +29,9 @@ on:
         options:
           - smoke
           - full
+          - portability
+          - responsive
+          - critical
 
 permissions:
   contents: read
@@ -71,7 +74,7 @@ jobs:
       ACCEPTANCE_BASE_URL: http://127.0.0.1:8080
       ACCEPTANCE_MAILHOG_URL: http://127.0.0.1:8025
       ACCEPTANCE_OUTPUT_DIR: /tmp/oteryn-visual-acceptance
-      ACCEPTANCE_PROFILE: ${{ github.event_name == 'pull_request' && github.head_ref != 'task/OTERYN-20260721-functional-visual-acceptance' && 'smoke' || github.event_name == 'workflow_dispatch' && inputs.profile || 'full' }}
+      ACCEPTANCE_PROFILE: ${{ github.event_name == 'pull_request' && 'critical' || github.event_name == 'workflow_dispatch' && inputs.profile || 'full' }}
       APP_ENV: acceptance
       APP_DEBUG: 'false'
       APP_URL: http://127.0.0.1:8080
@@ -150,7 +153,11 @@ jobs:
         run: |
           npm --prefix scripts/acceptance install --no-audit --no-fund
           cd scripts/acceptance
-          npx playwright install --with-deps chromium
+          if [ "$ACCEPTANCE_PROFILE" = 'portability' ] || [ "$ACCEPTANCE_PROFILE" = 'critical' ]; then
+            npx playwright install --with-deps chromium firefox webkit
+          else
+            npx playwright install --with-deps chromium
+          fi
 
       - name: Generate ephemeral acceptance application key
         run: echo "APP_KEY=$(php -r 'echo "base64:".base64_encode(random_bytes(32));')" >> "$GITHUB_ENV"
@@ -172,24 +179,85 @@ jobs:
           echo 'Acceptance HTTP runtime did not become healthy.' >&2
           exit 1
 
-      - name: Execute browser acceptance profile
-        id: e2e
+      - name: Execute primary Chromium smoke profile
+        id: smoke
+        if: env.ACCEPTANCE_PROFILE == 'smoke' || env.ACCEPTANCE_PROFILE == 'critical'
         run: |
           echo "Exact tested SHA: $ACCEPTANCE_SHA"
-          echo "Acceptance profile: $ACCEPTANCE_PROFILE"
-          if [ "$ACCEPTANCE_PROFILE" = 'smoke' ]; then
-            npm --prefix scripts/acceptance run test:smoke
-          else
-            npm --prefix scripts/acceptance test
+          echo "Acceptance profile: smoke"
+          STARTED_AT="$(date +%s)"
+          set +e
+          npm --prefix scripts/acceptance run test:smoke
+          STATUS=$?
+          set -e
+          DURATION_SECONDS="$(( $(date +%s) - STARTED_AT ))"
+          echo "SMOKE_DURATION_SECONDS=$DURATION_SECONDS" >> "$GITHUB_ENV"
+          if [ -f artifacts/acceptance/junit.xml ]; then
+            cp artifacts/acceptance/junit.xml artifacts/acceptance/junit-smoke.xml
           fi
+          exit "$STATUS"
+
+      - name: Execute bounded browser portability profile
+        id: portability
+        if: env.ACCEPTANCE_PROFILE == 'portability' || env.ACCEPTANCE_PROFILE == 'critical'
+        run: |
+          echo "Exact tested SHA: $ACCEPTANCE_SHA"
+          echo "Acceptance profile: portability"
+          STARTED_AT="$(date +%s)"
+          set +e
+          npm --prefix scripts/acceptance run test:portability
+          STATUS=$?
+          set -e
+          DURATION_SECONDS="$(( $(date +%s) - STARTED_AT ))"
+          echo "PORTABILITY_DURATION_SECONDS=$DURATION_SECONDS" >> "$GITHUB_ENV"
+          if [ -f artifacts/acceptance/junit.xml ]; then
+            cp artifacts/acceptance/junit.xml artifacts/acceptance/junit-portability.xml
+          fi
+          exit "$STATUS"
+
+      - name: Execute bounded responsive profile
+        id: responsive
+        if: env.ACCEPTANCE_PROFILE == 'responsive' || env.ACCEPTANCE_PROFILE == 'critical'
+        run: |
+          echo "Exact tested SHA: $ACCEPTANCE_SHA"
+          echo "Acceptance profile: responsive"
+          STARTED_AT="$(date +%s)"
+          set +e
+          npm --prefix scripts/acceptance run test:responsive
+          STATUS=$?
+          set -e
+          DURATION_SECONDS="$(( $(date +%s) - STARTED_AT ))"
+          echo "RESPONSIVE_DURATION_SECONDS=$DURATION_SECONDS" >> "$GITHUB_ENV"
+          if [ -f artifacts/acceptance/junit.xml ]; then
+            cp artifacts/acceptance/junit.xml artifacts/acceptance/junit-responsive.xml
+          fi
+          exit "$STATUS"
+
+      - name: Execute full primary Chromium acceptance baseline
+        id: full
+        if: env.ACCEPTANCE_PROFILE == 'full'
+        run: |
+          echo "Exact tested SHA: $ACCEPTANCE_SHA"
+          echo "Acceptance profile: full"
+          STARTED_AT="$(date +%s)"
+          set +e
+          npm --prefix scripts/acceptance test
+          STATUS=$?
+          set -e
+          DURATION_SECONDS="$(( $(date +%s) - STARTED_AT ))"
+          echo "FULL_DURATION_SECONDS=$DURATION_SECONDS" >> "$GITHUB_ENV"
+          if [ -f artifacts/acceptance/junit.xml ]; then
+            cp artifacts/acceptance/junit.xml artifacts/acceptance/junit-full.xml
+          fi
+          exit "$STATUS"
 
       - name: Seed deterministic exploratory visual fixtures
-        if: steps.e2e.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
+        if: steps.full.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
         run: php scripts/acceptance/seed.php seed >/tmp/oteryn-visual-seed.json
 
       - name: Execute bounded exploratory visual and accessibility pass
         id: visual
-        if: steps.e2e.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
+        if: steps.full.outcome == 'success' && env.ACCEPTANCE_PROFILE == 'full'
         run: node scripts/acceptance/visual-acceptance.js
 
       - name: Build visual contact sheet
@@ -214,18 +282,80 @@ jobs:
       - name: Write durable non-secret acceptance evidence
         if: always()
         env:
-          E2E_OUTCOME: ${{ steps.e2e.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
+          PORTABILITY_OUTCOME: ${{ steps.portability.outcome }}
+          RESPONSIVE_OUTCOME: ${{ steps.responsive.outcome }}
+          FULL_OUTCOME: ${{ steps.full.outcome }}
           VISUAL_OUTCOME: ${{ steps.visual.outcome }}
         run: |
           mkdir -p artifacts/acceptance
-          if [ "$E2E_OUTCOME" = 'success' ] && [ "$ACCEPTANCE_PROFILE" = 'full' ]; then
-            AUTOMATED_E2E='AUTOMATED_E2E_PASS'
-            FUNCTIONAL='FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN'
-          elif [ "$E2E_OUTCOME" = 'success' ]; then
-            AUTOMATED_E2E='AUTOMATED_E2E_SMOKE_PASS'
-            FUNCTIONAL='FULL_ACCEPTANCE_NOT_EXECUTED'
+
+          case "$ACCEPTANCE_PROFILE" in
+            smoke)
+              E2E_OUTCOME="$SMOKE_OUTCOME"
+              AUTOMATED_PASS='AUTOMATED_E2E_SMOKE_PASS'
+              PROJECTS='["chromium-primary"]'
+              BROWSERS='["chromium"]'
+              BROWSER_SUMMARY='chromium'
+              VIEWPORT_PROFILES='["desktop-1440x1000"]'
+              ;;
+            portability)
+              E2E_OUTCOME="$PORTABILITY_OUTCOME"
+              AUTOMATED_PASS='AUTOMATED_E2E_PORTABILITY_PASS'
+              PROJECTS='["portability-chromium","portability-firefox","portability-webkit"]'
+              BROWSERS='["chromium","firefox","webkit"]'
+              BROWSER_SUMMARY='chromium,firefox,webkit'
+              VIEWPORT_PROFILES='["desktop-1440x1000"]'
+              ;;
+            responsive)
+              E2E_OUTCOME="$RESPONSIVE_OUTCOME"
+              AUTOMATED_PASS='AUTOMATED_E2E_RESPONSIVE_PASS'
+              PROJECTS='["responsive-desktop","responsive-tablet","responsive-mobile"]'
+              BROWSERS='["chromium"]'
+              BROWSER_SUMMARY='chromium'
+              VIEWPORT_PROFILES='["desktop-1440x1000","tablet-820x1180","mobile-390x844"]'
+              ;;
+            critical)
+              if [ "$SMOKE_OUTCOME" = 'success' ] && [ "$PORTABILITY_OUTCOME" = 'success' ] && [ "$RESPONSIVE_OUTCOME" = 'success' ]; then
+                E2E_OUTCOME='success'
+              else
+                E2E_OUTCOME='failure'
+              fi
+              AUTOMATED_PASS='AUTOMATED_E2E_CRITICAL_PASS'
+              PROJECTS='["chromium-primary","portability-chromium","portability-firefox","portability-webkit","responsive-desktop","responsive-tablet","responsive-mobile"]'
+              BROWSERS='["chromium","firefox","webkit"]'
+              BROWSER_SUMMARY='chromium,firefox,webkit'
+              VIEWPORT_PROFILES='["desktop-1440x1000","tablet-820x1180","mobile-390x844"]'
+              ;;
+            full)
+              E2E_OUTCOME="$FULL_OUTCOME"
+              AUTOMATED_PASS='AUTOMATED_E2E_PASS'
+              PROJECTS='["chromium-primary"]'
+              BROWSERS='["chromium"]'
+              BROWSER_SUMMARY='chromium'
+              VIEWPORT_PROFILES='["desktop-1440x1000"]'
+              ;;
+            *)
+              E2E_OUTCOME='failure'
+              AUTOMATED_PASS='AUTOMATED_E2E_UNKNOWN_PROFILE'
+              PROJECTS='[]'
+              BROWSERS='[]'
+              BROWSER_SUMMARY='unknown'
+              VIEWPORT_PROFILES='[]'
+              ;;
+          esac
+
+          if [ "$E2E_OUTCOME" = 'success' ]; then
+            AUTOMATED_E2E="$AUTOMATED_PASS"
           else
             AUTOMATED_E2E='AUTOMATED_E2E_FAIL'
+          fi
+
+          if [ "$E2E_OUTCOME" = 'success' ] && [ "$ACCEPTANCE_PROFILE" = 'full' ]; then
+            FUNCTIONAL='FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN'
+          elif [ "$E2E_OUTCOME" = 'success' ]; then
+            FUNCTIONAL='FULL_ACCEPTANCE_NOT_EXECUTED'
+          else
             FUNCTIONAL='FUNCTIONAL_ACCEPTANCE_NOT_PROVEN'
           fi
 
@@ -237,12 +367,25 @@ jobs:
             VISUAL_UX='VISUAL_UX_NOT_EXECUTED'
           fi
 
+          SMOKE_DURATION_JSON="${SMOKE_DURATION_SECONDS:-null}"
+          PORTABILITY_DURATION_JSON="${PORTABILITY_DURATION_SECONDS:-null}"
+          RESPONSIVE_DURATION_JSON="${RESPONSIVE_DURATION_SECONDS:-null}"
+          FULL_DURATION_JSON="${FULL_DURATION_SECONDS:-null}"
+
           cat > artifacts/acceptance/evidence.json <<JSON
           {
             "exact_tested_sha": "$ACCEPTANCE_SHA",
             "run_id": "$ACCEPTANCE_RUN_ID",
             "profile": "$ACCEPTANCE_PROFILE",
-            "browser": "chromium",
+            "browser": "$BROWSER_SUMMARY",
+            "browsers": $BROWSERS,
+            "projects": $PROJECTS,
+            "viewport_profiles": $VIEWPORT_PROFILES,
+            "bounded_profile_retries": 0,
+            "smoke_duration_seconds": $SMOKE_DURATION_JSON,
+            "portability_duration_seconds": $PORTABILITY_DURATION_JSON,
+            "responsive_duration_seconds": $RESPONSIVE_DURATION_JSON,
+            "full_duration_seconds": $FULL_DURATION_JSON,
             "runtime": "real Laravel HTTP",
             "platform_database": "MariaDB 11.8 isolated acceptance schema",
             "canary_database": "MariaDB 11.8 isolated acceptance schema with operation-specific principals",
@@ -253,6 +396,10 @@ jobs:
             "visual_ux_acceptance": "$VISUAL_UX",
             "production_smoke": "PRODUCTION_SMOKE_PENDING",
             "e2e_result": "$E2E_OUTCOME",
+            "smoke_result": "$SMOKE_OUTCOME",
+            "portability_result": "$PORTABILITY_OUTCOME",
+            "responsive_result": "$RESPONSIVE_OUTCOME",
+            "full_result": "$FULL_OUTCOME",
             "visual_result": "$VISUAL_OUTCOME"
           }
           JSON
@@ -261,6 +408,12 @@ jobs:
             echo '### Oteryn acceptance evidence'
             echo "- exact tested SHA: \`$ACCEPTANCE_SHA\`"
             echo "- profile: \`$ACCEPTANCE_PROFILE\`"
+            echo "- projects: \`$PROJECTS\`"
+            echo "- browsers: \`$BROWSERS\`"
+            echo "- viewport profiles: \`$VIEWPORT_PROFILES\`"
+            echo "- smoke duration seconds: \`$SMOKE_DURATION_JSON\`"
+            echo "- portability duration seconds: \`$PORTABILITY_DURATION_JSON\`"
+            echo "- responsive duration seconds: \`$RESPONSIVE_DURATION_JSON\`"
             echo "- automated E2E: \`$AUTOMATED_E2E\`"
             echo "- functional acceptance: \`$FUNCTIONAL\`"
             echo "- visual/UX execution: \`$VISUAL_UX\`"
@@ -271,7 +424,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: acceptance-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          name: acceptance-e2e-${{ env.ACCEPTANCE_PROFILE }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: artifacts/acceptance
           if-no-files-found: error
           retention-days: 14

@@ -17,6 +17,8 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 - **Phase 7 — Production hardening and operations: COMPLETE**
 
+The active E2E coverage-hardening work is a continuous verification track. It does not reopen a completed delivery phase.
+
 ## Operational release state
 
 - **Production Readiness: STAGING_PROVEN**
@@ -24,6 +26,8 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Production Verification: REQUIRED BEFORE GO-LIVE**
 
 ADR 0007 separates Phase 7 engineering/hardening completion from final production go-live verification. Phase 7 completion does not claim that the final production environment is production-ready or `PRODUCTION_PROVEN`.
+
+ADR 0008 defines risk-based continuous E2E validation beyond the current acceptance baseline. Expanded staging/repository coverage does not substitute for direct production verification.
 
 ## Current architecture state
 
@@ -80,6 +84,24 @@ The controlled evidence closes the staging-verifiable engineering/hardening work
 The `105 ms` final-head recovery result and the earlier `102 ms` staging snapshot are staging measurements only. Neither is a production RTO or RPO.
 
 Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`.
+
+## Continuous E2E coverage hardening
+
+Task `OTERYN-20260721-e2e-coverage-hardening` / draft PR #94 extends validation beyond the already `STAGING_PROVEN` functional acceptance baseline.
+
+The durable architecture is ADR 0008 plus `docs/testing/E2E_COVERAGE_ROADMAP.md`. The track prioritizes:
+
+- bounded Chromium/Firefox/WebKit critical portability evidence;
+- representative desktop/tablet/mobile critical journeys;
+- browser-visible authorization/security abuse boundaries;
+- representative existing-data migration/upgrade/rollback validation;
+- deterministic dependency interruption/recovery only where it adds unique evidence;
+- sanitized observability correlation;
+- scheduled/manual repeated-run and soak profiles.
+
+Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
+
+The existing full primary-browser production-like acceptance baseline and secret-safe artifact rules remain intact.
 
 ## Production Go-Live Gate
 
@@ -152,23 +174,27 @@ Platform-originated users still require a separately authorized authoritative ga
 
 Expected external scope remains primarily `opentibiabr/login-server`; `blakinio/canary` changes require separate explicit authorization if needed by the selected protocol.
 
-No Canary/login-server repository was modified by Phase 7 work or the production-verification preparation task.
+No Canary/login-server repository was modified by Phase 7 work, production-verification preparation or the E2E coverage-hardening architecture task.
 
 ## Current active task
 
-None.
+`OTERYN-20260721-e2e-coverage-hardening` on branch `task/OTERYN-20260721-e2e-coverage-hardening`, draft PR #94.
 
-Repository-only Production Go-Live verification preparation is complete and archived. Issue #91 is the durable tracker for actual production execution.
+The repository/staging hardening track can proceed independently of production access. Issue #91 remains the separate production execution tracker.
 
 ## Recommended next work
 
-Resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record direct evidence in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployed release.
+Continue draft PR #94 from its active task checkpoint. Implement the first bounded P0 browser-portability/responsive hardening slice using the existing acceptance helpers and fixtures, measure CI duration/flakiness, and keep exact-SHA/browser/profile evidence secret-safe.
 
-Do not repeat the closed staging validation unless the production candidate code or relevant contracts change materially, and do not claim production readiness from staging evidence alone.
+Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record direct evidence in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployed release.
+
+Do not repeat closed staging validation without a new risk/assertion, and do not claim production readiness from staging evidence alone.
 
 ## High-priority remaining unknowns
 
 - authoritative Platform game-login assertion/session protocol and rollout if required for launch scope;
+- measured CI duration/flakiness impact of Firefox/WebKit on the production-like acceptance harness;
+- which proposed dependency-interruption scenarios add unique evidence beyond existing Phase 7/outage validation;
 - deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
 - production database, mail, session/cache and queue topology;
