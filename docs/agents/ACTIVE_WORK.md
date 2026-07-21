@@ -4,7 +4,11 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-None.
+- `OTERYN-20260721-production-go-live-verification-prep`
+  - issue: #91
+  - PR: #92
+  - status: implementing
+  - goal: prepare a fail-closed non-secret production verification evidence packet and deterministic handoff without performing production deployment or production mutation smoke.
 
 ## Closed acceptance follow-ups
 
@@ -33,7 +37,7 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-When the exact final deployed production SHA and explicit production access/deployment authorization are available, create and execute the bounded Production Go-Live Gate against that exact deployment. Do not repeat closed staging validation unless the production candidate code or relevant contracts change materially.
+Complete PR #92 repository-only verification preparation, then keep issue #91 blocked until the exact final deployed production SHA and explicit production access/deployment authorization are available. Execute the authoritative Production Go-Live Gate only against that exact deployment.
 
 ## Remaining cross-repository dependency
 
