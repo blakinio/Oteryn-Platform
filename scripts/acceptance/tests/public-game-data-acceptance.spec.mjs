@@ -37,12 +37,12 @@ test('Flow 6b — public game data, pagination, empty and controlled dependency-
   await expect(page.getByText('No active characters found.')).toBeVisible();
 
   await page.goto('/servers');
-  await expect(page.getByText(/Runtime:/u)).toContainText('ONLINE');
-  await expect(page.getByText(/Players online:/u)).toContainText('1');
+  await expect(page.locator('p').filter({ hasText: 'Runtime:' })).toContainText('ONLINE');
+  await expect(page.locator('p').filter({ hasText: 'Players online:' })).toContainText('1');
 
   runBinary('redis-cli', ['DEL', 'cluster:channel:1:runtime']);
   await page.goto('/servers');
-  await expect(page.getByText(/Runtime:/u)).toContainText('Unknown');
+  await expect(page.locator('p').filter({ hasText: 'Runtime:' })).toContainText('Unknown');
 
   runBinary('redis-cli', ['HSET', 'cluster:channel:1:runtime', 'channel_id', '1', 'status', 'INVALID', 'players_online', '1']);
   runBinary('redis-cli', ['PEXPIRE', 'cluster:channel:1:runtime', '3600000']);
