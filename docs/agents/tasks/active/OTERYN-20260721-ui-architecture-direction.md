@@ -55,11 +55,12 @@ modules:
   - AdminPresentation
   - ErrorPresentation
 dependencies:
-  - main@517968539bdfd7d189677b669bf0899c35fccec1
-  - merged Functional Acceptance Matrix in docs/testing/FUNCTIONAL_ACCEPTANCE_MATRIX.md
-  - merged Visual UX Acceptance Matrix and follow-up OTERYN-20260721-ui-ux-launch-readiness definition from PR #67
+  - main@3f3582fc74e1ae348c222d76255ed8b9823e8536
+  - merged PR #76 architecture/design source of truth
+  - merged Functional Acceptance Matrix
+  - merged Visual UX Acceptance Matrix and OTERYN-20260721-ui-ux-launch-readiness follow-up definition
 blockers:
-  - none for architecture documentation
+  - none
 cross_repository_tasks:
   - none
 ```
@@ -68,11 +69,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T10:03:00+02:00
-head: 3592abdccb1293e952eb8ae9b30e860270e2d674
-branch: task/OTERYN-20260721-ui-architecture-direction
-pr: 76
-status: validating
+updated_at: 2026-07-21T10:08:00+02:00
+head: 3f3582fc74e1ae348c222d76255ed8b9823e8536
+branch: task/OTERYN-20260721-ui-architecture-handover
+pr: 78
+status: ready
 context_routes:
   - architecture
   - web-cms
@@ -87,31 +88,24 @@ owned_paths:
   - docs/architecture/adr/0008-oteryn-frontend-information-and-shell-architecture.md
   - docs/agents/tasks/active/OTERYN-20260721-ui-architecture-direction.md
 proven:
-  - Current routes deliver Home, registration, login/logout, password recovery/reset/change, MFA challenge/settings/enrollment/disable, character creation, Admin dashboard/news/pages/roles/audit, News list/detail, managed public pages, Highscores, embedded character search plus Character detail, Guild detail, Online and Servers.
-  - Current routes do not deliver a general Account Center/overview route, a dedicated provisioning-status screen, a Guilds index, or a standalone Character Search results screen.
-  - Current public and admin shells share a minimal stylesheet; Identity/account flows are standalone browser-default pages.
-  - PR #67 merged to main as 517968539bdfd7d189677b669bf0899c35fccec1 and records Visual / UX Acceptance as FAIL plus the separate implementation follow-up OTERYN-20260721-ui-ux-launch-readiness.
-  - docs/design/INFORMATION_ARCHITECTURE.md defines CURRENT, FUTURE-READY and DEPENDENCY IA without advertising missing routes as delivered.
-  - docs/design/VISUAL_DIRECTION.md defines the modern dark-fantasy MMORPG direction plus explicit UI/art asset boundaries and placeholder-safe composition.
-  - docs/design/DESIGN_SYSTEM.md defines semantic color, typography, spacing, layout and reusable component contracts.
-  - docs/design/RESPONSIVE_STRATEGY.md defines intentional wide-desktop/desktop/tablet/mobile composition, responsive table patterns and long-content containment.
-  - docs/design/UI_ARCHITECTURE.md defines Public, Identity, Account and Admin shells; product error/state architecture; per-surface blueprints; and bounded implementation slices.
-  - ADR 0008 records the durable shell/IA decision and preserves backend/security/authorization boundaries.
-  - Visual / UX Acceptance is intentionally not reclassified; final PASS remains dependent on implementation and exact-final-SHA browser evidence.
-  - Open PR #75 owns docs/agents/ACTIVE_WORK.md; this task intentionally does not edit that shared index.
+  - PR #76 was squash-merged to main as 3f3582fc74e1ae348c222d76255ed8b9823e8536.
+  - The merged source of truth consists of INFORMATION_ARCHITECTURE.md, VISUAL_DIRECTION.md, UI_ARCHITECTURE.md, DESIGN_SYSTEM.md, RESPONSIVE_STRATEGY.md and ADR 0008.
+  - Current routes do not deliver a general Account Center overview, dedicated provisioning-status screen, Guilds index or standalone Character Search results screen; the design documentation does not represent them as CURRENT.
+  - Visual UX Acceptance remains FAIL and was not reclassified by this architecture task.
+  - PR #76 head cec3d667362ded450498b0b0ca042ec19247d9df passed CI #856, Phase 7 Production-Like Validation #98, Platform DB Outage Validation #28 and Agent Governance #776.
+  - PR #76 had no unresolved review threads or submitted review blockers before merge.
 derived:
-  - The architecture/design source of truth is path-disjoint from the acceptance harness and from the future product UI implementation paths.
-  - Account Center IA can be implemented incrementally, but Account Overview/provisioning status/character list require separately bounded authoritative read/controller dependencies where current application surfaces do not expose the necessary data.
+  - The architecture/design task is complete and the next implementation agent can use the merged design documents and ADR 0008 without rediscovering visual direction or information architecture.
+  - Account Overview, provisioning-status and authoritative account character-list UI remain separate bounded backend/read-model dependencies where current routes do not expose the required surface.
 unknown:
-  - final per-surface Visual / UX classifications after implementation and browser acceptance rerun
+  - final per-surface Visual UX classifications after UI implementation and exact-final-SHA browser acceptance rerun
 conflicts: []
 first_failure:
   marker: Agent Governance checkpoint validation on 3592abdccb1293e952eb8ae9b30e860270e2d674
-  evidence: run 29812365675 failed because the checkpoint used unsupported validation result PENDING; the governance contract permits PASS, FAIL, BLOCKED or NOT_RUN only
+  evidence: run 29812365675 rejected unsupported validation result PENDING; checkpoint-only fix cec3d667362ded450498b0b0ca042ec19247d9df then passed Agent Governance run 29812555881 / #776
 rejected_hypotheses:
-  - The OTERYN-20260721-ui-ux-launch-readiness implementation should be performed on the former PR #67 acceptance branch: rejected because governance requires a dedicated task branch for substantial implementation work.
   - Account Overview and provisioning status can be documented as CURRENT: rejected because no current route/view delivers those screens.
-  - A permanent three-column public shell should be used everywhere: rejected because table-heavy/smaller-desktop surfaces require wider main content and responsive recomposition.
+  - A permanent three-column public shell should be used everywhere: rejected because table-heavy and smaller-desktop surfaces require wider main content and responsive recomposition.
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260721-ui-architecture-direction.md
   - docs/architecture/adr/0008-oteryn-frontend-information-and-shell-architecture.md
@@ -121,32 +115,23 @@ changed_paths:
   - docs/design/UI_ARCHITECTURE.md
   - docs/design/VISUAL_DIRECTION.md
 validation:
-  - command: live GitHub preflight against main, open PRs, current routes, Functional Acceptance Matrix, Visual UX Acceptance Matrix, current shells and stylesheet
+  - command: PR #76 current-head GitHub checks on cec3d667362ded450498b0b0ca042ec19247d9df
     result: PASS
-    evidence: delivered versus missing surfaces are explicitly separated; design paths are disjoint from acceptance implementation paths; ACTIVE_WORK overlap is avoided
-  - command: cross-document architecture consistency review
+    evidence: CI #856, Phase 7 Production-Like Validation #98, Platform DB Outage Validation #28 and Agent Governance #776 all completed successfully
+  - command: PR #76 review-thread and review blocker inspection
     result: PASS
-    evidence: all five design documents use the same Public Portal / Account Center / Admin split, CURRENT/FUTURE-READY/DEPENDENCY semantics, responsive table requirements and no-fake-route rule
-  - command: PR #76 changed-file review
+    evidence: no review threads and no submitted reviews were present
+  - command: squash merge PR #76 with expected head cec3d667362ded450498b0b0ca042ec19247d9df
     result: PASS
-    evidence: only the owned task record, ADR 0008 and docs/design source-of-truth files are changed
-  - command: CI run 29812365552 / #855 on 3592abdccb1293e952eb8ae9b30e860270e2d674
+    evidence: merged to main as 3f3582fc74e1ae348c222d76255ed8b9823e8536
+  - command: compare 3f3582fc74e1ae348c222d76255ed8b9823e8536 to main after merge
     result: PASS
-    evidence: required CI completed successfully
-  - command: Phase 7 Production-Like Validation run 29812365458 / #97 on 3592abdccb1293e952eb8ae9b30e860270e2d674
-    result: PASS
-    evidence: established production-like validation remained green
-  - command: Platform DB Outage Validation run 29812365534 / #27 on 3592abdccb1293e952eb8ae9b30e860270e2d674
-    result: PASS
-    evidence: controlled Platform DB outage validation remained green
-  - command: Agent Governance run 29812365675 / #775 on 3592abdccb1293e952eb8ae9b30e860270e2d674
-    result: FAIL
-    evidence: checkpoint validation rejected unsupported result PENDING; this checkpoint update replaces that invalid state and requires a clean rerun on the new head
+    evidence: identical, ahead_by 0, behind_by 0
 blockers:
-  - current-head Agent Governance must pass after the checkpoint validation-state fix before merge readiness
-next_action: Verify Agent Governance on the checkpoint-fix head; if it passes and other required checks remain green, mark PR #76 ready for review.
+  - none
+next_action: Transition to the existing OTERYN-20260721-ui-ux-launch-readiness implementation task on its own dedicated branch, archiving this completed architecture task record as part of that handoff.
 ```
 
 ## Notes
 
-`docs/agents/ACTIVE_WORK.md` is intentionally not edited because open PR #75 owns that shared path. The architecture task consumes the now-merged PR #67 visual evidence but does not modify its acceptance workflow/scripts or the implementation follow-up task record.
+The durable architecture source of truth is merged. This record remains active only for compact handoff into the separately bounded UI/UX implementation task; Visual / UX Acceptance remains FAIL until implementation and exact-final-SHA acceptance evidence prove otherwise.
