@@ -17,7 +17,7 @@ This file is the compact authoritative entry point for "where are we now?". It i
 - **Phase 6 — CMS, Admin, RBAC and Audit: COMPLETE**
 - **Phase 7 — Production hardening and operations: COMPLETE**
 
-The active E2E coverage-hardening work is a continuous verification track. It does not reopen a completed delivery phase.
+The E2E coverage-hardening programme is a continuous verification track. It does not reopen a completed delivery phase.
 
 ## Operational release state
 
@@ -96,9 +96,17 @@ PR #94 merged as `26ff602696c597aac0833415b0a47af5d427a52d` and delivered:
 - browser-visible session rotation/cookie and foreign-ownership manipulation checks;
 - secret-safe exact-SHA evidence while preserving the full primary Chromium acceptance baseline.
 
-PR #99 / issue #98 extends the same programme at the release-validation layer. Its first implementation run `29844031564` on head `45ce658f54cbbe78652b7e8710e0cd25c7e85a2a` passed the integrated Phase 7 representative existing-data upgrade/rollback slice using rollback/base `26ff602696c597aac0833415b0a47af5d427a52d`.
+PR #99 merged as `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` and closed issue #98. The existing Phase 7 release-validation path now also includes:
 
-That slice uses an isolated synthetic Identity + published-news dataset, verifies persisted-data fingerprint preservation, candidate smoke, old-code smoke on the post-upgrade database and candidate redeploy smoke. The bootstrap implementation PR had `11 -> 11` migrations, so it proves the required mechanism without fabricating a schema delta; future migration-bearing candidates traverse the same exact-base/exact-head path.
+- an isolated synthetic Identity + published-news existing-data dataset built from actual `BASE_SHA` migrations;
+- exact-candidate migration execution against that persisted state;
+- persisted-data fingerprint validation;
+- candidate smoke;
+- old-code rollback smoke against the post-upgrade database through the existing release symlink;
+- candidate redeploy plus repeated migration/smoke;
+- separate durable non-secret `STAGING_PROVEN` evidence.
+
+The bootstrap implementation had `11 -> 11` migrations because PR #99 added validation infrastructure rather than a Platform schema migration. This proves the mechanism without fabricating a schema delta; future migration-bearing candidates traverse the same exact-base/exact-head path.
 
 Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
 
@@ -179,15 +187,13 @@ No Canary/login-server repository was modified by Phase 7 work, production-verif
 
 ## Current active task
 
-`OTERYN-20260721-e2e-migration-rollback-validation` on branch `task/OTERYN-20260721-e2e-migration-rollback-validation`, draft PR #99 / issue #98.
+None.
 
-The repository/staging hardening track can proceed independently of production access. Issue #91 remains the separate production execution tracker.
+Repository/staging E2E hardening is currently closed through PR #99. Issue #91 remains the separate production execution tracker.
 
 ## Recommended next work
 
-Finish PR #99 by validating the documentation-updated exact head through all required checks, record the final exact-SHA evidence in the active task checkpoint, and merge only if the merge gate remains satisfied.
-
-After #99, continue only bounded E2E hardening slices that add unique evidence beyond existing Phase 7, Platform DB outage, feature and integration coverage. The next roadmap priorities are P1 resilience/evidence correlation or P2 repeated-run/soak work, not duplicate happy-path browser tests.
+Start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers. Remaining candidates are P1 resilience/evidence correlation and deeper accessibility interaction, or P2 repeated-run/soak work.
 
 Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record direct evidence in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployed release.
 

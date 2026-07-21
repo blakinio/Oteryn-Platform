@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260721-e2e-migration-rollback-validation` — draft PR #99 / issue #98; extend the existing Phase 7 production-like release harness with deterministic synthetic existing-data upgrade/migration, bounded cross-version smoke and controlled rollback/redeploy validation.
+None.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -15,7 +15,8 @@ Convenience index only. Individual active task records, live PRs and Git state a
 - PR #77 / `1e6e21f0963406d4e58c39b347a49cfa4529bd1c` — delivered-surface UI/UX remediation merged with clean browser Visual/Accessibility evidence.
 - PR #86 / `5d3628f8c6ba2e454246f24947ebe08ca93cf684` — issue #81 closed; authenticated Account Overview and provisioning-status UX delivered with full production-like browser evidence.
 - PR #92 / `c18432df6b387932aa04e1eb269677c9078d9063` — fail-closed non-secret Production Go-Live verification evidence packet prepared; actual production execution remains issue #91.
-- PR #94 / `26ff602696c597aac0833415b0a47af5d427a52d` — risk-based E2E architecture plus required bounded Chromium/Firefox/WebKit portability, desktop/tablet/mobile responsive and representative browser-security coverage merged; migration/rollback continuation split to issue #98.
+- PR #94 / `26ff602696c597aac0833415b0a47af5d427a52d` — risk-based E2E architecture plus required bounded Chromium/Firefox/WebKit portability, desktop/tablet/mobile responsive and representative browser-security coverage merged.
+- PR #99 / `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` — issue #98 closed; existing Phase 7 release validation now includes isolated synthetic existing-data upgrade, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy smoke with durable `STAGING_PROVEN` evidence.
 
 ## Current project phase
 
@@ -37,10 +38,11 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-Two independent tracks are active or available:
+No repository/staging E2E hardening task is currently active.
 
-1. **Repository/staging continuous verification** — PR #99 / issue #98 validates representative existing-data upgrade/migration and controlled rollback/redeploy inside the existing Phase 7 release harness. Further resilience, observability, accessibility interaction and soak slices remain incremental under ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`.
-2. **Production-only verification** — issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
+Further resilience, observability, accessibility-interaction, repeated-run and soak slices remain optional incremental work under ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`. Start only a bounded task that adds unique evidence beyond existing browser, Phase 7, Platform DB outage, feature and integration coverage.
+
+Issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
 The repository/staging hardening track must not claim production proof and does not block waiting for production access.
 
