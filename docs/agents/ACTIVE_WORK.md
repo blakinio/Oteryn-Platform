@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-None.
+- `OTERYN-20260721-e2e-accessibility-stability-soak` — issue #110; add bounded keyboard/focus accessibility interaction coverage plus scheduled/manual repeated-run flakiness and read-only soak profiles.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -42,9 +42,7 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-No repository/staging E2E task is currently active.
-
-Further accessibility-interaction, repeated-run and soak slices remain optional incremental work under ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`. Additional resilience work should start only for a distinct recovery gap beyond current Canary/Redis, Phase 7, Platform DB outage, feature and integration evidence.
+The active repository/staging E2E task is issue #110: bounded keyboard/focus accessibility interaction plus scheduled/manual repeated-run stability and read-only soak measurement. Accessibility may become a required bounded PR profile; repeat/soak must remain non-blocking until measured evidence justifies otherwise.
 
 Issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 

@@ -10,7 +10,10 @@ const primaryIgnore = [
   '**/portability-critical.spec.mjs',
   '**/responsive-critical.spec.mjs',
   '**/resilience-critical.spec.mjs',
+  '**/accessibility-critical.spec.mjs',
+  '**/soak-public.spec.mjs',
 ];
+const configuredRetries = process.env.ACCEPTANCE_ZERO_RETRIES === '1' ? 0 : process.env.CI ? 1 : 0;
 
 export default defineConfig({
   testDir: './tests',
@@ -20,7 +23,7 @@ export default defineConfig({
   outputDir,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
-  retries: process.env.CI ? 1 : 0,
+  retries: configuredRetries,
   workers: 1,
   timeout: 120_000,
   reporter: [
@@ -34,8 +37,8 @@ export default defineConfig({
     navigationTimeout: 30_000,
     // Raw Playwright traces and automatic failure screenshots can capture session
     // cookies, reset URLs, TOTP enrollment secrets or recovery codes. Secret-bearing
-    // full, portability and responsive flows therefore use sanitized diagnostics.
-    // The non-secret smoke suite opts into raw trace/screenshot evidence explicitly.
+    // full, portability, responsive and accessibility flows therefore use sanitized
+    // diagnostics. The non-secret smoke/soak paths may opt into bounded evidence.
     trace: 'off',
     screenshot: 'off',
     video: 'off',
@@ -103,6 +106,22 @@ export default defineConfig({
     {
       name: 'resilience-chromium',
       testMatch: '**/resilience-critical.spec.mjs',
+      use: {
+        browserName: 'chromium',
+        viewport: desktopViewport,
+      },
+    },
+    {
+      name: 'accessibility-chromium',
+      testMatch: '**/accessibility-critical.spec.mjs',
+      use: {
+        browserName: 'chromium',
+        viewport: desktopViewport,
+      },
+    },
+    {
+      name: 'soak-chromium',
+      testMatch: '**/soak-public.spec.mjs',
       use: {
         browserName: 'chromium',
         viewport: desktopViewport,
