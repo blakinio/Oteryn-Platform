@@ -30,7 +30,7 @@ final class GameLoginTicketLifecycleTest extends TestCase
         self::assertNotSame($issued->ticket, $stored->ticket_hash);
         self::assertSame(hash('sha256', $issued->ticket), $stored->ticket_hash);
         self::assertSame(64, strlen($stored->ticket_hash));
-        self::assertStringNotContainsString($issued->ticket, json_encode($stored->getAttributes(), JSON_THROW_ON_ERROR));
+        self::assertArrayNotHasKey('ticket', $stored->getAttributes());
         self::assertSame($identity->id, $stored->identity_id);
         self::assertSame($binding->canary_account_id, $stored->canary_account_id);
         self::assertSame('oteryn-game-gateway', $stored->audience);
@@ -50,7 +50,10 @@ final class GameLoginTicketLifecycleTest extends TestCase
         $padding = str_repeat('=', (4 - strlen($ticket) % 4) % 4);
         $decoded = base64_decode(strtr($ticket.$padding, '-_', '+/'), true);
 
-        self::assertIsString($decoded);
+        if (! is_string($decoded)) {
+            self::fail('Generated ticket is not valid base64url data.');
+        }
+
         self::assertSame(32, strlen($decoded));
     }
 
