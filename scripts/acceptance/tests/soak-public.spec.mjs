@@ -14,7 +14,12 @@ const routes = [
   { path: '/', assert: async (page) => expect(page.getByRole('heading', { name: 'Oteryn Platform' })).toBeVisible() },
   { path: '/online', assert: async (page) => expect(page.getByText('Acceptance Hero')).toBeVisible() },
   { path: '/highscores', assert: async (page) => expect(page.getByRole('heading', { name: 'Level highscores' })).toBeVisible() },
-  { path: '/servers', assert: async (page) => expect(page.getByText('ONLINE', { exact: true })).toBeVisible() },
+  {
+    path: '/servers',
+    assert: async (page) => expect(
+      page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Acceptance' }) }),
+    ).toContainText('Runtime: ONLINE'),
+  },
 ];
 
 function percentile(values, fraction) {
