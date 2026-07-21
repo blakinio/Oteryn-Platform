@@ -5,7 +5,7 @@
 @section('content')
     <div class="page-header">
         <p class="eyebrow">Oteryn world portal</p>
-        <h1>Explore Oteryn</h1>
+        <h1>Oteryn Platform</h1>
         <p class="muted">Find characters, check who is online, browse rankings and review configured game servers.</p>
     </div>
 
