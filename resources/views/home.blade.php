@@ -7,8 +7,8 @@
     <section class="portal-hero" aria-labelledby="portal-hero-title">
         <div class="portal-hero-inner">
             <div class="portal-hero-copy">
-                <p class="portal-kicker">Oteryn Platform · World portal</p>
-                <h1 id="portal-hero-title" class="portal-hero-title">Enter the world of Oteryn</h1>
+                <h1 class="portal-kicker">Oteryn Platform</h1>
+                <h2 id="portal-hero-title" class="portal-hero-title">Enter the world of Oteryn</h2>
                 <p class="portal-hero-lede">Find characters, follow world activity, explore rankings and move between public world information and your account from one deliberate portal.</p>
                 <div class="portal-hero-actions">
                     @guest
