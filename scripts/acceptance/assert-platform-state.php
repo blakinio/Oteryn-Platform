@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 use App\Accounts\Models\IdentityCanaryAccount;
 use App\Admin\AdminAuthorization;
+use App\Identity\Mfa\MfaRecoveryCodes;
 use App\Identity\Models\Identity;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 require dirname(__DIR__, 2).'/vendor/autoload.php';
 
@@ -87,6 +89,24 @@ if ($command === 'unknown-permission-denied') {
     }
 
     $json(['unknown_permission_allowed' => false]);
+}
+
+if ($command === 'recovery-code-consumed') {
+    $email = $argv[2] ?? '';
+    $code = $argv[3] ?? '';
+    $identity = Identity::query()->where('email', $email)->first();
+    if (! $identity instanceof Identity) {
+        $fail('Identity not found.');
+    }
+
+    $normalized = (new MfaRecoveryCodes)->normalize($code);
+    foreach ($identity->two_factor_recovery_codes ?? [] as $hash) {
+        if (Hash::check($normalized, $hash)) {
+            $fail('Recovery code remains available after successful consumption.');
+        }
+    }
+
+    $json(['recovery_code_consumed' => true]);
 }
 
 $fail('Unknown acceptance assertion command.', 2);
