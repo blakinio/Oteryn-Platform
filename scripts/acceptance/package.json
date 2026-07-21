@@ -8,7 +8,9 @@
     "test:smoke": "playwright test --project=chromium-primary --grep @smoke",
     "test:portability": "playwright test --project=portability-chromium --project=portability-firefox --project=portability-webkit",
     "test:responsive": "playwright test --project=responsive-desktop --project=responsive-tablet --project=responsive-mobile",
-    "test:resilience": "playwright test --project=resilience-chromium"
+    "test:resilience": "playwright test --project=resilience-chromium",
+    "test:accessibility": "playwright test --project=accessibility-chromium",
+    "test:soak": "playwright test --project=soak-chromium"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0"

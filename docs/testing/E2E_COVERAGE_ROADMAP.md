@@ -29,6 +29,9 @@ The production-like acceptance system now provides:
 - bounded Chromium/Firefox/WebKit portability;
 - bounded desktop/tablet/mobile responsive coverage;
 - bounded Chromium public-dependency resilience coverage;
+- bounded Chromium keyboard/focus accessibility interaction coverage on PR #111;
+- reusable workflow-call support for isolated repeated critical executions;
+- scheduled/manual read-only public soak orchestration on PR #111;
 - secret-safe evidence and diagnostics for sensitive flows.
 
 The currently delivered staging-verifiable functional surface remains `STAGING_PROVEN`. Visual / UX Acceptance remains `PASS` for the currently delivered staging-verifiable launch scope. Final production smoke/E2E remains `UNKNOWN` until issue #91 is executed against the exact deployed production SHA.
@@ -134,7 +137,7 @@ This proves controlled-runtime correlation only. Production edge propagation, ce
 
 ## Implemented P1 public dependency recovery slice
 
-PR #106 adds the first bounded browser recovery profile, `resilience-chromium`, with zero retries.
+PR #106 merged as `8030f98d7280c16705f34f2d29c8ebd7fc85f285` and added the first bounded browser recovery profile, `resilience-chromium`, with zero retries.
 
 It proves two full dependency lifecycles on the same exact application SHA:
 
@@ -175,6 +178,54 @@ Durable evidence:
 
 Further dependency recovery scenarios remain additive only when they provide unique evidence beyond Phase 7, Platform DB outage, feature and integration tests. Candidate examples include SMTP recovery or provisioning retry UI, but they are not automatically required.
 
+## P1/P2 accessibility, stability and soak slice
+
+PR #111 / issue #110 adds the remaining bounded optional hardening without broadening the complete secret-sensitive browser matrix.
+
+### Accessibility interaction
+
+Project: `accessibility-chromium`.
+
+The profile uses real keyboard traversal and activation rather than only DOM presence assertions. Representative coverage includes:
+
+- login and password-recovery form focus/activation;
+- Account Overview create-character navigation;
+- character form forward and reverse keyboard traversal;
+- MFA challenge completion;
+- privileged managed-page table-to-edit-form navigation;
+- `:focus-visible` plus computed visible focus-indicator checks for reached controls.
+
+The spec configures zero retries and is included in `critical` and `full`. Raw secret-bearing trace/screenshot/video collection remains disabled.
+
+Exact-head PR validation remains authoritative; the implementation record is `docs/testing/E2E_ACCESSIBILITY_STABILITY_SOAK_EVIDENCE.md`.
+
+### Repeated-run stability
+
+`.github/workflows/acceptance-stability.yml` runs three fresh isolated `critical` executions with `fail-fast: false`, distinct iteration suffixes and global Playwright retries forced to zero.
+
+Each matrix job invokes the reusable exact-SHA acceptance workflow and receives fresh MariaDB, Redis, MailHog, application runtime, cache and session state. This avoids treating shared limiter/session/dependency state as test flakiness and prevents Playwright retries from masking first-pass instability.
+
+The workflow is scheduled/manual rather than blocking every PR. First repeated-run evidence remains pending until the workflow executes after merge or manual dispatch.
+
+### Read-only soak
+
+Project: `soak-chromium`.
+
+`.github/workflows/acceptance-soak.yml` schedules/exposes a bounded default 300-second read-only public soak over home, online, highscores and servers.
+
+The soak records:
+
+- request/iteration count;
+- overall and per-route min/p50/p95/max navigation time where applicable;
+- Laravel serve process-tree RSS start/end/max;
+- Redis key count before/after.
+
+No performance threshold is enforced. Initial metrics are calibration-only until repeated runs establish normal variance. The soak performs no auth, MFA, password, account, character or privileged mutation.
+
+Durable implementation evidence:
+
+- `docs/testing/E2E_ACCESSIBILITY_STABILITY_SOAK_EVIDENCE.md`.
+
 ## Layering rule
 
 Before adding a new E2E scenario, answer:
@@ -202,9 +253,9 @@ Do not add browser tests solely to increase test count.
 | Retry/data integrity | Retry duplicates or corrupts state | Real DB integration | Confirm selected user-visible final state | P1 | Focused CI |
 | Concurrency conflicts | Simultaneous actions violate invariants | Real DB concurrency | Selected browser-visible conflict outcome only | P1 | Focused CI |
 | Observability | Request cannot be correlated with runtime evidence | Feature/integration + production-like runtime | Sanitized response/log correlation | P1 | Focused CI |
-| Accessibility interaction | Keyboard/focus behavior blocks critical journeys | Playwright/accessibility | Keyboard-only and focus behavior for bounded surfaces | P1 | Bounded subset |
-| Repeated-run flakiness | Suite is green once but unstable | Test infrastructure | Repeat bounded critical suite and report instability | P2 | Scheduled/manual |
-| Soak | Long-running runtime/session/cache behavior degrades | Production-like runtime/monitoring | Repeated non-secret journeys over time | P2 | Scheduled/manual |
+| Accessibility interaction | Keyboard/focus behavior blocks critical journeys | Playwright/accessibility | Keyboard-only and focus behavior for bounded surfaces | P1 | Required bounded Chromium subset |
+| Repeated-run flakiness | Suite is green once but unstable | Test infrastructure | Repeat bounded critical suite in fresh jobs | P2 | Scheduled/manual |
+| Soak | Long-running runtime behavior degrades | Production-like runtime/monitoring | Repeated non-secret public journeys plus calibration metrics | P2 | Scheduled/manual |
 | Volume | Repeated usage exposes leaks or stale state | Integration/performance harness | Browser only for representative sampling | P2 | Scheduled/manual |
 | Performance budgets | User-visible latency regresses | Dedicated performance tooling | Optional calibrated navigation checks | P2 | Non-blocking until calibrated |
 | Authoritative game login | Platform Identity cannot reliably enter game | Cross-repository contract/system E2E | Full Platform -> login-server -> Canary journey when authorized | Future launch-dependent | Separate programme |
@@ -216,13 +267,13 @@ Do not add browser tests solely to increase test count.
 
 Status: **implemented for the first bounded critical slice**.
 
-Broader full-suite cross-browser execution remains deferred pending repeated-run cost/flakiness evidence.
+Broader full-suite cross-browser execution remains intentionally deferred; repeated-run evidence now measures the bounded critical suite instead of multiplying the full secret-sensitive suite.
 
 ### P0.2 Responsive/mobile critical journeys
 
 Status: **implemented for the first bounded critical slice**.
 
-Character-creation-specific responsive coverage and deeper keyboard/focus interaction remain separate future slices where they add unique evidence.
+Deeper keyboard/focus interaction is implemented separately by the P1 `accessibility-chromium` slice on PR #111 rather than multiplying every responsive viewport.
 
 ### P0.3 Browser-visible security boundaries
 
@@ -234,7 +285,7 @@ Existing smoke/portability covers protected-route and permission denial. PR #94 
 
 Status: **implemented through PR #99**.
 
-Every migration-bearing candidate traversing Phase 7 release validation uses the same base-to-head existing-data path. Unsafe destructive/backward-incompatible changes must fail or require an explicit rollout/rollback design; the harness does not make unsafe rollback acceptable.
+Every migration-bearing candidate traversing Phase 7 release validation using the same base-to-head existing-data path. Unsafe destructive/backward-incompatible changes must fail or require an explicit rollout/rollback design; the harness does not make unsafe rollback acceptable.
 
 ## P1 — resilience and evidence correlation
 
@@ -268,45 +319,35 @@ Future observability E2E should add only new correlation boundaries such as priv
 
 ### P1.4 Accessibility interaction
 
-Status: **not yet implemented as a dedicated keyboard/focus journey slice**.
+Status: **implemented as a bounded Chromium keyboard/focus slice on PR #111, pending exact-head merge validation**.
 
-Potential bounded targets:
+Covered targets:
 
-- login/recovery/MFA forms;
-- Account Overview actions;
-- character creation form;
-- privileged admin form/table interactions;
-- modal/dialog focus trap only where such components exist.
+- login/recovery forms;
+- Account Overview create-character action;
+- character creation controls;
+- MFA challenge;
+- privileged admin table/form interaction.
 
-Do not claim screen-reader compatibility from DOM assertions alone.
+Do not claim screen-reader compatibility from these browser focus assertions alone.
 
 ## P2 — scheduled/manual confidence profiles
 
 ### P2.1 Repeated-run flakiness
 
-Repeat the bounded critical suite on the same exact SHA and record:
+Status: **workflow implemented on PR #111; first scheduled/manual multi-iteration evidence pending**.
 
-- iteration count;
-- first failing test and iteration;
-- browser/project;
-- failure classification;
-- whether retry masked an initial failure.
+The stability workflow repeats the bounded `critical` suite three times in fresh isolated jobs and records distinct iteration identity. Global Playwright retries are forced to zero for these runs.
 
-A test repeatedly requiring retry is not healthy merely because the final job is green.
+A failed iteration is not healthy merely because another iteration passes. Investigate the first failing test/project/iteration and classify product, harness or infrastructure causes.
 
 ### P2.2 Soak
 
-Run non-secret representative journeys for an extended period in a controlled environment. Observe where tooling exists:
+Status: **bounded read-only soak profile and scheduled/manual workflow implemented on PR #111; first baseline run pending**.
 
-- process memory/resource growth;
-- session/cache accumulation;
-- database connection exhaustion;
-- Redis connection/key behavior;
-- repeated login/logout stability;
-- repeated public-read stability;
-- bounded mutation/retry stability using disposable fixtures.
+The initial soak deliberately excludes mutation-heavy and secret-bearing journeys. It observes public-read stability, navigation-time distributions, Laravel serve process-tree RSS and Redis key count.
 
-No fixed duration is mandated until measured infrastructure cost and signal quality are known.
+No latency, memory or key-count threshold is mandated until measured infrastructure cost and normal variance are known.
 
 ### P2.3 Optional performance budgets
 
@@ -336,18 +377,20 @@ Failure evidence should prefer bounded assertion messages, non-sensitive status/
 Implemented profiles and release-validation slices:
 
 - `smoke` — fast primary Chromium smoke;
-- `full` — full primary Chromium production-like functional acceptance plus required resilience and visual/accessibility collector;
+- `full` — full primary Chromium production-like functional acceptance plus required resilience, accessibility and visual/accessibility collector;
 - `portability` — bounded critical subset across Chromium/Firefox/WebKit;
 - `responsive` — bounded critical subset across representative viewport classes;
 - `resilience` — bounded Chromium public dependency failure/restoration/recovery scenarios;
-- `critical` — required pull-request composition of smoke + portability + responsive + resilience without the full visual collector;
+- `accessibility` — bounded Chromium keyboard/focus interaction journeys;
+- `soak` — scheduled/manual bounded read-only Chromium public soak with calibration metrics;
+- `critical` — required pull-request composition of smoke + portability + responsive + resilience + accessibility without the full visual collector;
 - Phase 7 existing-data upgrade/rollback — representative persisted-state validation in the existing exact-SHA release workflow;
 - Phase 7 request/log correlation — exact response request ID to structured request-completion log correlation.
 
-Deferred profiles:
+Scheduled/manual orchestration:
 
-- `repeat` — repeated-run flakiness detection;
-- `soak` — scheduled/manual long-duration validation.
+- `acceptance-stability.yml` — three isolated zero-retry `critical` executions per scheduled/manual run;
+- `acceptance-soak.yml` — one bounded zero-retry `soak` execution per scheduled/manual run.
 
 Profiles may share fixtures/helpers but must not silently broaden secret artifact capture.
 

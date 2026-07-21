@@ -25,9 +25,7 @@ The E2E coverage-hardening programme is a continuous verification track. It does
 - **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
 - **Production Verification: REQUIRED BEFORE GO-LIVE**
 
-ADR 0007 separates Phase 7 engineering/hardening completion from final production go-live verification. Phase 7 completion does not claim that the final production environment is production-ready or `PRODUCTION_PROVEN`.
-
-ADR 0008 defines risk-based continuous E2E validation beyond the current acceptance baseline. Expanded staging/repository coverage does not substitute for direct production verification.
+ADR 0007 separates Phase 7 engineering/hardening completion from final production go-live verification. ADR 0008 defines risk-based continuous E2E validation beyond the acceptance baseline. Repository/staging evidence never substitutes for direct production verification.
 
 ## Current architecture state
 
@@ -54,56 +52,51 @@ Platform web authentication remains separate from the still-unimplemented author
 
 ## Phase 7 controlled production-like validation
 
-PR #63 is merged on `main`. Its final PR head `7842f78ec4ac2d07d3800ffe8bde9809b055822d` passed:
+PR #63 merged with exact-head controlled staging evidence classified `STAGING_PROVEN` for its documented boundaries.
 
-- Phase 7 Production-Like Validation run `29779554130` / #9;
-- required CI run `29779553687` / #759;
-- Agent Governance run `29779554188` / #679.
-
-Final PR-head staging artifact evidence:
-
-- classification `STAGING_PROVEN`;
-- rollback target `b6878c4775eda542738c78ea99fd5d2e19d2b35f`;
-- measured controlled restore `105 ms`;
-- source/restored tables `13/13`;
-- source/restored migrations `11/11`;
-- validation-SHA probe matched.
-
-The controlled evidence closes the staging-verifiable engineering/hardening work for:
+The production-like path proves, among other things:
 
 - clean deployment, migrations, controlled rollback, interrupted-release isolation and redeploy;
-- provider-independent production configuration guardrails and invalid-config fail-closed behavior;
+- provider-independent production configuration guardrails;
 - effective MariaDB least-privilege principals for generic read-only, provisioning and character creation;
-- prohibited cross-surface writes and excessive/insufficient database privilege fail-closed behavior;
-- runtime Redis ACL/key/command boundary plus missing/malformed/unavailable dependency semantics;
+- prohibited cross-surface writes and privilege fail-closed behavior;
+- runtime Redis ACL/key/command boundaries and missing/malformed/unavailable dependency semantics;
 - SMTP delivery through a real test SMTP service and unavailable-mail behavior;
-- exact-SHA critical feature/integration regression coverage across Identity, admin/RBAC/CMS, account/binding, character and public game-data surfaces;
+- exact-SHA critical feature/integration regressions across Identity, admin/RBAC/CMS, account/binding, character and public game-data surfaces;
 - running health, CSP/security headers, Secure/HttpOnly cookies, request correlation, JSON request-completion logging and representative sensitive-error/log behavior;
-- real production-like MariaDB backup/clean restore/integrity/restored-environment smoke with measured staging recovery time.
+- production-like MariaDB backup/clean restore/integrity/restored-environment smoke.
 
-The `105 ms` final-head recovery result and the earlier `102 ms` staging snapshot are staging measurements only. Neither is a production RTO or RPO.
-
-Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`.
+Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_EVIDENCE.md`. Staging recovery measurements are not production RTO/RPO claims.
 
 ## Continuous E2E coverage hardening
 
 ADR 0008 plus `docs/testing/E2E_COVERAGE_ROADMAP.md` define the additive continuous-verification programme beyond the already `STAGING_PROVEN` functional acceptance baseline.
 
-PR #94 merged as `26ff602696c597aac0833415b0a47af5d427a52d` and delivered bounded Chromium/Firefox/WebKit portability, representative desktop/tablet/mobile critical journeys, browser-visible session/ownership security checks and secret-safe exact-SHA evidence while preserving the full primary Chromium acceptance baseline.
+Merged slices:
 
-PR #99 merged as `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` and closed issue #98. The existing Phase 7 release-validation path now includes representative existing-data migration, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy smoke with separate durable `STAGING_PROVEN` evidence.
+- PR #94 / `26ff602696c597aac0833415b0a47af5d427a52d` — bounded Chromium/Firefox/WebKit portability, representative desktop/tablet/mobile journeys and browser-visible session/ownership security checks.
+- PR #99 / `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` — existing-data migration, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy validation.
+- PR #102 / `ee235cbbdd379a5047fede98ff79a0e35e22ce76` — exact response `X-Request-ID` to structured request-completion log correlation.
+- PR #106 / `8030f98d7280c16705f34f2d29c8ebd7fc85f285` — zero-retry Chromium public dependency recovery for Canary read grants and Redis `HMGET` ACL restoration.
 
-PR #102 merged as `ee235cbbdd379a5047fede98ff79a0e35e22ce76` and closed issue #101. The Phase 7 running-HTTP path now proves that one concrete application-generated response `X-Request-ID` maps to exactly one structured `http.request.completed` JSON log event with the same `request_id` and expected `GET` / `200` pair.
+Active PR #111 / issue #110 extends the programme with:
 
-PR #106 merged as `8030f98d7280c16705f34f2d29c8ebd7fc85f285` and closed issue #105. Required browser acceptance now also includes a zero-retry `resilience-chromium` profile proving:
+- required bounded `accessibility-chromium` keyboard/focus interaction coverage;
+- reusable exact-SHA acceptance workflow support;
+- scheduled/manual three-iteration zero-retry `critical` stability measurement using fresh isolated jobs;
+- scheduled/manual bounded read-only public soak with navigation-time, Laravel process-tree RSS and Redis key-count calibration metrics.
 
-- Canary public online reads recover after controlled acceptance read-grant denial and restoration;
-- Redis server-runtime reads recover after controlled `HMGET` ACL denial and restoration;
-- every acceptance-scoped dependency mutation is restored in deterministic cleanup.
+First successful accessibility implementation evidence is Acceptance E2E and Visual UX run `29853941922` on exact SHA `3bd1e4901a71841bc4593ec7e4efb98866c8c30f`:
 
-The required pull-request `critical` profile now composes smoke + portability + responsive + resilience. The `full` profile requires both the full primary Chromium baseline and resilience before it can claim `FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN` or execute the visual/accessibility collector.
+- smoke: PASS;
+- portability: PASS across Chromium/Firefox/WebKit;
+- responsive: PASS across desktop/tablet/mobile;
+- resilience: PASS;
+- accessibility: PASS, 3 tests, 0 failures, 0 skipped, 6 seconds wall-clock profile duration.
 
-First resilience evidence measured `3 s` wall-clock with zero retries; durable evidence is `docs/testing/E2E_PUBLIC_DEPENDENCY_RECOVERY_EVIDENCE.md`.
+The required pull-request `critical` profile now composes smoke + portability + responsive + resilience + accessibility. The `full` profile requires the full primary Chromium baseline plus resilience and accessibility before it can claim `FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN` or execute the visual/accessibility collector.
+
+Repeated-run and soak workflow mechanisms are repository-proven on PR #111 but their first scheduled/manual runtime evidence remains pending; the current connector does not expose workflow dispatch. They remain non-blocking calibration/stability profiles.
 
 Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
 
@@ -113,28 +106,22 @@ All continuous-hardening evidence remains staging/repository evidence. It does n
 
 The authoritative fail-closed gate is `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
 
-PR #92 / `c18432df6b387932aa04e1eb269677c9078d9063` prepared `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md` as the non-secret execution record for issue #91. The evidence record does not itself prove production; every production-specific fact starts as `UNKNOWN` until directly verified against the exact deployed release.
+PR #92 / `c18432df6b387932aa04e1eb269677c9078d9063` prepared `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md` as the non-secret execution record for issue #91. The record does not itself prove production; every production-specific fact starts as `UNKNOWN` until directly verified against the exact deployed release.
 
 Controlled staging cannot prove the final production:
 
 - exact deployed Oteryn Platform SHA and relevant Canary/login-server versions;
-- DNS/Cloudflare/WAF/Access/TLS/HSTS posture;
-- direct-origin exposure and ingress firewall/reverse-proxy rules;
-- Platform DB engine/endpoint/network isolation/HA and production credential ownership/rotation;
-- Canary SQL production endpoints/network paths and actual effective grants for each enabled dedicated principal;
-- runtime Redis endpoint/ACL/network/TLS state and dependency/freshness monitoring;
-- effective session/cache scaling model and queue/worker topology;
-- mail provider/domain/delivery/bounce monitoring;
-- centralized logs/metrics/alerts/retention/access/on-call routing;
-- actual provider deployment/migration/rollback mechanism and emergency operator authorization;
-- production backup scope/schedule/retention/encryption/access policy and a dated production restore result;
-- final critical production smoke/E2E checks against the exact deployed SHA.
+- DNS/edge/TLS/WAF/origin exposure and ingress controls;
+- production Platform DB topology/isolation/credentials/backup/restore;
+- production Canary SQL effective grants;
+- production runtime Redis ACL/network/TLS/freshness monitoring;
+- effective session/cache/queue topology;
+- production mail delivery/monitoring;
+- centralized logs/metrics/alerts/on-call;
+- actual provider deployment/migration/rollback mechanism;
+- final critical production smoke/E2E against the exact deployed SHA.
 
-These facts remain `UNKNOWN` until directly proven in the final production environment. `STAGING_PROVEN` or `REPO-PROVEN` evidence does not promote them to `PRODUCTION_PROVEN`.
-
-An eligible owner risk decision, where policy permits, does not fabricate production evidence and cannot be used to claim that an unverified production fact was verified.
-
-The Production Go-Live Gate must remain pending until its mandatory production verification is complete.
+These facts remain `UNKNOWN` until directly proven in the final production environment. `STAGING_PROVEN` or repository evidence does not promote them to `PRODUCTION_PROVEN`.
 
 The authoritative Platform game-login bridge remains a separately authorized cross-repository requirement. If Platform-originated game login is part of launch scope, the go-live gate remains blocked until that requirement is resolved and proven end to end.
 
@@ -184,29 +171,22 @@ No Canary/login-server repository was modified by Phase 7 work, production-verif
 
 ## Current active task
 
-None.
-
-Repository/staging E2E hardening is currently closed through PR #106. Issue #91 remains the separate production execution tracker.
+`OTERYN-20260721-e2e-accessibility-stability-soak` on branch `task/OTERYN-20260721-e2e-accessibility-stability-soak`, draft PR #111 / issue #110.
 
 ## Recommended next work
 
-Start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers.
+Finish PR #111 by reconciling its exact-head checks after the final documentation checkpoint and merge only if the branch is current with `main`, review/ownership scope is clean and all required exact-head gates are green.
 
-The strongest remaining candidates are:
-
-- P1 deeper accessibility interaction for keyboard/focus-critical journeys;
-- P2 repeated-run flakiness measurement;
-- P2 soak only after a bounded low-cost profile and useful resource signals are defined.
-
-Additional resilience work should start only for a distinct recovery gap beyond the current Canary/Redis browser recovery plus Phase 7 and Platform DB outage evidence.
+After PR #111, do not add more repository/staging E2E solely to increase test count. Repeated-run and soak evidence should accumulate through their scheduled/manual workflows; promote performance/stability thresholds only after measured variance justifies them.
 
 Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
 ## High-priority remaining unknowns
 
 - authoritative Platform game-login assertion/session protocol and rollout if required for launch scope;
-- long-term repeated-run Firefox/WebKit and resilience flakiness beyond current bounded measurements;
-- whether additional dependency-interruption scenarios add unique recovery evidence beyond current Canary/Redis plus Phase 7/outage validation;
+- first three-iteration zero-retry critical stability result after PR #111;
+- first bounded public soak latency/RSS/Redis-key baseline after PR #111;
+- long-term Firefox/WebKit, resilience and accessibility flakiness beyond current exact-SHA evidence;
 - deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
 - production database, mail, session/cache and queue topology;

@@ -88,6 +88,7 @@ test('@portability MFA-confirmed privileged access and seeded CMS public visibil
   await login(page, adminEmail, browserAdminPassword);
   await expect(page.getByRole('heading', { name: 'Complete your sign in' })).toBeVisible();
   await completeMfaChallenge(page, browserAdminRecoveryCode);
+  await expect(page).toHaveURL(/\/$/u);
 
   await page.goto('/admin');
   await expect(page.getByRole('heading', { name: 'Administration' })).toBeVisible();
