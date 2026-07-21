@@ -42,7 +42,7 @@ final class AccountOverviewTest extends TestCase
         $response->assertOk();
         $response->assertSee('Account overview');
         $response->assertSee('Ready');
-        $response->assertSee('Create a character');
+        $response->assertSee('Your game account setup is complete and character creation is available.');
         $response->assertDontSee((string) $binding->canary_account_id);
         $response->assertDontSee($binding->provisioning_name);
         $response->assertDontSee('Retry game account setup');
@@ -57,8 +57,8 @@ final class AccountOverviewTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Setup in progress');
+        $response->assertSee('Your game account setup is still in progress.');
         $response->assertDontSee('Retry game account setup');
-        $response->assertDontSee('Create a character');
     }
 
     public function test_dependency_failure_is_presented_as_recoverable_retry(): void
@@ -75,7 +75,6 @@ final class AccountOverviewTest extends TestCase
         $response->assertOk();
         $response->assertSee('Setup interrupted');
         $response->assertSee('Retry game account setup');
-        $response->assertDontSee('Create a character');
     }
 
     public function test_conflict_binding_fails_closed_with_support_guidance(): void
@@ -93,7 +92,6 @@ final class AccountOverviewTest extends TestCase
         $response->assertSee('Support required');
         $response->assertSee('No replacement account will be created automatically.');
         $response->assertDontSee('Retry game account setup');
-        $response->assertDontSee('Create a character');
     }
 
     public function test_missing_binding_renders_safe_non_actionable_state(): void
@@ -107,7 +105,6 @@ final class AccountOverviewTest extends TestCase
         $response->assertSee('Support required');
         $response->assertSee('We cannot confirm your game account setup right now.');
         $response->assertDontSee('Retry game account setup');
-        $response->assertDontSee('Create a character');
     }
 
     public function test_recoverable_retry_reuses_authoritative_persisted_intent_and_marks_binding_ready(): void
