@@ -4,10 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260721-functional-visual-acceptance`
-  - PR #67 merged as `517968539bdfd7d189677b669bf0899c35fccec1`
-  - status: completed; active task record is pending archive by its owning task flow
-  - result: browser Functional Acceptance evidence delivered; Visual / UX launch blockers are now closed by merged PR #77 plus merged PR #86 / issue #81.
+None.
 
 ## Closed acceptance follow-ups
 
@@ -36,7 +33,7 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-Keep production-only smoke and the Production Go-Live Gate separate until the exact final deployed SHA and explicit production authorization are available.
+When the exact final deployed production SHA and explicit production access/deployment authorization are available, create and execute the bounded Production Go-Live Gate against that exact deployment. Do not repeat closed staging validation unless the production candidate code or relevant contracts change materially.
 
 ## Remaining cross-repository dependency
 
