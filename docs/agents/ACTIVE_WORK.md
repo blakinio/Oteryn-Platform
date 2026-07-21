@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-None.
+- `OTERYN-20260721-e2e-coverage-hardening` — draft PR #94; risk-based continuous E2E hardening on top of the existing `STAGING_PROVEN` functional acceptance baseline. Current architecture slice defines bounded cross-browser/responsive/security/migration priorities while preserving lower-layer concurrency/integrity evidence and the separate production gate.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -22,6 +22,8 @@ None.
 
 **Phase 7 — Production hardening and operations: COMPLETE**
 
+The E2E coverage-hardening task is a continuous verification track and does not reopen either completed phase.
+
 ## Operational release state
 
 - **Production Readiness: STAGING_PROVEN**
@@ -34,7 +36,12 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-Issue #91 is the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record results in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployment.
+Two independent tracks are allowed:
+
+1. **Repository/staging continuous verification** — continue `OTERYN-20260721-e2e-coverage-hardening` / PR #94 using ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`. Start with the bounded P0 browser portability/responsive hardening slice and split follow-ups when the implementation becomes too broad.
+2. **Production-only verification** — issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record results in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployment.
+
+The repository/staging hardening track must not claim production proof and does not block waiting for production access.
 
 ## Remaining cross-repository dependency
 
