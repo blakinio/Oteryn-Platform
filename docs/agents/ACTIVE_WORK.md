@@ -4,11 +4,15 @@ Convenience index only. The individual active task record, live PR and Git state
 
 ## Active tasks
 
-- `OTERYN-20260721-platform-db-outage-validation`
-  - branch: `task/OTERYN-20260721-platform-db-outage-validation`
-  - draft PR: #73
-  - issue: #71
-  - goal: prove fail-closed Platform DB outage behavior through an isolated production-like running-release HTTP mutation without overlapping PR #67 acceptance paths.
+- `OTERYN-20260721-cms-audit-regressions`
+  - branch: `task/OTERYN-20260721-cms-audit-regressions`
+  - issue: #72
+  - goal: add focused CMS state-transition and privileged-audit sensitive-data regressions without changing product behavior unless a real defect is proven.
+
+- `OTERYN-20260721-functional-visual-acceptance`
+  - branch: `task/OTERYN-20260721-functional-visual-acceptance`
+  - draft PR: #67
+  - coordination: owns the separate live acceptance/visual harness and current #68-#70 evidence path; do not duplicate its workflow/scripts ownership here.
 
 ## Current project phase
 
@@ -33,8 +37,7 @@ ADR 0007 separates Phase 7 engineering/hardening completion from final productio
 - PR #55 / `b6650966fe877a0e7872f29606b32b6394dde99f` — server-generated request correlation and bounded structured request-completion logging.
 - PR #56 / `ae659089bb288dd467f5e2f163ffb7d731e35cec` — production-readiness checklist, incident/recovery runbook and Phase 7 continuation handover.
 - PR #63 / `61f72ddda5c253f26c7d59aa7b6fce3506f120dc` — controlled production-like validation harness and staging evidence closure.
-
-The staging evidence task `OTERYN-20260720-phase7-production-evidence-collection` and the Phase 7/go-live separation task `OTERYN-20260721-phase7-go-live-gate-separation` are archived under `docs/agents/tasks/archive/`.
+- PR #73 / `06d8d94aafd73de996eb4ea93705e8a45fbadafb` — controlled Platform DB outage validation; issue #71 closed with `STAGING_PROVEN` staging-only evidence.
 
 ## Production-like Phase 7 validation
 
@@ -48,7 +51,14 @@ Final PR #63 head evidence:
 - measured controlled restore: `105 ms`, `13/13` tables, `11/11` migrations, validation-SHA probe matched;
 - classification: `STAGING_PROVEN` only.
 
-The controlled validation closes the staging-verifiable deployment/rollback, configuration, DB privilege, Redis ACL, SMTP, critical-flow regression, security-smoke and backup/restore engineering work.
+Additional functional failure-path evidence:
+
+- Platform DB outage exact-SHA workflow: PASS on PR #73;
+- no false-success registration mutation with unavailable Platform DB;
+- Platform state unchanged;
+- bounded response/log sensitive-data checks passed;
+- normal DB-backed recovery read passed;
+- classification: `STAGING_PROVEN` for that controlled staging failure path only.
 
 Staging evidence must not be promoted to proof of final production state or production RTO/RPO.
 
@@ -73,11 +83,11 @@ These facts remain `UNKNOWN` until directly proven. The gate cannot become `PASS
 
 ## Next work
 
-Complete `OTERYN-20260721-platform-db-outage-validation` / issue #71 first. Issues #68-#70 are being covered on the separate active acceptance path in PR #67 and must not be duplicated here.
+Complete `OTERYN-20260721-cms-audit-regressions` / issue #72. In parallel, PR #67 retains ownership of the separate #68-#70 live acceptance evidence path.
+
+After both bounded paths are resolved, perform one final functional-acceptance reconciliation against `main` and update the durable matrix from direct merged evidence only.
 
 When all staging functional-acceptance gaps are closed and actual production access plus deployment authorization are available, create a bounded production-verification task and execute the fail-closed Production Go-Live Gate against the exact deployed SHA(s).
-
-Do not repeat closed staging validation unless the production candidate code or relevant contracts change materially.
 
 ## Repository-verifiable preflight commands
 
