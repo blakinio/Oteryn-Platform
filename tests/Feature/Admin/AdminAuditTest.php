@@ -80,14 +80,17 @@ final class AdminAuditTest extends TestCase
         $storedResetTokenHash = DB::table('password_reset_tokens')
             ->where('email', $actor->email)
             ->value('token');
-        self::assertIsString($storedResetTokenHash);
-
-        $rawIdentity = DB::table('identities')->where('id', $actor->id)->first();
-        self::assertNotNull($rawIdentity);
-        self::assertIsString($rawIdentity->two_factor_secret);
-        self::assertIsString($rawIdentity->two_factor_recovery_codes);
-
+        $encryptedTotpState = DB::table('identities')
+            ->where('id', $actor->id)
+            ->value('two_factor_secret');
+        $encryptedRecoveryCodeState = DB::table('identities')
+            ->where('id', $actor->id)
+            ->value('two_factor_recovery_codes');
         $applicationKey = config('app.key');
+
+        self::assertIsString($storedResetTokenHash);
+        self::assertIsString($encryptedTotpState);
+        self::assertIsString($encryptedRecoveryCodeState);
         self::assertIsString($applicationKey);
         self::assertNotSame('', $applicationKey);
 
@@ -115,10 +118,10 @@ final class AdminAuditTest extends TestCase
             'plain password' => $plainPassword,
             'password hash' => $passwordHash,
             'TOTP secret' => $totpSecret,
-            'encrypted TOTP state' => $rawIdentity->two_factor_secret,
+            'encrypted TOTP state' => $encryptedTotpState,
             'plain recovery code' => $plainRecoveryCode,
             'recovery-code hash' => $recoveryCodeHash,
-            'encrypted recovery-code state' => $rawIdentity->two_factor_recovery_codes,
+            'encrypted recovery-code state' => $encryptedRecoveryCodeState,
             'plain reset token' => $resetToken,
             'stored reset-token hash' => $storedResetTokenHash,
             'application key' => $applicationKey,
