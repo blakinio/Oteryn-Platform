@@ -32,7 +32,7 @@
                     <div class="form-field">
                         <label for="character-name">Character name</label>
                         <input id="character-name" name="name" type="search" value="{{ old('name') }}" maxlength="255" autocomplete="off" required>
-                        <p class="form-help">Search the public character directory by exact name.</p>
+                        <p class="form-help">Search by exact character name.</p>
                     </div>
                     @error('name')
                         <p class="notice" role="alert">{{ $message }}</p>
