@@ -1,0 +1,44 @@
+name: Native OAuth Dependency Bootstrap
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-oauth-dependency-bootstrap-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lock-passport:
+    if: github.event.pull_request.number == 119
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Lock Laravel Passport 13
+        run: composer require laravel/passport:^13.0 --no-interaction --no-progress
+
+      - name: Validate Composer files
+        run: composer validate --strict
+
+      - name: Upload locked Composer files
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-oauth-composer-lock-${{ github.run_id }}
+          path: |
+            composer.json
+            composer.lock
+          retention-days: 1
+          if-no-files-found: error
