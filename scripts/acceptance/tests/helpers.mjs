@@ -204,7 +204,7 @@ export async function logout(page) {
 export async function enrollMfa(page, password) {
   await page.goto('/mfa');
   await page.getByRole('button', { name: 'Start MFA enrollment' }).click();
-  const secret = (await page.locator('p').filter({ hasText: 'Manual secret:' }).locator('code').textContent())?.trim();
+  const secret = (await page.locator('.secure-information code').first().textContent())?.trim();
   if (!secret) {
     throw new Error('MFA enrollment secret was not rendered.');
   }
@@ -238,7 +238,7 @@ export async function waitForResetLink(email, timeoutMs = 20_000) {
         .replace(/=3D/gu, '=')
         .replace(/&amp;/gu, '&');
       if (normalized.includes(email)) {
-        const match = normalized.match(/https?:\\?\/\\?\/[^\s"'<>]+\/reset-password\/[^\s"'<>\\]+(?:\\?email=[^\s"'<>\\]+)?/u);
+        const match = normalized.match(/https?:\\?\/\\?\/[^\s"'<>]+\/reset-password\/[^\s"'<>\\]+(?:\?email=[^\s"'<>\\]+)?/u);
         if (match) {
           return match[0].replace(/\\\//gu, '/');
         }
