@@ -73,8 +73,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T17:48:00Z
-head: 74ea0f302f09013f01010daa9af7daad8cd4b639
+updated_at: 2026-07-21T17:55:00Z
+head: 41dc8d8db379c88f6aa45528e2a8b14ee00b9fad
 branch: task/OTERYN-20260721-e2e-accessibility-stability-soak
 pr: 111
 status: validating
@@ -97,7 +97,8 @@ owned_paths:
 proven:
   - main head at task start was cc63f1c4d4aac7f314c0b234b7bb17a864ed0972 after governance cleanup PR 107
   - issue 110 and draft PR 111 are the dedicated tracker and implementation PR
-  - open PR 103 changes only its own task record plus public brand-art assets and home/game layout views; it does not overlap this task's owned workflow/test/doc paths, though a future merge may alter keyboard traversal and must be handled by normal exact-head revalidation
+  - PR 103 and cleanup PR 112 merged to main as ec03f024d98bd9d155639e3ab7e4c25963e7e0c3 and 4f65e91b7d1369a2ed11a0c06077f3f71a0f88da while this task was active
+  - the task branch was rebased/synchronized onto current main 4f65e91b7d1369a2ed11a0c06077f3f71a0f88da by reconstructing the exact 14-file PR scope on the current main tree; compare then reported ahead 1 behind 0 before this checkpoint update
   - accessibility-chromium is a zero-retry Chromium project using real Tab Shift+Tab Enter and focus-visible assertions for login recovery account character MFA and admin journeys
   - direct pull-request critical acceptance composes smoke portability responsive resilience and accessibility
   - full acceptance requires the full Chromium baseline plus resilience and accessibility before staging functional classification and visual collection
@@ -109,16 +110,16 @@ proven:
   - exact SHA 3bd1e4901a71841bc4593ec7e4efb98866c8c30f passed Acceptance E2E and Visual UX run 29853941922 with smoke portability responsive resilience and accessibility all successful
   - accessibility exact-head evidence is 3 tests 0 failures 0 skipped and 6 seconds wall-clock profile duration
   - artifact acceptance-e2e-critical-29853941922-1-direct digest sha256:df7776df2c3ecb6e3199baab24469e351b3bbef4d099d916095a99f68f183b9a records accessibility_result success
-  - durable roadmap test strategy evidence and project state now describe accessibility repeat and soak implementation plus their production boundary
+  - durable roadmap test strategy evidence and project state describe accessibility repeat and soak implementation plus their production boundary
   - issue 91 remains production-only and independent
   - no Canary or login-server repository writes were performed
 derived:
   - accessibility interaction adds unique browser evidence without unjustified cross-browser multiplication
   - isolated reusable-workflow jobs are the safest repeat model because rate-limit session cache and dependency state are fresh per iteration
   - soak signal should remain calibration-only until repeated scheduled/manual runs establish normal variance
-  - repeat and soak mechanisms can be merged with first runtime evidence explicitly pending because the current connector has no workflow-dispatch action and neither profile is a required PR blocker
+  - repeat and soak mechanisms can merge with first runtime evidence explicitly pending because the current connector has no workflow-dispatch action and neither profile is a required PR blocker
 unknown:
-  - final exact-head required-check outcome after documentation reconciliation
+  - final required-check outcome on the current-main-synchronized documentation-updated PR head
   - first scheduled/manual three-iteration stability result because no workflow-dispatch action is available in the current connector
   - first scheduled/manual soak latency and RSS baseline because no workflow-dispatch action is available in the current connector
 conflicts: []
@@ -151,7 +152,7 @@ changed_paths:
 validation:
   - command: live repository and existing acceptance profile inspection
     result: PASS
-    evidence: main state PR 103 path scope current acceptance projects and workflow inspected before implementation
+    evidence: repository state current acceptance projects and workflow inspected before implementation
   - command: Acceptance E2E and Visual UX run 29851698242 on a97a6a770fef0b8cc6d7212ad7039828a0122c87
     result: FAIL
     evidence: existing WebKit portability privileged flow exposed an MFA navigation race; no accessibility result was reached
@@ -164,9 +165,12 @@ validation:
   - command: artifact acceptance-e2e-critical-29853941922-1-direct
     result: PASS
     evidence: accessibility 3 tests 0 failures 0 skipped; wall-clock 6 seconds; aggregate AUTOMATED_E2E_CRITICAL_PASS
+  - command: compare main 4f65e91b7d1369a2ed11a0c06077f3f71a0f88da to synchronized task head 41dc8d8db379c88f6aa45528e2a8b14ee00b9fad
+    result: PASS
+    evidence: ahead 1 behind 0 with exactly the 14 expected task-owned changed paths
 blockers:
   - none
-next_action: Verify PR 111 final documentation-updated exact head against all required checks, confirm branch synchronization and clean ownership/review scope, then merge only if the exact-head gate is fully green.
+next_action: Verify PR 111 current-main-synchronized final head against all required checks, confirm branch synchronization and clean ownership/review scope, then merge only if the exact-head gate is fully green.
 ```
 
 ## Notes
