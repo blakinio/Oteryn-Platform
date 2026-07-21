@@ -5,6 +5,9 @@ const outputDir = process.env.ACCEPTANCE_OUTPUT_DIR ?? '../../artifacts/acceptan
 
 export default defineConfig({
   testDir: './tests',
+  // The original monolithic serial acceptance spec is retained as historical source
+  // while the executable suite uses isolated, independently seeded scenarios.
+  testIgnore: '**/full-acceptance.spec.mjs',
   outputDir,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
