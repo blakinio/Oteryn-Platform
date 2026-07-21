@@ -3,29 +3,52 @@
 @section('title', 'Manage News')
 
 @section('content')
-    <h2>News</h2>
-    <p><a href="{{ route('admin.news.create') }}">Create news post</a></p>
+    <div class="page-header">
+        <p class="eyebrow">Content</p>
+        <h1>News</h1>
+        <p class="muted">Create and maintain public news posts and their publication state.</p>
+    </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Title</th>
-                <th>Slug</th>
-                <th>Publication</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach ($posts as $post)
-                <tr>
-                    <td>{{ $post->title }}</td>
-                    <td>{{ $post->slug }}</td>
-                    <td>{{ $post->published_at?->format('Y-m-d H:i') ?? 'Draft' }}</td>
-                    <td><a href="{{ route('admin.news.edit', $post) }}">Edit</a></td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+    <div class="action-row">
+        <a class="button" href="{{ route('admin.news.create') }}">Create news post</a>
+    </div>
 
-    {{ $posts->links() }}
+    @if ($posts->count() === 0)
+        <div class="empty-state">
+            <strong>No news posts yet.</strong>
+            <p>Create a post to begin managing public news.</p>
+        </div>
+    @else
+        <div class="table-region" tabindex="0" aria-label="News management table, horizontally scrollable on small screens">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">Title</th>
+                        <th scope="col">Slug</th>
+                        <th scope="col">Publication</th>
+                        <th scope="col">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($posts as $post)
+                        <tr>
+                            <td>{{ $post->title }}</td>
+                            <td>{{ $post->slug }}</td>
+                            <td>
+                                @if ($post->published_at)
+                                    <span class="badge badge-success">Published</span><br>
+                                    <span class="muted">{{ $post->published_at->format('Y-m-d H:i') }}</span>
+                                @else
+                                    <span class="badge badge-warning">Draft</span>
+                                @endif
+                            </td>
+                            <td><a class="button button-secondary" href="{{ route('admin.news.edit', $post) }}">Edit</a></td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    <div class="pagination">{{ $posts->links() }}</div>
 @endsection
