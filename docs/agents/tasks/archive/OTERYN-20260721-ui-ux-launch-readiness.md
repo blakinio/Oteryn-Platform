@@ -58,7 +58,8 @@ owned_paths:
   - scripts/acceptance/tests/mfa-security-acceptance.spec.mjs
   - scripts/acceptance/tests/password-change-acceptance.spec.mjs
   - scripts/acceptance/tests/password-recovery-acceptance.spec.mjs
-  - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
+  - docs/agents/tasks/archive/OTERYN-20260721-ui-ux-launch-readiness.md
+  - docs/agents/ACTIVE_WORK.md
 modules:
   - WebCMS
   - PublicGameData
@@ -112,10 +113,10 @@ The screenshots were visually reviewed through the generated contact sheet and r
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T12:05:00+02:00
-head: f40cf02de39f9908416c80b91d1007d589fe0b5b
-branch: task/OTERYN-20260721-ui-ux-launch-readiness
-pr: 77
+updated_at: 2026-07-21T12:45:53+02:00
+head: 59e89191df0f4654bc66c595024bf287a85e6edb
+branch: main
+pr: 84
 status: ready
 context_routes:
   - web-cms
@@ -143,17 +144,20 @@ owned_paths:
   - scripts/acceptance/tests/mfa-security-acceptance.spec.mjs
   - scripts/acceptance/tests/password-change-acceptance.spec.mjs
   - scripts/acceptance/tests/password-recovery-acceptance.spec.mjs
-  - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
+  - docs/agents/tasks/archive/OTERYN-20260721-ui-ux-launch-readiness.md
+  - docs/agents/ACTIVE_WORK.md
 proven:
   - PR #67 remains the source of merged functional acceptance automation; Functional Acceptance is STAGING_PROVEN and was not downgraded by UI work.
   - PR #76 merged the authoritative UI architecture, design-system and responsive-strategy contract before this implementation completed.
-  - PR #77 implements the bounded presentation remediation across public, identity/MFA/account-operation, character, administrator and error surfaces.
+  - PR #77 was squash-merged as 1e6e21f0963406d4e58c39b347a49cfa4529bd1c after its final head 354e49ff85ef8a23048b6ac88febdc1f7ba2f58e passed CI run 29822847917, Agent Governance run 29822848029, Phase 7 Production-Like Validation run 29822847967, Platform DB Outage Validation run 29822847971 and Acceptance E2E and Visual UX run 29822847923.
   - Exact implementation SHA f40cf02de39f9908416c80b91d1007d589fe0b5b passed CI run 29818968619, Agent Governance run 29818968514, Phase 7 Production-Like Validation run 29818968506, Platform DB Outage Validation run 29818968594 and full Acceptance E2E and Visual UX run 29818968552.
   - Full acceptance run 29818968552 completed both Execute browser acceptance profile and Execute bounded exploratory visual and accessibility pass successfully.
   - Visual artifact 8490681703 / acceptance-e2e-29818968552-1 has digest sha256:9424a5244612de666f1dbbdcf6b4833cd6f638dd57d484b3c9125357e50ea16e and contains 71 screenshots plus contact sheet and JSON metrics.
   - Final measured visual metrics are 0 status mismatches, 0 horizontal overflow, 0 unlabeled controls, 0 sampled low-contrast surfaces, 0 focus-not-observed surfaces and 0 raw technical messages.
   - The six browser error surfaces are only the expected console resource messages for the intentionally exercised 403, 404 and 503 responses; no page errors were recorded.
   - Missing Account Overview/provisioning-status UX is split into issue #81 because no current route/read model supplies that surface and this task is forbidden from changing backend/provisioning semantics.
+  - Validation-only PR #80 was closed without merge after final exact-SHA evidence collection completed.
+  - PR #84 was squash-merged as 59e89191df0f4654bc66c595024bf287a85e6edb after Agent Governance run 29823214518, CI run 29823214493, Phase 7 Production-Like Validation run 29823214469 and Platform DB Outage Validation run 29823214581 all passed; it archived this task record, removed the active copy and updated ACTIVE_WORK.md.
 derived:
   - All currently delivered presentation surfaces covered by the 71-screen acceptance inventory satisfy this task's measured launch-readiness UI/UX criteria.
   - The broader user-requested Visual/UX launch gate cannot be declared globally PASS while issue #81 remains open because the requested account/dashboard and Canary provisioning-status surfaces are still not delivered.
@@ -205,28 +209,27 @@ changed_paths:
   - scripts/acceptance/tests/mfa-security-acceptance.spec.mjs
   - scripts/acceptance/tests/password-change-acceptance.spec.mjs
   - scripts/acceptance/tests/password-recovery-acceptance.spec.mjs
+  - docs/agents/ACTIVE_WORK.md
   - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
+  - docs/agents/tasks/archive/OTERYN-20260721-ui-ux-launch-readiness.md
 validation:
-  - command: exact-head CI
+  - command: exact-head full repository gate set before merge of PR #77
     result: PASS
-    evidence: run 29818968619 on f40cf02de39f9908416c80b91d1007d589fe0b5b
-  - command: exact-head Agent Governance
+    evidence: CI 29822847917; Agent Governance 29822848029; Phase 7 Production-Like Validation 29822847967; Platform DB Outage Validation 29822847971; Acceptance E2E and Visual UX 29822847923 on head 354e49ff85ef8a23048b6ac88febdc1f7ba2f58e
+  - command: squash-merge PR #77 with expected head 354e49ff85ef8a23048b6ac88febdc1f7ba2f58e
     result: PASS
-    evidence: run 29818968514 on f40cf02de39f9908416c80b91d1007d589fe0b5b
-  - command: exact-head Phase 7 Production-Like Validation
+    evidence: merged=true; merge commit 1e6e21f0963406d4e58c39b347a49cfa4529bd1c
+  - command: archive-cleanup gate set on PR #84 head 6ec43abf8712e60729e09233031d971dc228269a
     result: PASS
-    evidence: run 29818968506 on f40cf02de39f9908416c80b91d1007d589fe0b5b
-  - command: exact-head Platform DB Outage Validation
+    evidence: Agent Governance 29823214518; CI 29823214493; Phase 7 Production-Like Validation 29823214469; Platform DB Outage Validation 29823214581
+  - command: squash-merge PR #84 with expected head 6ec43abf8712e60729e09233031d971dc228269a
     result: PASS
-    evidence: run 29818968594 on f40cf02de39f9908416c80b91d1007d589fe0b5b
-  - command: exact-head full Acceptance E2E and Visual UX
-    result: PASS
-    evidence: run 29818968552; artifact 8490681703; 71 screenshots; 0 measured visual blockers
+    evidence: merged=true; merge commit 59e89191df0f4654bc66c595024bf287a85e6edb
 blockers:
   - issue #81 — authenticated Account Overview and provisioning-status UX requires separate read-model/controller work before broader launch-scope Visual/UX closure
-next_action: Merge PR #77 after current-head checks pass, then archive this task record and continue issue #81 as the separate launch-scope UX dependency.
+next_action: Execute issue #81 as the separate Account Overview/provisioning-status dependency.
 ```
 
 ## Notes
 
-This task is complete for its bounded presentation-only remediation. The test changes are limited to presentation regression and acceptance-locator compatibility updates. Issue #81 intentionally owns the missing account/provisioning surface so no backend/security/integration semantics are hidden in this PR.
+This task is complete and archived. The test changes were limited to presentation regression and acceptance-locator compatibility updates. Issue #81 intentionally owns the missing account/provisioning surface so no backend/security/integration semantics are hidden in this task.
