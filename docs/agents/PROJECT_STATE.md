@@ -85,7 +85,7 @@ Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_E
 
 The authoritative fail-closed gate is `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`.
 
-PR #92 prepares `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md` as the non-secret execution record for issue #91. The evidence record does not itself prove production; every production-specific fact starts as `UNKNOWN` until directly verified against the exact deployed release.
+PR #92 / `c18432df6b387932aa04e1eb269677c9078d9063` prepared `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md` as the non-secret execution record for issue #91. The evidence record does not itself prove production; every production-specific fact starts as `UNKNOWN` until directly verified against the exact deployed release.
 
 Controlled staging cannot prove the final production:
 
@@ -156,13 +156,13 @@ No Canary/login-server repository was modified by Phase 7 work or the production
 
 ## Current active task
 
-`OTERYN-20260721-production-go-live-verification-prep` / PR #92.
+None.
 
-Repository-only scope: prepare a fail-closed non-secret production verification evidence packet for issue #91. It does not perform production deployment, production mutation smoke or cross-repository writes.
+Repository-only Production Go-Live verification preparation is complete and archived. Issue #91 is the durable tracker for actual production execution.
 
 ## Recommended next work
 
-Complete and merge PR #92, then leave issue #91 blocked until the exact final deployed production SHA, explicit production deployment/verification authorization and production evidence access are available. At that point execute only the authoritative Production Go-Live Gate and final production smoke against the exact deployed release.
+Resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record direct evidence in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployed release.
 
 Do not repeat the closed staging validation unless the production candidate code or relevant contracts change materially, and do not claim production readiness from staging evidence alone.
 
