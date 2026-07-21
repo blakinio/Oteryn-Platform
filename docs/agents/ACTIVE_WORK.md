@@ -5,10 +5,9 @@ Convenience index only. Individual active task records, live PRs and Git state a
 ## Active tasks
 
 - `OTERYN-20260721-functional-acceptance-closure`
-  - branch: `task/OTERYN-20260721-functional-acceptance-closure`
-  - PR: #75
-  - status: validating final matrix reconciliation and current-head checks
-  - goal: finalize the durable Functional Acceptance Matrix from merged evidence and leave production-only verification separate.
+  - PR #75 merged as `4fc6fcccea00bdd8d7679595b92d189cb572dd35`
+  - status: completed; active task record pending archive after compact handoff
+  - result: Functional Acceptance is `STAGING_PROVEN` for the currently delivered staging-verifiable functional surface; production-only verification remains separate.
 
 - `OTERYN-20260721-ui-ux-launch-readiness`
   - status: separate presentation-layer follow-up
@@ -24,6 +23,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 - PR #67 / `517968539bdfd7d189677b669bf0899c35fccec1` — issues #68-#70 closed with exact-SHA production-like browser acceptance evidence classified `STAGING_PROVEN`.
 - PR #73 / `06d8d94aafd73de996eb4ea93705e8a45fbadafb` — issue #71 closed with controlled Platform DB outage evidence classified `STAGING_PROVEN` for that staging failure path only.
 - PR #74 / `24eaa4ca5e38bb255db95a989c0ff02e954360f3` — issue #72 closed with focused CMS publication-state and privileged-audit regressions; no runtime defect found.
+- PR #75 / `4fc6fcccea00bdd8d7679595b92d189cb572dd35` — final Functional Acceptance matrix reconciliation merged; FAV-01 through FAV-05 are closed for the delivered staging-verifiable scope.
 
 ## Current project phase
 
@@ -43,9 +43,9 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-Complete PR #75 current-head validation and merge the final Functional Acceptance reconciliation. Production-only smoke remains separate and must run only against the exact final deployed SHA.
+Continue the independent Visual / UI / UX launch-readiness task on its owned presentation paths. Production-only smoke remains separate and must run only against the exact final deployed SHA when production access and deployment authorization are available.
 
-The independent Visual / UI / UX task may continue on its own owned paths. It must not change backend business logic, authentication/session policy, RBAC semantics, database ownership or Canary integration contracts merely to make the visual gate pass.
+The UI/UX task must not change backend business logic, authentication/session policy, RBAC semantics, database ownership or Canary integration contracts merely to make the visual gate pass.
 
 ## Remaining cross-repository dependency
 
