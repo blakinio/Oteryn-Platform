@@ -1,0 +1,13 @@
+{
+  "name": "oteryn-acceptance-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "test": "playwright test --grep-invert \"Flow 3 — password recovery uses real test SMTP, revokes old sessions and rejects token replay|Password change — authenticated change revokes all existing sessions and requires the new password|Flow 5 — character validation, reserved/duplicate/quota/ownership/idempotency boundaries|Flow 6 — public game data, pagination, empty and controlled dependency-failure states\"",
+    "test:smoke": "playwright test --grep @smoke"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0"
+  }
+}
