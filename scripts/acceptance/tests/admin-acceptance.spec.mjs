@@ -53,7 +53,7 @@ test('Flows 7-9 — admin MFA/RBAC, CMS lifecycle and audit evidence', async ({ 
   runPhpState('unknown-permission-denied', adminEmail);
 
   await page.goto('/admin');
-  await expect(page.getByRole('heading', { name: 'Oteryn Admin' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Administration' })).toBeVisible();
 
   await logout(page);
   await login(page, adminEmail, adminPassword);
@@ -61,7 +61,7 @@ test('Flows 7-9 — admin MFA/RBAC, CMS lifecycle and audit evidence', async ({ 
   await completeMfaChallenge(page, adminCode);
   adminLastTotp = adminCode;
   await page.goto('/admin');
-  await expect(page.getByRole('heading', { name: 'Oteryn Admin' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Administration' })).toBeVisible();
 
   await page.goto('/admin/news/create');
   await page.getByLabel('Slug').fill(newsSlug);
