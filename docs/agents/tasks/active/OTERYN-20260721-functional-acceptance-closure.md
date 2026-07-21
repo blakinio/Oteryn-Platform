@@ -6,7 +6,7 @@ required_reads:
   - docs/testing/FUNCTIONAL_ACCEPTANCE_MATRIX.md
   - docs/testing/PRODUCTION_SMOKE_CHECKLIST.md
 search_first:
-  - PR #67 and issues #68 #69 #70 for final live-acceptance evidence
+  - PR #75 merged state and current main checkpoint before archive
   - open PRs and active tasks overlapping functional acceptance matrix ownership
 optional_reads:
   - docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md
@@ -30,6 +30,7 @@ Reconcile the Functional Acceptance Matrix once all bounded follow-up evidence i
 - [x] Mark overall Functional Acceptance `STAGING_PROVEN` only after every staging-verifiable critical flow and required failure/authorization path is directly supported by the composed evidence set.
 - [x] Preserve all production smoke facts as non-passing until final production execution.
 - [x] Pass required exact-head repository checks before merge.
+- [x] Squash-merge PR #75 and record the merged task state.
 
 ## Ownership
 
@@ -58,9 +59,9 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T10:22:00+02:00
-head: 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
-branch: task/OTERYN-20260721-functional-acceptance-closure
+updated_at: 2026-07-21T10:25:00+02:00
+head: 22dc3ec18e3a730917413178f40324ba39ae9369
+branch: main
 pr: 75
 status: ready
 context_routes:
@@ -83,19 +84,21 @@ proven:
   - Issues #68, #69 and #70 were closed completed after durable evidence comments were added; the classification is STAGING_PROVEN only.
   - PR #73 merged as 06d8d94aafd73de996eb4ea93705e8a45fbadafb and issue #71 is closed with controlled Platform DB outage evidence classified STAGING_PROVEN for that staging failure path only.
   - PR #74 merged as 24eaa4ca5e38bb255db95a989c0ff02e954360f3 and issue #72 is closed; focused news/page publication-state and privileged-audit regressions passed without runtime product changes.
-  - The Functional Acceptance Matrix has been reconciled from merged FAV-01 through FAV-05 evidence and now classifies the currently delivered staging-verifiable functional surface as STAGING_PROVEN while preserving production as UNKNOWN/pending.
-  - PR #75 validated content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd passed CI run 29813533874 / #864, Agent Governance run 29813533972 / #784, Phase 7 Production-Like Validation run 29813533997 / #104 and Platform DB Outage Validation run 29813533893 / #34.
-  - PR #75 has no review submissions or unresolved review threads and its changed-file set is limited to the functional-acceptance matrix and owned agent-governance task/index records.
+  - The Functional Acceptance Matrix was reconciled from merged FAV-01 through FAV-05 evidence and classifies the currently delivered staging-verifiable functional surface as STAGING_PROVEN while preserving production as UNKNOWN/pending.
+  - PR #75 checkpoint-only final head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33 passed CI run 29813862152 / #877, Agent Governance run 29813862283 / #797, Phase 7 Production-Like Validation run 29813862211 / #117 and Platform DB Outage Validation run 29813862315 / #47.
+  - PR #75 was marked ready and squash-merged with expected head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33 as merge commit 4fc6fcccea00bdd8d7679595b92d189cb572dd35.
+  - Main ACTIVE_WORK was checkpointed after merge at commit 22dc3ec18e3a730917413178f40324ba39ae9369 and records this task as completed pending archive.
+  - Issues #68 through #72 are closed and no remaining functional-acceptance staging gap is known for the currently delivered scope.
   - Visual / UI / UX Acceptance remains a separate FAIL gate and was not promoted by this functional closure.
-  - This task changes documentation/governance state only; no runtime application, authentication, authorization, session, database, Canary or login-server code is changed.
-  - Trust boundary affected: none; this task records evidence for existing Platform Identity, administrator and Platform/Canary dependency boundaries without altering them.
+  - This task changed documentation/governance state only; no runtime application, authentication, authorization, session, database, Canary or login-server code was changed.
+  - Trust boundary affected: none; this task recorded evidence for existing Platform Identity, administrator and Platform/Canary dependency boundaries without altering them.
   - Authentication/authorization invariant affected: none; existing auth, MFA, session-revocation and deny-by-default RBAC behavior is unchanged.
   - Canary/login-server schema or session compatibility changes: none.
   - Rollback requirement: no runtime rollback is required; documentation and issue-state changes are reversible repository/project-management changes.
   - Secrets or production-only configuration involved: none; durable evidence contains identifiers and non-secret artifact digests only.
 derived:
   - FAV-01 through FAV-05 no longer block aggregate staging functional acceptance for the currently delivered scope.
-  - Full Functional Acceptance can be classified STAGING_PROVEN without claiming that the final production environment is verified.
+  - Full Functional Acceptance is STAGING_PROVEN without claiming that the final production environment is verified.
   - Production smoke, the Production Go-Live Gate, Visual / UX Acceptance and any separately authorized Platform game-login bridge remain independent gates.
 unknown:
   - final production environment facts and final production smoke result
@@ -103,7 +106,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: none
-  evidence: all functional-acceptance follow-up evidence is merged, issues #68-#72 are closed and required checks passed on validated PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+  evidence: functional acceptance closure is merged; only archival of this completed active task record remains
 rejected_hypotheses:
   - Aggregate Functional Acceptance must remain UNKNOWN after PR #67 merge: rejected by merged exact-SHA browser acceptance plus PR #73 and PR #74 focused evidence.
   - STAGING_PROVEN implies production readiness: rejected; production-only facts remain UNKNOWN and the Production Go-Live Gate remains pending.
@@ -124,21 +127,24 @@ validation:
   - command: merged follow-up verification for PR #73/#71 and PR #74/#72
     result: PASS
     evidence: both bounded follow-ups are merged and issues #71/#72 are closed
-  - command: CI run 29813533874 / #864 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+  - command: CI run 29813862152 / #877 on PR #75 checkpoint-only final head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33
     result: PASS
     evidence: GitHub Actions conclusion success
-  - command: Agent Governance run 29813533972 / #784 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+  - command: Agent Governance run 29813862283 / #797 on PR #75 checkpoint-only final head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33
     result: PASS
     evidence: GitHub Actions conclusion success
-  - command: Phase 7 Production-Like Validation run 29813533997 / #104 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+  - command: Phase 7 Production-Like Validation run 29813862211 / #117 on PR #75 checkpoint-only final head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33
     result: PASS
     evidence: GitHub Actions conclusion success
-  - command: Platform DB Outage Validation run 29813533893 / #34 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+  - command: Platform DB Outage Validation run 29813862315 / #47 on PR #75 checkpoint-only final head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33
     result: PASS
     evidence: GitHub Actions conclusion success
+  - command: squash-merge PR #75 with expected head 8d7b00cb51167fd2e22b05fb3a22c6c1f41c6d33
+    result: PASS
+    evidence: merged=true; merge commit 4fc6fcccea00bdd8d7679595b92d189cb572dd35
 blockers:
   - none
-next_action: Verify required checks on the checkpoint-only PR #75 head, then mark the PR ready and squash-merge it if the merge gate remains satisfied.
+next_action: Archive this completed task record under docs/agents/tasks/archive/OTERYN-20260721-functional-acceptance-closure.md and remove the active copy without changing the accepted functional, visual or production classifications.
 ```
 
 ## Notes
