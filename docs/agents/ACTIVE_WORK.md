@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260721-e2e-public-dependency-recovery` — issue #105; add a bounded Chromium resilience profile proving browser-visible Canary DB and Redis dependency failure plus successful recovery after deterministic restoration.
+None.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -20,6 +20,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 - PR #100 / `8a4fd46db04d2476b6fea7fb47fdd58443548ac3` — archived the completed migration/rollback validation task and closed its governance lifecycle.
 - PR #102 / `ee235cbbdd379a5047fede98ff79a0e35e22ce76` — issue #101 closed; Phase 7 now proves exact response `X-Request-ID` to matching structured request-completion log correlation with bounded method/status agreement and non-secret `STAGING_PROVEN` evidence.
 - PR #104 / `18bd5b2c3b4496677cc58df41fd50c6387e9e6f8` — archived the completed observability-correlation task and closed its governance lifecycle.
+- PR #106 / `8030f98d7280c16705f34f2d29c8ebd7fc85f285` — issue #105 closed; required acceptance now includes zero-retry Chromium public dependency resilience proving Canary DB and Redis failure, deterministic restoration and successful browser recovery.
 
 ## Current project phase
 
@@ -41,9 +42,9 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-The active repository/staging task is issue #105: prove deterministic public dependency failure **and recovery** at the browser boundary for Canary read access and Redis runtime ACL access. It must restore all acceptance-scoped mutations before completion and must not weaken existing failure semantics.
+No repository/staging E2E task is currently active.
 
-Further accessibility-interaction, repeated-run and soak slices remain optional incremental work under ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`. Start only bounded work that adds unique evidence beyond existing browser, Phase 7, Platform DB outage, feature and integration coverage.
+Further accessibility-interaction, repeated-run and soak slices remain optional incremental work under ADR 0008 and `docs/testing/E2E_COVERAGE_ROADMAP.md`. Additional resilience work should start only for a distinct recovery gap beyond current Canary/Redis, Phase 7, Platform DB outage, feature and integration evidence.
 
 Issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
