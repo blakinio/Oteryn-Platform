@@ -59,10 +59,10 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T12:24:32+02:00
-head: 054bfc0223e93566db1e9fb08a13ffdbcf604f03
+updated_at: 2026-07-21T12:26:46+02:00
+head: 4e6998cf6488a8eced7a76ad8aee637d9132ade5
 branch: task/OTERYN-20260721-functional-acceptance-archive
-pr: none
+pr: 82
 status: ready
 context_routes:
   - testing
@@ -92,6 +92,7 @@ proven:
   - PR #75 remains merged and closed with merge commit 4fc6fcccea00bdd8d7679595b92d189cb572dd35.
   - No open pull request was found claiming Functional Acceptance Matrix ownership or matching its repository path during the pre-archive overlap check.
   - The still-active OTERYN-20260721-functional-visual-acceptance record explicitly excludes docs/testing/FUNCTIONAL_ACCEPTANCE_MATRIX.md ownership and consumes the functional gate as an independent result; its owned paths are acceptance workflow/scripts/docs and visual task records.
+  - PR #82 is the archival-only follow-up from main@054bfc0223e93566db1e9fb08a13ffdbcf604f03; its diff only moves this completed task to archive and removes its stale Active Work entry.
   - Issues #68 through #72 are closed and no remaining functional-acceptance staging gap is known for the currently delivered scope.
   - Visual / UI / UX Acceptance remains a separate FAIL gate and was not promoted by this functional closure.
   - This task changed documentation/governance state only; no runtime application, authentication, authorization, session, database, Canary or login-server code was changed.
@@ -156,9 +157,12 @@ validation:
   - command: active task overlap inspection
     result: PASS
     evidence: functional-visual-acceptance explicitly does not own docs/testing/FUNCTIONAL_ACCEPTANCE_MATRIX.md and keeps the visual gate independent
+  - command: create PR #82 for archival-only move and Active Work cleanup
+    result: PASS
+    evidence: base main@054bfc0223e93566db1e9fb08a13ffdbcf604f03; archival PR created with only documentation/governance changes
 blockers:
   - none
-next_action: Continue the independent OTERYN-20260721-ui-ux-launch-readiness task; keep production smoke separate and do not change the STAGING_PROVEN functional classification without new evidence.
+next_action: Merge PR #82 after its required checks pass; then this task is complete.
 ```
 
 ## Notes
