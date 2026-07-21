@@ -12,7 +12,7 @@
     <div class="header-inner">
         <a class="brand" href="{{ route('home') }}" aria-label="Oteryn Platform home">
             <span class="brand-mark" aria-hidden="true">OT</span>
-            <span>Oteryn Platform</span>
+            <span class="brand-label">Oteryn Platform</span>
         </a>
         <div class="account-actions">
             <a class="nav-link" href="{{ route('home') }}">Public site</a>
