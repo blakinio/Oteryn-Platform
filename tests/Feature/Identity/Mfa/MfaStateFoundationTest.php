@@ -3,6 +3,7 @@
 namespace Tests\Feature\Identity\Mfa;
 
 use App\Audit\SecurityEventRecorder;
+use App\Identity\Actions\RevokeIdentityGameAuthorizations;
 use App\Identity\Actions\RevokeIdentityWebSessions;
 use App\Identity\Mfa\ResetIdentityMfa;
 use App\Identity\Models\Identity;
@@ -87,6 +88,7 @@ final class MfaStateFoundationTest extends TestCase
         $securityEvents = new SecurityEventRecorder;
         $resetMfa = new ResetIdentityMfa(
             new RevokeIdentityWebSessions($securityEvents),
+            new RevokeIdentityGameAuthorizations($securityEvents),
             $securityEvents,
         );
 
@@ -99,6 +101,7 @@ final class MfaStateFoundationTest extends TestCase
         self::assertNull($fresh->two_factor_last_used_timestep);
         self::assertFalse($fresh->hasConfirmedMfa());
         self::assertSame(1, $fresh->web_session_generation);
+        self::assertSame(1, $fresh->game_auth_generation);
 
         $this->assertDatabaseHas('identity_security_events', [
             'identity_id' => $identity->id,
@@ -107,6 +110,10 @@ final class MfaStateFoundationTest extends TestCase
         $this->assertDatabaseHas('identity_security_events', [
             'identity_id' => $identity->id,
             'event_type' => SecurityEventRecorder::IDENTITY_WEB_SESSIONS_REVOKED,
+        ]);
+        $this->assertDatabaseHas('identity_security_events', [
+            'identity_id' => $identity->id,
+            'event_type' => SecurityEventRecorder::IDENTITY_GAME_AUTHORIZATIONS_REVOKED,
         ]);
 
         $this->get('/')->assertOk();
