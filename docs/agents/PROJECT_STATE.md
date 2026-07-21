@@ -52,9 +52,7 @@ Platform web authentication remains separate from the still-unimplemented author
 
 ## Phase 7 controlled production-like validation
 
-PR #63 merged with exact-head controlled staging evidence classified `STAGING_PROVEN` for its documented boundaries.
-
-The production-like path proves, among other things:
+The production-like path proves, within its controlled staging boundary:
 
 - clean deployment, migrations, controlled rollback, interrupted-release isolation and redeploy;
 - provider-independent production configuration guardrails;
@@ -78,25 +76,29 @@ Merged slices:
 - PR #99 / `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` — existing-data migration, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy validation.
 - PR #102 / `ee235cbbdd379a5047fede98ff79a0e35e22ce76` — exact response `X-Request-ID` to structured request-completion log correlation.
 - PR #106 / `8030f98d7280c16705f34f2d29c8ebd7fc85f285` — zero-retry Chromium public dependency recovery for Canary read grants and Redis `HMGET` ACL restoration.
+- PR #111 / `740d9879b341d98e4cf0ef0e7f076b43cd86cdaf` — required bounded keyboard/focus accessibility plus reusable acceptance execution, scheduled/manual three-iteration stability measurement and bounded read-only public soak calibration.
 
-Active PR #111 / issue #110 extends the programme with:
+PR #111 final head `66a1acb2fd508210c3bbd941ac1036a73af9be32`, synchronized with the then-current `main`, passed:
 
-- required bounded `accessibility-chromium` keyboard/focus interaction coverage;
-- reusable exact-SHA acceptance workflow support;
-- scheduled/manual three-iteration zero-retry `critical` stability measurement using fresh isolated jobs;
-- scheduled/manual bounded read-only public soak with navigation-time, Laravel process-tree RSS and Redis key-count calibration metrics.
+- CI run `29855146602`;
+- Agent Governance run `29855146606`;
+- Platform DB Outage Validation run `29855146617`;
+- Phase 7 Production-Like Validation run `29855146614`;
+- Acceptance E2E and Visual UX run `29855146601`.
 
-First successful accessibility implementation evidence is Acceptance E2E and Visual UX run `29853941922` on exact SHA `3bd1e4901a71841bc4593ec7e4efb98866c8c30f`:
+The required pull-request `critical` profile now composes:
 
-- smoke: PASS;
-- portability: PASS across Chromium/Firefox/WebKit;
-- responsive: PASS across desktop/tablet/mobile;
-- resilience: PASS;
-- accessibility: PASS, 3 tests, 0 failures, 0 skipped, 6 seconds wall-clock profile duration.
+- primary Chromium smoke;
+- bounded Chromium/Firefox/WebKit portability;
+- bounded desktop/tablet/mobile responsive validation;
+- bounded Chromium public dependency resilience;
+- bounded Chromium keyboard/focus accessibility interaction.
 
-The required pull-request `critical` profile now composes smoke + portability + responsive + resilience + accessibility. The `full` profile requires the full primary Chromium baseline plus resilience and accessibility before it can claim `FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN` or execute the visual/accessibility collector.
+The `full` profile requires the full primary Chromium baseline plus resilience and accessibility before it can claim `FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN` or execute the visual/accessibility collector.
 
-Repeated-run and soak workflow mechanisms are repository-proven on PR #111 but their first scheduled/manual runtime evidence remains pending; the current connector does not expose workflow dispatch. They remain non-blocking calibration/stability profiles.
+The merged stability workflow runs three fresh isolated zero-retry `critical` jobs on its scheduled/manual cadence. The merged soak workflow runs a bounded read-only Chromium public-surface soak and records navigation-time, Laravel process-tree RSS and Redis key-count calibration metrics without arbitrary performance thresholds.
+
+Their first scheduled/manual runtime measurements remain pending. This is intentional: they are non-blocking evidence profiles until measured variance justifies stronger gates.
 
 Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
 
@@ -171,13 +173,13 @@ No Canary/login-server repository was modified by Phase 7 work, production-verif
 
 ## Current active task
 
-`OTERYN-20260721-e2e-accessibility-stability-soak` on branch `task/OTERYN-20260721-e2e-accessibility-stability-soak`, draft PR #111 / issue #110.
+None.
+
+Repository/staging E2E implementation hardening is closed through PR #111. Scheduled stability/soak workflows now accumulate further non-blocking evidence over time.
 
 ## Recommended next work
 
-Finish PR #111 by reconciling its exact-head checks after the final documentation checkpoint and merge only if the branch is current with `main`, review/ownership scope is clean and all required exact-head gates are green.
-
-After PR #111, do not add more repository/staging E2E solely to increase test count. Repeated-run and soak evidence should accumulate through their scheduled/manual workflows; promote performance/stability thresholds only after measured variance justifies them.
+Do not add more repository/staging E2E solely to increase test count. Review scheduled repeat/soak evidence when it becomes available and promote thresholds only after measured variance justifies them.
 
 Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
