@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: native-oauth-dependency-bootstrap-${{ github.ref }}
@@ -17,8 +17,10 @@ jobs:
     if: github.event.pull_request.number == 119
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -32,6 +34,20 @@ jobs:
 
       - name: Validate Composer files
         run: composer validate --strict
+
+      - name: Commit locked Composer files
+        shell: bash
+        run: |
+          if git diff --quiet -- composer.json composer.lock; then
+            echo "Composer files are already locked."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add composer.json composer.lock
+          git commit -m "build(auth): lock Laravel Passport 13"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
 
       - name: Upload locked Composer files
         uses: actions/upload-artifact@v4
