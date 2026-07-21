@@ -7,6 +7,8 @@ use Illuminate\Contracts\Auth\CanResetPassword as CanResetPasswordContract;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Laravel\Passport\Contracts\OAuthenticatable;
+use Laravel\Passport\HasApiTokens;
 
 /**
  * @property int $id
@@ -20,9 +22,10 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $two_factor_confirmed_at
  * @property int|null $two_factor_last_used_timestep
  */
-final class Identity extends Authenticatable implements CanResetPasswordContract
+final class Identity extends Authenticatable implements CanResetPasswordContract, OAuthenticatable
 {
     use CanResetPasswordTrait;
+    use HasApiTokens;
     use Notifiable;
 
     protected $table = 'identities';
