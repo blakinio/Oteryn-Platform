@@ -41,9 +41,8 @@ Implement the public homepage visual north-star from `VISUAL_DIRECTION.md` as an
 owned_paths:
   - resources/views/game/layout.blade.php
   - resources/views/home.blade.php
-  - public/css/app.css
+  - public/css/portal.css
   - public/images/oteryn-sigil.svg
-  - tests/Feature/HomeTest.php
   - docs/agents/tasks/active/OTERYN-20260721-public-portal-visual-identity.md
   - docs/agents/tasks/archive/OTERYN-20260721-public-portal-visual-identity.md
 modules:
@@ -63,11 +62,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T16:05:00+02:00
-head: 990ebdbbdbeb7c2c1671d715b49e4e17bea7785c
+updated_at: 2026-07-21T16:12:00+02:00
+head: 6faf213b2f1c98348ec4f3558f3f34677d7d74f7
 branch: task/OTERYN-20260721-public-portal-visual-identity
-pr: pending
-status: implementing
+pr: 95
+status: validating
 context_routes:
   - web-cms
   - testing
@@ -75,37 +74,46 @@ context_routes:
 owned_paths:
   - resources/views/game/layout.blade.php
   - resources/views/home.blade.php
-  - public/css/app.css
+  - public/css/portal.css
   - public/images/oteryn-sigil.svg
-  - tests/Feature/HomeTest.php
   - docs/agents/tasks/active/OTERYN-20260721-public-portal-visual-identity.md
   - docs/agents/tasks/archive/OTERYN-20260721-public-portal-visual-identity.md
 proven:
   - main baseline is 990ebdbbdbeb7c2c1671d715b49e4e17bea7785c.
   - docs/design/VISUAL_DIRECTION.md defines a modern dark-fantasy MMORPG portal and explicitly requires placeholder-safe layouts that work without final artwork.
-  - Existing public shell already provides responsive navigation, authenticated Account entry and guest Sign in/Create account actions.
-  - Existing homepage already exposes exact-name character search and links to Online, Highscores and Servers.
-  - Existing CSS already provides warm dark tokens, focus-visible treatment, responsive breakpoints and reduced-motion handling.
   - Open PR #94 currently changes only testing/governance documentation and does not overlap this task's owned product paths.
+  - PR #95 implements the public visual direction entirely in presentation-layer files.
+  - The implementation uses an original repository-owned SVG sigil and CSS-generated atmospheric/citadel fallback rather than copied external game/OTS assets or the generated full-page mockup PNG.
+  - Existing character-search route/form semantics are preserved.
+  - Guest hero primary action is Create account; authenticated hero primary action is Account Center; both expose Explore the world as the secondary action.
+  - Online, Highscores, Servers and News are exposed as world-navigation cards without fabricated live counts, rates, events or version claims.
 derived:
-  - The bounded implementation can be completed entirely in the presentation layer with original CSS/SVG fallback artwork and no backend changes.
+  - The current implementation materially closes the previously identified Public Game Portal atmosphere/hero gap while preserving placeholder-safe operation without commissioned artwork.
 unknown:
-  - final commissioned Oteryn hero/brand artwork is not available and is not required for this task
+  - final current-head browser/visual validation result
+  - final current-head CI and production-like gate results
 conflicts: []
 first_failure:
   marker: none
-  evidence: no overlapping product-path PR found
+  evidence: current-head workflows are still running
 rejected_hypotheses:
   - Reuse the generated homepage mockup PNG as a production background: rejected because it is a full UI concept image, not a reusable production art asset.
   - Copy an existing OTS/MMORPG theme for atmosphere: rejected by VISUAL_DIRECTION.md originality constraints.
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260721-public-portal-visual-identity.md
+  - resources/views/game/layout.blade.php
+  - resources/views/home.blade.php
+  - public/css/portal.css
+  - public/images/oteryn-sigil.svg
 validation:
   - command: live GitHub preflight
     result: PASS
     evidence: PR #94 is docs-only relative to this task's product paths
+  - command: PR #95 current-head required workflows
+    result: NOT_RUN
+    evidence: workflows on 6faf213b2f1c98348ec4f3558f3f34677d7d74f7 are still running
 blockers: []
-next_action: Implement the original public portal hero, brand sigil, character-search composition and world cards in the owned presentation files.
+next_action: Wait for PR #95 current-head workflows to complete, inspect any first failure, then run or collect full browser/visual evidence for the final implementation head.
 ```
 
 ## Notes
