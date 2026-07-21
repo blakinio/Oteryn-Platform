@@ -29,7 +29,8 @@ final class AccountOverviewController
         Request $request,
         AccountOverviewReadModel $overview,
         ProvisionCanaryAccount $provisionCanaryAccount,
-    ): RedirectResponse {
+    ): RedirectResponse
+    {
         $identity = $request->user();
 
         abort_unless($identity instanceof Identity, 403);
