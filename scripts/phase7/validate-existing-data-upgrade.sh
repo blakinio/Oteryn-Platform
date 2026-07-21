@@ -47,24 +47,13 @@ assert_dataset() {
   echo "Representative dataset intact after ${phase}."
 }
 
-stop_smoke_server() {
-  local pid_file="$1"
-  if [ -f "$pid_file" ]; then
-    local pid
-    pid="$(cat "$pid_file")"
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-    rm -f "$pid_file"
-  fi
-}
-
 run_release_smoke() {
   local release_sha="$1"
   local phase="$2"
   local port="$3"
   local release_dir="/tmp/phase7-releases/${release_sha}"
-  local pid_file="/tmp/phase7-upgrade-${phase}.pid"
   local log_file="/tmp/phase7-upgrade-${phase}.log"
+  local body_file="/tmp/phase7-upgrade-${phase}.body"
 
   ln -sfn "$release_dir" "$CURRENT_LINK"
   test "$(readlink -f "$CURRENT_LINK")" = "$release_dir"
@@ -74,27 +63,24 @@ run_release_smoke() {
     DB_DATABASE="$UPGRADE_DATABASE" php artisan production:verify-configuration
     DB_DATABASE="$UPGRADE_DATABASE" php artisan migrate:status --no-interaction >/dev/null
     DB_DATABASE="$UPGRADE_DATABASE" php artisan serve --host=127.0.0.1 --port="$port" >"$log_file" 2>&1 &
-    echo $! >"$pid_file"
+    server_pid=$!
+    trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+
+    for attempt in $(seq 1 30); do
+      if curl -fsS "http://127.0.0.1:${port}/health" >/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+
+    curl -fsS "http://127.0.0.1:${port}/health" >/dev/null
+    curl -fsS "http://127.0.0.1:${port}/news/${UPGRADE_NEWS_SLUG}" >"$body_file"
+    grep -Fq "$UPGRADE_NEWS_TITLE" "$body_file"
+    grep -Fq "$UPGRADE_NEWS_BODY" "$body_file"
+    ! grep -qi 'stack trace' "$body_file"
+    ! grep -Fq "${APP_KEY:-not-present}" "$body_file"
+    ! grep -Fq "${APP_KEY:-not-present}" "$log_file"
   )
-
-  trap 'stop_smoke_server "$pid_file"' RETURN
-
-  for attempt in $(seq 1 30); do
-    if curl -fsS "http://127.0.0.1:${port}/health" >/dev/null; then
-      break
-    fi
-    sleep 1
-  done
-
-  curl -fsS "http://127.0.0.1:${port}/health" >/dev/null
-  curl -fsS "http://127.0.0.1:${port}/news/${UPGRADE_NEWS_SLUG}" >"/tmp/phase7-upgrade-${phase}.body"
-  grep -Fq "$UPGRADE_NEWS_TITLE" "/tmp/phase7-upgrade-${phase}.body"
-  grep -Fq "$UPGRADE_NEWS_BODY" "/tmp/phase7-upgrade-${phase}.body"
-  ! grep -qi 'stack trace' "/tmp/phase7-upgrade-${phase}.body"
-  ! grep -Fq "${APP_KEY:-not-present}" "/tmp/phase7-upgrade-${phase}.body"
-
-  stop_smoke_server "$pid_file"
-  trap - RETURN
 }
 
 mysql_root -e "DROP DATABASE IF EXISTS ${UPGRADE_DATABASE}; CREATE DATABASE ${UPGRADE_DATABASE} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
