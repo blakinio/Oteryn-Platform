@@ -1,34 +1,26 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MFA challenge | Oteryn Platform</title>
-</head>
-<body>
-    <main>
+@extends('identity.layout')
+
+@section('title', 'MFA challenge')
+@section('error-title', 'Sign in could not be completed.')
+
+@section('content')
+    <div class="page-header">
+        <p class="eyebrow">Second factor</p>
         <h1>Complete your sign in</h1>
-        <p>Enter a fresh six-digit authenticator code or one unused recovery code.</p>
+        <p class="muted">Enter a fresh six-digit authenticator code or one unused recovery code.</p>
+    </div>
 
-        @if ($errors->any())
-            <div role="alert">
-                <p>Sign in could not be completed.</p>
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
+    <form class="form-stack" method="POST" action="{{ route('identity.mfa.challenge.store') }}">
+        @csrf
+        <div class="form-field">
+            <label for="code">Authenticator or recovery code</label>
+            <input id="code" name="code" type="text" autocomplete="one-time-code" maxlength="64" required autofocus>
+        </div>
+        <button type="submit">Verify and sign in</button>
+    </form>
 
-        <form method="POST" action="{{ route('identity.mfa.challenge.store') }}">
-            @csrf
-            <div>
-                <label for="code">Authenticator or recovery code</label>
-                <input id="code" name="code" type="text" autocomplete="one-time-code" maxlength="64" required autofocus>
-            </div>
-            <button type="submit">Verify and sign in</button>
-        </form>
-    </main>
-</body>
-</html>
+    <nav class="identity-links" aria-label="MFA challenge navigation">
+        <a href="{{ route('identity.login.create') }}">Start sign in again</a>
+        <a href="{{ route('home') }}">Return to the public site</a>
+    </nav>
+@endsection
