@@ -6,19 +6,24 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 - `OTERYN-20260721-functional-acceptance-closure`
   - branch: `task/OTERYN-20260721-functional-acceptance-closure`
-  - status: blocked on PR #67 / issues #68-#70
-  - goal: reconcile the Functional Acceptance Matrix once the independently owned live acceptance evidence is green and merged.
+  - PR: #75
+  - status: validating final matrix reconciliation and current-head checks
+  - goal: finalize the durable Functional Acceptance Matrix from merged evidence and leave production-only verification separate.
+
+- `OTERYN-20260721-ui-ux-launch-readiness`
+  - status: separate presentation-layer follow-up
+  - goal: resolve evidenced Visual / UI / UX launch blockers without changing backend/security/data contracts.
 
 - `OTERYN-20260721-functional-visual-acceptance`
-  - branch: `task/OTERYN-20260721-functional-visual-acceptance`
-  - draft PR: #67
-  - ownership: `.github/workflows/acceptance-validation.yml`, `scripts/acceptance/**`, `docs/acceptance/**`
-  - current blocker: exact current head still has failing Acceptance E2E and Agent Governance checks; this task owns the remaining #68-#70 live acceptance evidence path.
+  - PR #67 merged as `517968539bdfd7d189677b669bf0899c35fccec1`
+  - status: completed; active task record is pending archive by its owning task flow
+  - result: browser Functional Acceptance evidence delivered; Visual / UX Acceptance remains FAIL.
 
 ## Closed functional-acceptance follow-ups
 
-- PR #73 / `06d8d94aafd73de996eb4ea93705e8a45fbadafb` — issue #71 Platform DB outage path closed with controlled staging-only `STAGING_PROVEN` evidence.
-- PR #74 / `24eaa4ca5e38bb255db95a989c0ff02e954360f3` — issue #72 CMS publication-state and privileged-audit regressions closed; no runtime defect found.
+- PR #67 / `517968539bdfd7d189677b669bf0899c35fccec1` — issues #68-#70 closed with exact-SHA production-like browser acceptance evidence classified `STAGING_PROVEN`.
+- PR #73 / `06d8d94aafd73de996eb4ea93705e8a45fbadafb` — issue #71 closed with controlled Platform DB outage evidence classified `STAGING_PROVEN` for that staging failure path only.
+- PR #74 / `24eaa4ca5e38bb255db95a989c0ff02e954360f3` — issue #72 closed with focused CMS publication-state and privileged-audit regressions; no runtime defect found.
 
 ## Current project phase
 
@@ -29,8 +34,8 @@ Convenience index only. Individual active task records, live PRs and Git state a
 ## Operational release state
 
 - **Production Readiness: STAGING_PROVEN**
-- **Functional Acceptance: PENDING final #68-#70 live evidence reconciliation**
-- **Visual / UX Acceptance: FAIL on current delivered frontend; separate UI/UX follow-up required**
+- **Functional Acceptance: STAGING_PROVEN for the currently delivered staging-verifiable functional surface**
+- **Visual / UX Acceptance: FAIL; dedicated UI/UX launch-readiness work remains required**
 - **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
 - **Production Verification: REQUIRED BEFORE GO-LIVE**
 
@@ -38,9 +43,9 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-PR #67 must complete or release its active acceptance-harness ownership with green exact-SHA evidence for #68-#70. Then resume `OTERYN-20260721-functional-acceptance-closure`, update the durable matrix once from merged evidence, and close satisfied issues.
+Complete PR #75 current-head validation and merge the final Functional Acceptance reconciliation. Production-only smoke remains separate and must run only against the exact final deployed SHA.
 
-Production-only smoke remains separate and must run only against the final deployed SHA.
+The independent Visual / UI / UX task may continue on its own owned paths. It must not change backend business logic, authentication/session policy, RBAC semantics, database ownership or Canary integration contracts merely to make the visual gate pass.
 
 ## Remaining cross-repository dependency
 
