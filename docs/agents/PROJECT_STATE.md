@@ -87,21 +87,22 @@ Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_E
 
 ## Continuous E2E coverage hardening
 
-Task `OTERYN-20260721-e2e-coverage-hardening` / draft PR #94 extends validation beyond the already `STAGING_PROVEN` functional acceptance baseline.
+ADR 0008 plus `docs/testing/E2E_COVERAGE_ROADMAP.md` define the additive continuous-verification programme beyond the already `STAGING_PROVEN` functional acceptance baseline.
 
-The durable architecture is ADR 0008 plus `docs/testing/E2E_COVERAGE_ROADMAP.md`. The track prioritizes:
+PR #94 merged as `26ff602696c597aac0833415b0a47af5d427a52d` and delivered:
 
 - bounded Chromium/Firefox/WebKit critical portability evidence;
 - representative desktop/tablet/mobile critical journeys;
-- browser-visible authorization/security abuse boundaries;
-- representative existing-data migration/upgrade/rollback validation;
-- deterministic dependency interruption/recovery only where it adds unique evidence;
-- sanitized observability correlation;
-- scheduled/manual repeated-run and soak profiles.
+- browser-visible session rotation/cookie and foreign-ownership manipulation checks;
+- secret-safe exact-SHA evidence while preserving the full primary Chromium acceptance baseline.
+
+PR #99 / issue #98 extends the same programme at the release-validation layer. Its first implementation run `29844031564` on head `45ce658f54cbbe78652b7e8710e0cd25c7e85a2a` passed the integrated Phase 7 representative existing-data upgrade/rollback slice using rollback/base `26ff602696c597aac0833415b0a47af5d427a52d`.
+
+That slice uses an isolated synthetic Identity + published-news dataset, verifies persisted-data fingerprint preservation, candidate smoke, old-code smoke on the post-upgrade database and candidate redeploy smoke. The bootstrap implementation PR had `11 -> 11` migrations, so it proves the required mechanism without fabricating a schema delta; future migration-bearing candidates traverse the same exact-base/exact-head path.
 
 Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
 
-The existing full primary-browser production-like acceptance baseline and secret-safe artifact rules remain intact.
+All continuous-hardening evidence remains staging/repository evidence. It does not change the Production Go-Live Gate.
 
 ## Production Go-Live Gate
 
@@ -174,17 +175,19 @@ Platform-originated users still require a separately authorized authoritative ga
 
 Expected external scope remains primarily `opentibiabr/login-server`; `blakinio/canary` changes require separate explicit authorization if needed by the selected protocol.
 
-No Canary/login-server repository was modified by Phase 7 work, production-verification preparation or the E2E coverage-hardening architecture task.
+No Canary/login-server repository was modified by Phase 7 work, production-verification preparation or the E2E continuous-hardening tasks.
 
 ## Current active task
 
-`OTERYN-20260721-e2e-coverage-hardening` on branch `task/OTERYN-20260721-e2e-coverage-hardening`, draft PR #94.
+`OTERYN-20260721-e2e-migration-rollback-validation` on branch `task/OTERYN-20260721-e2e-migration-rollback-validation`, draft PR #99 / issue #98.
 
 The repository/staging hardening track can proceed independently of production access. Issue #91 remains the separate production execution tracker.
 
 ## Recommended next work
 
-Continue draft PR #94 from its active task checkpoint. Implement the first bounded P0 browser-portability/responsive hardening slice using the existing acceptance helpers and fixtures, measure CI duration/flakiness, and keep exact-SHA/browser/profile evidence secret-safe.
+Finish PR #99 by validating the documentation-updated exact head through all required checks, record the final exact-SHA evidence in the active task checkpoint, and merge only if the merge gate remains satisfied.
+
+After #99, continue only bounded E2E hardening slices that add unique evidence beyond existing Phase 7, Platform DB outage, feature and integration coverage. The next roadmap priorities are P1 resilience/evidence correlation or P2 repeated-run/soak work, not duplicate happy-path browser tests.
 
 Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available. Then execute `docs/operations/PRODUCTION_READINESS_CHECKLIST.md`, record direct evidence in `docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md`, and run `docs/testing/PRODUCTION_SMOKE_CHECKLIST.md` against that exact deployed release.
 
@@ -193,7 +196,7 @@ Do not repeat closed staging validation without a new risk/assertion, and do not
 ## High-priority remaining unknowns
 
 - authoritative Platform game-login assertion/session protocol and rollout if required for launch scope;
-- measured CI duration/flakiness impact of Firefox/WebKit on the production-like acceptance harness;
+- long-term repeated-run Firefox/WebKit flakiness beyond current bounded measurements;
 - which proposed dependency-interruption scenarios add unique evidence beyond existing Phase 7/outage validation;
 - deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
