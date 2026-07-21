@@ -4,11 +4,6 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260721-functional-acceptance-closure`
-  - PR #75 merged as `4fc6fcccea00bdd8d7679595b92d189cb572dd35`
-  - status: completed; active task record pending archive after compact handoff
-  - result: Functional Acceptance is `STAGING_PROVEN` for the currently delivered staging-verifiable functional surface; production-only verification remains separate.
-
 - `OTERYN-20260721-ui-ux-launch-readiness`
   - status: separate presentation-layer follow-up
   - goal: resolve evidenced Visual / UI / UX launch blockers without changing backend/security/data contracts.
