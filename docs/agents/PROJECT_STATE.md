@@ -89,33 +89,21 @@ Detailed evidence is maintained in `docs/operations/PRODUCTION_LIKE_VALIDATION_E
 
 ADR 0008 plus `docs/testing/E2E_COVERAGE_ROADMAP.md` define the additive continuous-verification programme beyond the already `STAGING_PROVEN` functional acceptance baseline.
 
-PR #94 merged as `26ff602696c597aac0833415b0a47af5d427a52d` and delivered:
+PR #94 merged as `26ff602696c597aac0833415b0a47af5d427a52d` and delivered bounded Chromium/Firefox/WebKit portability, representative desktop/tablet/mobile critical journeys, browser-visible session/ownership security checks and secret-safe exact-SHA evidence while preserving the full primary Chromium acceptance baseline.
 
-- bounded Chromium/Firefox/WebKit critical portability evidence;
-- representative desktop/tablet/mobile critical journeys;
-- browser-visible session rotation/cookie and foreign-ownership manipulation checks;
-- secret-safe exact-SHA evidence while preserving the full primary Chromium acceptance baseline.
+PR #99 merged as `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` and closed issue #98. The existing Phase 7 release-validation path now includes representative existing-data migration, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy smoke with separate durable `STAGING_PROVEN` evidence.
 
-PR #99 merged as `21d67c7e7edb533f9765ff96417f2ab2fbb1aea8` and closed issue #98. The existing Phase 7 release-validation path now also includes representative existing-data migration, candidate smoke, old-code rollback smoke against the post-upgrade database and candidate redeploy smoke with separate durable `STAGING_PROVEN` evidence.
+PR #102 merged as `ee235cbbdd379a5047fede98ff79a0e35e22ce76` and closed issue #101. The Phase 7 running-HTTP path now proves that one concrete application-generated response `X-Request-ID` maps to exactly one structured `http.request.completed` JSON log event with the same `request_id` and expected `GET` / `200` pair.
 
-PR #102 merged as `ee235cbbdd379a5047fede98ff79a0e35e22ce76` and closed issue #101. The Phase 7 running-HTTP path now also proves that one concrete application-generated response `X-Request-ID` maps to exactly one structured `http.request.completed` JSON log event with the same `request_id` and expected `GET` / `200` pair.
+PR #106 merged as `8030f98d7280c16705f34f2d29c8ebd7fc85f285` and closed issue #105. Required browser acceptance now also includes a zero-retry `resilience-chromium` profile proving:
 
-PR #106 / issue #105 is the active P1 resilience slice. Its first implementation head `7f21ac65bad1da9514d0e1d6ade48a2da9ee8918` passed:
+- Canary public online reads recover after controlled acceptance read-grant denial and restoration;
+- Redis server-runtime reads recover after controlled `HMGET` ACL denial and restoration;
+- every acceptance-scoped dependency mutation is restored in deterministic cleanup.
 
-- Acceptance E2E and Visual UX run `29847628355`;
-- CI run `29847629469`;
-- Agent Governance run `29847629232`;
-- Phase 7 Production-Like Validation run `29847629405`;
-- Platform DB Outage Validation run `29847628752`.
+The required pull-request `critical` profile now composes smoke + portability + responsive + resilience. The `full` profile requires both the full primary Chromium baseline and resilience before it can claim `FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN` or execute the visual/accessibility collector.
 
-The new `resilience-chromium` profile proves browser-visible restoration and recovery for:
-
-- Canary public online reads after controlled read-grant denial and restoration;
-- Redis runtime state after controlled removal and restoration of the acceptance runtime user's `HMGET` permission.
-
-The first run measured `3 s` wall-clock for the zero-retry resilience profile. The required pull-request `critical` profile now composes smoke + portability + responsive + resilience. The `full` profile requires both the full primary Chromium functional baseline and resilience before it can claim `FUNCTIONAL_ACCEPTANCE_STAGING_PROVEN` or run the visual/accessibility collector.
-
-Durable evidence is `docs/testing/E2E_PUBLIC_DEPENDENCY_RECOVERY_EVIDENCE.md`.
+First resilience evidence measured `3 s` wall-clock with zero retries; durable evidence is `docs/testing/E2E_PUBLIC_DEPENDENCY_RECOVERY_EVIDENCE.md`.
 
 Concurrency, locking, uniqueness, ambiguous commits and core data-integrity invariants remain primarily real-database integration concerns; browser E2E is added only for unique composed user-visible outcomes.
 
@@ -196,20 +184,28 @@ No Canary/login-server repository was modified by Phase 7 work, production-verif
 
 ## Current active task
 
-`OTERYN-20260721-e2e-public-dependency-recovery` on branch `task/OTERYN-20260721-e2e-public-dependency-recovery`, draft PR #106 / issue #105.
+None.
+
+Repository/staging E2E hardening is currently closed through PR #106. Issue #91 remains the separate production execution tracker.
 
 ## Recommended next work
 
-Finish PR #106 by validating the documentation-updated exact head through all required checks and merge only if the merge gate remains satisfied.
+Start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers.
 
-After #106, start another repository/staging E2E task only when a bounded roadmap slice adds unique evidence beyond the existing browser, Phase 7, Platform DB outage, feature and integration layers. Remaining candidates are deeper accessibility interaction or P2 repeated-run/soak work; additional resilience scenarios require a distinct recovery gap.
+The strongest remaining candidates are:
+
+- P1 deeper accessibility interaction for keyboard/focus-critical journeys;
+- P2 repeated-run flakiness measurement;
+- P2 soak only after a bounded low-cost profile and useful resource signals are defined.
+
+Additional resilience work should start only for a distinct recovery gap beyond the current Canary/Redis browser recovery plus Phase 7 and Platform DB outage evidence.
 
 Independently, resume issue #91 only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
 ## High-priority remaining unknowns
 
 - authoritative Platform game-login assertion/session protocol and rollout if required for launch scope;
-- long-term repeated-run Firefox/WebKit flakiness beyond current bounded measurements;
+- long-term repeated-run Firefox/WebKit and resilience flakiness beyond current bounded measurements;
 - whether additional dependency-interruption scenarios add unique recovery evidence beyond current Canary/Redis plus Phase 7/outage validation;
 - deployed production edge/origin/network/TLS topology;
 - production runtime Redis ACL/endpoint provisioning;
