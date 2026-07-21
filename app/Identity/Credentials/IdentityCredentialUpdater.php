@@ -3,6 +3,7 @@
 namespace App\Identity\Credentials;
 
 use App\Audit\SecurityEventRecorder;
+use App\Identity\Actions\RevokeIdentityGameAuthorizations;
 use App\Identity\Actions\RevokeIdentityWebSessions;
 use App\Identity\Models\Identity;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,7 @@ final class IdentityCredentialUpdater
 {
     public function __construct(
         private readonly RevokeIdentityWebSessions $webSessions,
+        private readonly RevokeIdentityGameAuthorizations $gameAuthorizations,
         private readonly SecurityEventRecorder $securityEvents,
     ) {}
 
@@ -20,6 +22,7 @@ final class IdentityCredentialUpdater
         DB::transaction(function () use ($identity, $newPassword): void {
             $this->replacePassword($identity, $newPassword);
             $this->webSessions->execute($identity);
+            $this->gameAuthorizations->execute($identity);
             $this->securityEvents->recordIdentityPasswordChanged($identity->id);
         });
     }
@@ -29,6 +32,7 @@ final class IdentityCredentialUpdater
         DB::transaction(function () use ($identity, $newPassword): void {
             $this->replacePassword($identity, $newPassword);
             $this->webSessions->execute($identity);
+            $this->gameAuthorizations->execute($identity);
             $this->securityEvents->recordIdentityPasswordResetCompleted($identity->id);
         });
     }
