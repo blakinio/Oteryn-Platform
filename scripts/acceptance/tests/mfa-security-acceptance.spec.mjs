@@ -1,0 +1,85 @@
+import { test, expect } from '@playwright/test';
+import {
+  attachDiagnostics,
+  completeMfaChallenge,
+  enrollMfa,
+  installDiagnostics,
+  login,
+  logout,
+  register,
+  uniqueEmail,
+  waitForDifferentTotp,
+} from './helpers.mjs';
+
+test.setTimeout(120_000);
+test.describe.configure({ retries: 0 });
+
+test.beforeEach(async ({ page }) => {
+  page.__acceptanceDiagnostics = installDiagnostics(page);
+});
+
+test.afterEach(async ({ page }, testInfo) => {
+  await attachDiagnostics(testInfo, page.__acceptanceDiagnostics);
+});
+
+test('Flow 4 — MFA valid, invalid, replay, recovery single-use, disable and session invalidation', async ({ browser, page }) => {
+  const email = uniqueEmail('mfa-security');
+  const password = 'AcceptanceMfa!234';
+
+  await register(page, email, password);
+  await login(page, email, password);
+  const mfa = await enrollMfa(page, password);
+  let lastTotp = mfa.enrollmentCode;
+
+  await logout(page);
+  await login(page, email, password);
+  const validTotp = await waitForDifferentTotp(mfa.secret, lastTotp);
+  await completeMfaChallenge(page, validTotp);
+  lastTotp = validTotp;
+  await expect(page).toHaveURL(/\/$/u);
+
+  await logout(page);
+  await login(page, email, password);
+  await completeMfaChallenge(page, 'not-a-code');
+  await expect(page.getByRole('alert')).toBeVisible();
+
+  await completeMfaChallenge(page, lastTotp);
+  await expect(page.getByRole('alert')).toBeVisible();
+
+  const firstRecoveryCode = mfa.recoveryCodes[0];
+  await completeMfaChallenge(page, firstRecoveryCode);
+  await expect(page).toHaveURL(/\/$/u);
+
+  await logout(page);
+  await login(page, email, password);
+  await completeMfaChallenge(page, firstRecoveryCode);
+  await expect(page.getByRole('alert')).toBeVisible();
+
+  await completeMfaChallenge(page, mfa.recoveryCodes[1]);
+  await expect(page).toHaveURL(/\/$/u);
+
+  const staleContext = await browser.newContext();
+  const stalePage = await staleContext.newPage();
+  try {
+    await login(stalePage, email, password);
+    const staleTotp = await waitForDifferentTotp(mfa.secret, lastTotp);
+    await completeMfaChallenge(stalePage, staleTotp);
+    lastTotp = staleTotp;
+    await expect(stalePage).toHaveURL(/\/$/u);
+
+    await page.goto('/mfa');
+    await page.getByLabel('Current password').fill(password);
+    await page.getByLabel('Fresh authenticator or recovery code').fill(mfa.recoveryCodes[2]);
+    await page.getByRole('button', { name: 'Disable MFA and sign out everywhere' }).click();
+    await expect(page.getByRole('status')).toContainText('Multi-factor authentication has been disabled.');
+
+    await page.goto('/mfa');
+    await expect(page).toHaveURL(/\/login$/u);
+
+    const staleResponse = await stalePage.goto('/mfa');
+    expect(staleResponse?.status()).toBe(403);
+    await expect(stalePage.getByRole('heading', { name: '403' })).toBeVisible();
+  } finally {
+    await staleContext.close();
+  }
+});
