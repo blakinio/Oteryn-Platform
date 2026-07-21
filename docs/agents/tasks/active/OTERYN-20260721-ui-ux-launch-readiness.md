@@ -95,11 +95,11 @@ cross_repository_tasks: []
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T10:28:00+02:00
-head: 8baea5e3da9368b274808685642113e2e39a10c1
+updated_at: 2026-07-21T10:42:00+02:00
+head: e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
 branch: task/OTERYN-20260721-ui-ux-launch-readiness
 pr: 77
-status: in_progress
+status: validating
 context_routes:
   - web-cms
   - auth-identity
@@ -125,7 +125,8 @@ proven:
   - Final integrated acceptance evidence on validated implementation SHA 4c3ec48dc5c13c6b37169291be25e09f3856de4d passed 12 Playwright tests with zero failures and retained the visual blocker set.
   - PR #76 merged the authoritative UI architecture, design-system and responsive-strategy documentation before implementation validation.
   - PR #77 now contains a shared public shell, identity/account-operation shell, administrator console shell, responsive design-system CSS, bounded MFA provisioning presentation, contained table/long-content strategies and product-owned 403/404/503 views.
-  - Platform DB Outage Validation run 29814137245 passed on implementation head ce078ed68d46bc9b92a26d7ee21e51d377819596.
+  - Acceptance E2E and Visual UX smoke run 29814890198 passed on implementation head e7b69cf646fdd6c5495a7f19e1d1ba98012bf987.
+  - Platform DB Outage Validation run 29814890246 passed on implementation head e7b69cf646fdd6c5495a7f19e1d1ba98012bf987.
 derived:
   - The presentation fixes remain path-bounded and do not require changes to backend/security contracts.
   - Account Overview/provisioning status cannot be invented under this task because no current route/read model delivers those surfaces.
@@ -133,8 +134,8 @@ unknown:
   - final per-surface Visual UX classifications after exact-head full browser rerun
 conflicts: []
 first_failure:
-  marker: exact-head implementation validation
-  evidence: CI run 29814137476 and Acceptance E2E smoke run 29814137424 failed after the first implementation pass; acceptance failure was an outdated home landmark heading expectation and the heading has been restored for the next rerun
+  marker: repository regression compatibility
+  evidence: CI run 29814890184 and Phase 7 Production-Like Validation run 29814890320 fail only at composer test / exact-SHA critical regression suite while acceptance smoke and Platform DB outage validation pass; presentation landmark compatibility is being narrowed without changing behavior
 rejected_hypotheses:
   - Rendering without server errors is sufficient visual acceptance: rejected by responsive, navigation, error-state and design-system evidence.
   - UI task should change provisioning/backend behavior to make the dashboard possible: rejected; backend/read-model work requires a separate bounded task.
@@ -175,15 +176,18 @@ validation:
   - command: lean live-state preflight against main, merged PR #67 evidence and overlapping design work
     result: PASS
     evidence: no overlapping presentation implementation ownership was found; PR #76 merged design-only guidance before final validation
-  - command: automatic PR exact-head Platform DB outage validation on ce078ed68d46bc9b92a26d7ee21e51d377819596
+  - command: automatic PR acceptance smoke on e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
     result: PASS
-    evidence: workflow run 29814137245 completed successfully
-  - command: automatic PR acceptance smoke on ce078ed68d46bc9b92a26d7ee21e51d377819596
+    evidence: Acceptance E2E and Visual UX run 29814890198 completed successfully after restoring accepted public landmarks
+  - command: automatic PR Platform DB outage validation on e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
+    result: PASS
+    evidence: Platform DB Outage Validation run 29814890246 completed successfully
+  - command: automatic PR CI and Phase 7 regression on e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
     result: FAIL
-    evidence: run 29814137424 failed only the first public-surface heading locator because the home H1 had changed from Oteryn Platform to Explore Oteryn; the accepted landmark heading has been restored
+    evidence: CI run 29814890184 fails only Run tests; Phase 7 run 29814890320 reaches and fails only Run exact-SHA critical regression suite
 blockers:
   - separate account/provisioning-state dependency if required by existing product data boundaries
-next_action: Rerun the exact-head CI, governance, production-like and acceptance smoke gates after the home landmark and checkpoint fixes, then inspect any remaining first failure before requesting full visual evidence.
+next_action: Resolve the remaining exact PHPUnit presentation-regression assertions, obtain clean exact-head CI/governance/production-like/smoke gates, then run a full exact-SHA Visual UX browser evidence profile before final classification.
 ```
 
 ## Notes
