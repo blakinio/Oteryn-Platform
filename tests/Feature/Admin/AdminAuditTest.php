@@ -9,6 +9,7 @@ use App\Identity\Sessions\WebSessionState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Tests\TestCase;
 
 final class AdminAuditTest extends TestCase
@@ -59,6 +60,76 @@ final class AdminAuditTest extends TestCase
             ->assertOk()
             ->assertSeeText('test.audit.001')
             ->assertDontSeeText('test.audit.051');
+    }
+
+    public function test_privileged_audit_records_exclude_identity_and_application_secrets(): void
+    {
+        $plainPassword = 'Correct-Horse-9!Battery';
+        $totpSecret = 'TEST-MFA-SECRET-NOT-REAL';
+        $plainRecoveryCode = 'AUDIT-RECOVERY-CODE-12345';
+        $recoveryCodeHash = Hash::make($plainRecoveryCode);
+
+        $actor = $this->createIdentity('audit-secret-actor@example.com');
+        $actor->forceFill([
+            'two_factor_recovery_codes' => [$recoveryCodeHash],
+        ])->save();
+        $actor->refresh();
+
+        $passwordHash = $actor->password;
+        $resetToken = Password::createToken($actor);
+        $storedResetTokenHash = DB::table('password_reset_tokens')
+            ->where('email', $actor->email)
+            ->value('token');
+        $encryptedTotpState = DB::table('identities')
+            ->where('id', $actor->id)
+            ->value('two_factor_secret');
+        $encryptedRecoveryCodeState = DB::table('identities')
+            ->where('id', $actor->id)
+            ->value('two_factor_recovery_codes');
+        $applicationKey = config('app.key');
+
+        self::assertIsString($storedResetTokenHash);
+        self::assertIsString($encryptedTotpState);
+        self::assertIsString($encryptedRecoveryCodeState);
+        self::assertIsString($applicationKey);
+        self::assertNotSame('', $applicationKey);
+
+        $this->assignRole($actor, AdminRoleManager::PLATFORM_ADMIN);
+        $target = $this->createIdentity('audit-secret-target@example.com');
+        $this->actingAsCurrent($actor);
+
+        $this->post(route('admin.roles.store', $target), [
+            'role' => AdminRoleManager::CONTENT_EDITOR,
+        ])->assertRedirect(route('admin.roles.index'));
+
+        $this->post(route('admin.news.store'), [
+            'slug' => 'audit-secret-regression',
+            'title' => 'Audit secret regression',
+            'body' => 'Audit metadata must remain bounded.',
+            'published_at' => null,
+        ])->assertRedirect();
+
+        $auditPayload = json_encode(
+            DB::table('admin_audit_events')->orderBy('id')->get()->all(),
+            JSON_THROW_ON_ERROR,
+        );
+
+        $sensitiveValues = [
+            'plain password' => $plainPassword,
+            'password hash' => $passwordHash,
+            'TOTP secret' => $totpSecret,
+            'encrypted TOTP state' => $encryptedTotpState,
+            'plain recovery code' => $plainRecoveryCode,
+            'recovery-code hash' => $recoveryCodeHash,
+            'encrypted recovery-code state' => $encryptedRecoveryCodeState,
+            'plain reset token' => $resetToken,
+            'stored reset-token hash' => $storedResetTokenHash,
+            'application key' => $applicationKey,
+        ];
+
+        foreach ($sensitiveValues as $label => $sensitiveValue) {
+            self::assertStringNotContainsString($sensitiveValue, $auditPayload, $label);
+        }
     }
 
     private function createIdentity(string $email, bool $confirmedMfa = true): Identity
