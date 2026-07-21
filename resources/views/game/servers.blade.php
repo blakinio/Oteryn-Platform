@@ -18,19 +18,18 @@
             @php($runtime = $runtimeSnapshot->forChannel((int) $channel->id))
             <article class="card">
                 <h2>{{ $channel->name }}</h2>
-                <dl>
-                    <dt>Channel ID</dt><dd>{{ $channel->id }}</dd>
-                    <dt>PvP type</dt><dd>{{ $channel->pvp_type }}</dd>
-                    <dt>Configured max players</dt><dd>{{ $channel->max_players }}</dd>
-                    @if (! $runtimeSnapshot->available)
-                        <dt>Runtime</dt><dd><span class="badge badge-warning">Unavailable</span></dd>
-                    @elseif ($runtime === null)
-                        <dt>Runtime</dt><dd><span class="badge badge-warning">Unknown</span></dd>
-                    @else
-                        <dt>Runtime</dt><dd><span class="badge badge-success">{{ $runtime->status }}</span></dd>
-                        <dt>Players online</dt><dd>{{ $runtime->playersOnline }}</dd>
-                    @endif
-                </dl>
+                <p><strong>Channel ID:</strong> {{ $channel->id }}</p>
+                <p><strong>PvP type:</strong> {{ $channel->pvp_type }}</p>
+                <p><strong>Configured max players:</strong> {{ $channel->max_players }}</p>
+
+                @if (! $runtimeSnapshot->available)
+                    <p class="badge badge-warning"><strong>Runtime:</strong> Unavailable</p>
+                @elseif ($runtime === null)
+                    <p class="badge badge-warning"><strong>Runtime:</strong> Unknown</p>
+                @else
+                    <p class="badge badge-success"><strong>Runtime:</strong> {{ $runtime->status }}</p>
+                    <p><strong>Players online:</strong> {{ $runtime->playersOnline }}</p>
+                @endif
 
                 @if ($runtimeSnapshot->available && $runtime !== null && $runtime->isFull((int) $channel->max_players))
                     <p class="status badge badge-warning">Full</p>
