@@ -5,11 +5,16 @@
 
 @section('content')
     <section class="portal-hero" aria-labelledby="portal-hero-title">
+        <div class="portal-hero-art" aria-hidden="true">
+            <img src="{{ asset('images/oteryn-hero-citadel.svg') }}" alt="">
+        </div>
+
         <div class="portal-hero-inner">
             <div class="portal-hero-copy">
                 <h1 class="portal-kicker">Oteryn Platform</h1>
                 <h2 id="portal-hero-title" class="portal-hero-title">Enter the world of Oteryn</h2>
                 <p class="portal-hero-lede">Find characters, follow world activity, explore rankings and move between public world information and your account from one deliberate portal.</p>
+                <img class="portal-heraldic-divider" src="{{ asset('images/oteryn-heraldic-divider.svg') }}" alt="" aria-hidden="true">
                 <div class="portal-hero-actions">
                     @guest
                         <a class="button" href="{{ route('identity.register.create') }}">Create account</a>
@@ -55,7 +60,7 @@
         <div class="portal-world-grid">
             <article class="world-card">
                 <div class="world-card-header">
-                    <span class="world-card-icon" aria-hidden="true">O</span>
+                    <img class="world-card-icon" src="{{ asset('images/oteryn-mark-online.svg') }}" alt="" aria-hidden="true">
                     <h3>Online</h3>
                 </div>
                 <p>See characters represented by fresh online leases and review the current public online view.</p>
@@ -64,7 +69,7 @@
 
             <article class="world-card">
                 <div class="world-card-header">
-                    <span class="world-card-icon" aria-hidden="true">H</span>
+                    <img class="world-card-icon" src="{{ asset('images/oteryn-mark-highscores.svg') }}" alt="" aria-hidden="true">
                     <h3>Highscores</h3>
                 </div>
                 <p>Browse the active-character level ranking through the public highscores surface.</p>
@@ -73,7 +78,7 @@
 
             <article class="world-card">
                 <div class="world-card-header">
-                    <span class="world-card-icon" aria-hidden="true">S</span>
+                    <img class="world-card-icon" src="{{ asset('images/oteryn-mark-servers.svg') }}" alt="" aria-hidden="true">
                     <h3>Servers</h3>
                 </div>
                 <p>Review configured game channels and the live runtime information currently available to the portal.</p>
@@ -82,7 +87,7 @@
 
             <article class="world-card">
                 <div class="world-card-header">
-                    <span class="world-card-icon" aria-hidden="true">N</span>
+                    <img class="world-card-icon" src="{{ asset('images/oteryn-mark-news.svg') }}" alt="" aria-hidden="true">
                     <h3>News</h3>
                 </div>
                 <p>Read published Platform news and world updates without inventing unverified events or gameplay claims.</p>
