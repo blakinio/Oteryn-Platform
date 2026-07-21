@@ -63,7 +63,7 @@ test('Account Overview — authorization, status matrix, responsive evidence and
 
   let fixture = seedState(email, 'ready');
   await login(page, email, password);
-  await expect(page).toHaveURL(/\/$/u);
+  await expect(page).toHaveURL(/\/account$/u);
 
   for (const state of ['ready', 'pending', 'recoverable', 'conflict', 'missing']) {
     fixture = seedState(email, state);
