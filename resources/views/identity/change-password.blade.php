@@ -1,46 +1,30 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Change Password | Oteryn Platform</title>
-</head>
-<body>
-    <main>
+@extends('identity.layout')
+
+@section('title', 'Change Password')
+@section('error-title', 'The password could not be changed.')
+
+@section('content')
+    <div class="page-header">
+        <p class="eyebrow">Account security</p>
         <h1>Change your Oteryn Platform password</h1>
+        <p class="muted">Changing your password revokes Platform web sessions. You will need to sign in again afterward.</p>
+    </div>
 
-        @if ($errors->any())
-            <div role="alert">
-                <p>The password could not be changed.</p>
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
-        @endif
-
-        <form method="POST" action="{{ route('identity.password.change.update') }}">
-            @csrf
-            @method('PUT')
-
-            <div>
-                <label for="current_password">Current password</label>
-                <input id="current_password" name="current_password" type="password" autocomplete="current-password" maxlength="1024" required>
-            </div>
-
-            <div>
-                <label for="password">New password</label>
-                <input id="password" name="password" type="password" autocomplete="new-password" maxlength="1024" required>
-            </div>
-
-            <div>
-                <label for="password_confirmation">Confirm new password</label>
-                <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" maxlength="1024" required>
-            </div>
-
-            <button type="submit">Change password</button>
-        </form>
-    </main>
-</body>
-</html>
+    <form class="form-stack" method="POST" action="{{ route('identity.password.change.update') }}">
+        @csrf
+        @method('PUT')
+        <div class="form-field">
+            <label for="current_password">Current password</label>
+            <input id="current_password" name="current_password" type="password" autocomplete="current-password" maxlength="1024" required autofocus>
+        </div>
+        <div class="form-field">
+            <label for="password">New password</label>
+            <input id="password" name="password" type="password" autocomplete="new-password" maxlength="1024" required>
+        </div>
+        <div class="form-field">
+            <label for="password_confirmation">Confirm new password</label>
+            <input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" maxlength="1024" required>
+        </div>
+        <button type="submit">Change password</button>
+    </form>
+@endsection
