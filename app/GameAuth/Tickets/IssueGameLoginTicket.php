@@ -34,10 +34,15 @@ final class IssueGameLoginTicket
                 throw new GameLoginTicketDenied;
             }
 
-            $ttlSeconds = (int) config('game-auth.ticket.ttl_seconds', 60);
-            $audience = (string) config('game-auth.ticket.audience', '');
+            $ttlSeconds = config('game-auth.ticket.ttl_seconds', 60);
+            $audience = config('game-auth.ticket.audience', '');
 
-            if ($ttlSeconds < 1 || $ttlSeconds > 300 || $audience === '') {
+            if (! is_int($ttlSeconds)
+                || $ttlSeconds < 1
+                || $ttlSeconds > 300
+                || ! is_string($audience)
+                || $audience === ''
+            ) {
                 throw new LogicException('Invalid game authentication ticket configuration.');
             }
 
