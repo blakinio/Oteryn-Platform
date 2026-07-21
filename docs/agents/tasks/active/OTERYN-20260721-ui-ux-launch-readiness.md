@@ -51,6 +51,9 @@ owned_paths:
   - resources/views/admin/**
   - resources/views/errors/**
   - public/css/app.css
+  - tests/Feature/HomeTest.php
+  - scripts/acceptance/tests/helpers.mjs
+  - scripts/acceptance/tests/character-boundaries-acceptance.spec.mjs
   - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
 modules:
   - WebCMS
@@ -59,6 +62,7 @@ modules:
   - AccountPresentation
   - AdminPresentation
   - ErrorPresentation
+  - AcceptanceTesting
 dependencies:
   - docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md
   - merged acceptance browser harness from PR #67
@@ -95,8 +99,8 @@ cross_repository_tasks: []
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T10:42:00+02:00
-head: e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
+updated_at: 2026-07-21T11:08:00+02:00
+head: 2bc89e55b1769a7b21277eeca14f2b17edb14a96
 branch: task/OTERYN-20260721-ui-ux-launch-readiness
 pr: 77
 status: validating
@@ -119,27 +123,31 @@ owned_paths:
   - resources/views/admin/**
   - resources/views/errors/**
   - public/css/app.css
+  - tests/Feature/HomeTest.php
+  - scripts/acceptance/tests/helpers.mjs
+  - scripts/acceptance/tests/character-boundaries-acceptance.spec.mjs
   - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
 proven:
-  - PR #67 is merged and records Functional Acceptance as STAGING_PROVEN while Visual UX Acceptance remains FAIL.
-  - Final integrated acceptance evidence on validated implementation SHA 4c3ec48dc5c13c6b37169291be25e09f3856de4d passed 12 Playwright tests with zero failures and retained the visual blocker set.
+  - PR #67 is merged and records Functional Acceptance as STAGING_PROVEN while the baseline Visual UX Acceptance remains FAIL.
   - PR #76 merged the authoritative UI architecture, design-system and responsive-strategy documentation before implementation validation.
-  - PR #77 now contains a shared public shell, identity/account-operation shell, administrator console shell, responsive design-system CSS, bounded MFA provisioning presentation, contained table/long-content strategies and product-owned 403/404/503 views.
-  - Acceptance E2E and Visual UX smoke run 29814890198 passed on implementation head e7b69cf646fdd6c5495a7f19e1d1ba98012bf987.
-  - Platform DB Outage Validation run 29814890246 passed on implementation head e7b69cf646fdd6c5495a7f19e1d1ba98012bf987.
+  - PR #77 contains the bounded presentation remediation: shared public and identity shells, administrator console shell, responsive design-system CSS, bounded MFA provisioning presentation, contained table/long-content strategies, user-facing character options and product-owned 403/404/503 views.
+  - Exact implementation SHA 6e1fbe57713a1268edb5fc7d30a34775c0dcb7b2 passed CI run 29816366835, Agent Governance run 29816366846, Phase 7 Production-Like Validation run 29816366923, Platform DB Outage Validation run 29816366901 and acceptance smoke run 29816366979.
+  - The only PHPUnit regression found during implementation was an obsolete HomeTest assertion for the removed technical text `Laravel 13 foundation is online.`; the regression test now checks the player-facing home landmarks instead.
+  - The first full acceptance rerun on exact UI SHA 6e1fbe57713a1268edb5fc7d30a34775c0dcb7b2 exposed two harness locator incompatibilities caused by the new shell markup: MFA manual-secret lookup and ambiguous character-form selection.
+  - The two locator failures were corrected in the acceptance harness without weakening authentication, MFA, registration or character rate limits.
 derived:
-  - The presentation fixes remain path-bounded and do not require changes to backend/security contracts.
+  - The 429 responses observed late in the failed full run followed retry attempts after the locator failures and do not establish a product rate-limit defect.
   - Account Overview/provisioning status cannot be invented under this task because no current route/read model delivers those surfaces.
 unknown:
-  - final per-surface Visual UX classifications after exact-head full browser rerun
+  - final per-surface Visual UX classifications after the corrected exact-head full browser rerun
 conflicts: []
 first_failure:
-  marker: repository regression compatibility
-  evidence: CI run 29814890184 and Phase 7 Production-Like Validation run 29814890320 fail only at composer test / exact-SHA critical regression suite while acceptance smoke and Platform DB outage validation pass; presentation landmark compatibility is being narrowed without changing behavior
+  marker: full visual acceptance harness compatibility
+  evidence: full run 29816563931 failed before the visual phase because the harness still targeted the pre-redesign MFA and character-form markup; product smoke, CI, production-like and outage gates remained green on the exact implementation SHA
 rejected_hypotheses:
   - Rendering without server errors is sufficient visual acceptance: rejected by responsive, navigation, error-state and design-system evidence.
   - UI task should change provisioning/backend behavior to make the dashboard possible: rejected; backend/read-model work requires a separate bounded task.
-  - The implementation should reuse PR #67 or PR #76 branches: rejected because substantial implementation requires its own dedicated task branch.
+  - Product security rate limits should be weakened to make the full harness pass: rejected; deterministic harness locators are corrected instead.
 changed_paths:
   - public/css/app.css
   - resources/views/game/layout.blade.php
@@ -171,25 +179,22 @@ changed_paths:
   - resources/views/errors/403.blade.php
   - resources/views/errors/404.blade.php
   - resources/views/errors/503.blade.php
+  - tests/Feature/HomeTest.php
+  - scripts/acceptance/tests/helpers.mjs
+  - scripts/acceptance/tests/character-boundaries-acceptance.spec.mjs
   - docs/agents/tasks/active/OTERYN-20260721-ui-ux-launch-readiness.md
 validation:
-  - command: lean live-state preflight against main, merged PR #67 evidence and overlapping design work
+  - command: exact-head native gates on 6e1fbe57713a1268edb5fc7d30a34775c0dcb7b2
     result: PASS
-    evidence: no overlapping presentation implementation ownership was found; PR #76 merged design-only guidance before final validation
-  - command: automatic PR acceptance smoke on e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
-    result: PASS
-    evidence: Acceptance E2E and Visual UX run 29814890198 completed successfully after restoring accepted public landmarks
-  - command: automatic PR Platform DB outage validation on e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
-    result: PASS
-    evidence: Platform DB Outage Validation run 29814890246 completed successfully
-  - command: automatic PR CI and Phase 7 regression on e7b69cf646fdd6c5495a7f19e1d1ba98012bf987
+    evidence: CI 29816366835; Agent Governance 29816366846; Phase 7 Production-Like Validation 29816366923; Platform DB Outage Validation 29816366901; Acceptance E2E smoke 29816366979
+  - command: full acceptance profile on 6e1fbe57713a1268edb5fc7d30a34775c0dcb7b2
     result: FAIL
-    evidence: CI run 29814890184 fails only Run tests; Phase 7 run 29814890320 reaches and fails only Run exact-SHA critical regression suite
+    evidence: run 29816563931 stopped before visual capture on two stale shell-dependent locators; the locator failures are corrected on the current branch for rerun
 blockers:
   - separate account/provisioning-state dependency if required by existing product data boundaries
-next_action: Resolve the remaining exact PHPUnit presentation-regression assertions, obtain clean exact-head CI/governance/production-like/smoke gates, then run a full exact-SHA Visual UX browser evidence profile before final classification.
+next_action: Validate the corrected acceptance harness on the current exact head, update the full-profile validation ref to that SHA, rerun full production-like browser and visual evidence, then classify delivered surfaces and the separate missing account/provisioning surface without overclaiming launch readiness.
 ```
 
 ## Notes
 
-This task is intentionally a presentation-layer follow-up. Any need for new account/provisioning read models, controller actions, mutation semantics or data ownership changes must be split into a separate bounded task before implementation.
+This task is intentionally a presentation-layer follow-up. The only test changes are bounded presentation-regression and acceptance-locator compatibility updates. Any need for new account/provisioning read models, controller actions, mutation semantics or data ownership changes must be split into a separate bounded task before implementation.
