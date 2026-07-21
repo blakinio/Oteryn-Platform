@@ -57,8 +57,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T19:39:41Z
-head: 605338fe4b1e2dae3383c434d0d39cd3a51388a2
+updated_at: 2026-07-21T19:44:50Z
+head: d2df6e730b6b502bde68e23c249da01bbbd0378c
 branch: task/OTERYN-20260721-full-production-like-e2e-simulation
 pr: 115
 status: validating
@@ -76,29 +76,41 @@ proven:
   - no active repository/staging implementation task is listed in ACTIVE_WORK
   - no open pull request overlapped this validation task at preflight
   - the repository already provides exact-SHA production-like acceptance, Phase 7, resilience, accessibility, portability, responsive and soak harnesses
-  - temporary comprehensive validation orchestration is committed on the dedicated task branch
   - draft PR #115 targets main from the dedicated task branch
+  - CI run 29862494021 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
+  - Agent Governance run 29862493873 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
+  - Platform DB Outage Validation run 29862493825 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
+  - Phase 7 Production-Like Validation run 29862494061 passed on validation head 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
+  - first temporary soak run failed before product assertions because the validation-only workflow generated an empty APP_KEY from invalid escaped PHP syntax
+  - the temporary APP_KEY orchestration defect is corrected on branch head d2df6e730b6b502bde68e23c249da01bbbd0378c
   - production execution and external Canary/login-server writes are outside this task
   - repository writes are limited to blakinio/Oteryn-Platform
 derived:
-  - PR #115 can provide fresh exact-head staging evidence while keeping production state untouched
+  - the initial homepage HTTP 500 in the temporary soak job was a validation-harness defect and is not evidence of a product regression
 unknown:
-  - outcome of the fresh comprehensive validation run
+  - outcome of the corrected fresh comprehensive validation run
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
-rejected_hypotheses: []
+  marker: temporary full-production-like-e2e-simulation APP_KEY generation
+  evidence: run 29862494074 job 88742473925 returned HTTP 500 for /; artifact 8507887932 showed 2-second soak failure; invalid php -r escaping reproduced with exit 255 and corrected in commit d2df6e730b6b502bde68e23c249da01bbbd0378c
+rejected_hypotheses:
+  - product homepage regression: the failure path used an empty APP_KEY caused by the temporary validation workflow before application behavior could be meaningfully assessed
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260721-full-production-like-e2e-simulation.md
   - .github/workflows/full-production-like-e2e-simulation.yml
 validation:
-  - command: Full Production-Like E2E Simulation plus standard PR validation workflows
+  - command: CI / Agent Governance / Platform DB Outage / Phase 7 on 62e4a28352ac00174e3ff7b17374c28db0fd4f7d
+    result: PASS
+    evidence: runs 29862494021 / 29862493873 / 29862493825 / 29862494061
+  - command: temporary comprehensive simulation run 29862494074
+    result: FAIL
+    evidence: harness-only APP_KEY generation defect; product result not classified from this run
+  - command: corrected comprehensive simulation workflow
     result: NOT_RUN
-    evidence: PR #115 opened; exact-head runs pending
+    evidence: corrected orchestration committed at d2df6e730b6b502bde68e23c249da01bbbd0378c; exact-head rerun pending
 blockers:
   - none
-next_action: inspect PR #115 exact-head workflow runs and classify the first failure or record passing evidence
+next_action: inspect the corrected PR #115 exact-head workflow runs and classify the first product or harness failure, or record passing evidence
 ```
 
 ## Notes
