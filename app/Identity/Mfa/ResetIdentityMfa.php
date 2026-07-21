@@ -3,6 +3,7 @@
 namespace App\Identity\Mfa;
 
 use App\Audit\SecurityEventRecorder;
+use App\Identity\Actions\RevokeIdentityGameAuthorizations;
 use App\Identity\Actions\RevokeIdentityWebSessions;
 use App\Identity\Models\Identity;
 use Illuminate\Support\Facades\DB;
@@ -11,6 +12,7 @@ final class ResetIdentityMfa
 {
     public function __construct(
         private readonly RevokeIdentityWebSessions $webSessions,
+        private readonly RevokeIdentityGameAuthorizations $gameAuthorizations,
         private readonly SecurityEventRecorder $securityEvents,
     ) {}
 
@@ -25,6 +27,7 @@ final class ResetIdentityMfa
             ])->save();
 
             $this->webSessions->execute($identity);
+            $this->gameAuthorizations->execute($identity);
             $this->securityEvents->recordIdentityMfaReset($identity->id);
         });
     }
