@@ -36,8 +36,13 @@ final class GameAuthRevocationTest extends TestCase
     public function test_mfa_disable_revokes_pending_game_authorizations(): void
     {
         $identity = $this->createIdentityWithMfa();
-        self::assertIsString($identity->two_factor_secret);
-        $code = (new Google2FA)->getCurrentOtp($identity->two_factor_secret);
+        $secret = $identity->two_factor_secret;
+
+        if (! is_string($secret)) {
+            self::fail('MFA test identity does not contain a decrypted TOTP secret.');
+        }
+
+        $code = (new Google2FA)->getCurrentOtp($secret);
 
         $this->app->make(DisableIdentityMfa::class)->execute($identity, self::PASSWORD, $code);
 
