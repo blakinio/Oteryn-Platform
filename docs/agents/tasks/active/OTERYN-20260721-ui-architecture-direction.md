@@ -69,10 +69,10 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T10:07:00+02:00
+updated_at: 2026-07-21T10:08:00+02:00
 head: 3f3582fc74e1ae348c222d76255ed8b9823e8536
 branch: task/OTERYN-20260721-ui-architecture-handover
-pr: none
+pr: 78
 status: ready
 context_routes:
   - architecture
