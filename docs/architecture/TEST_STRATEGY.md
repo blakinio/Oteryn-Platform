@@ -200,6 +200,12 @@ Never use copied production dumps in CI.
 
 Migration/browser smoke complements, but does not replace, migration and database integration tests.
 
+The required Phase 7 production-like release path now includes an isolated representative existing-data upgrade/rollback slice. It constructs synthetic Identity and published-news state on the actual PR `BASE_SHA` schema, runs exact-candidate migrations, verifies a non-secret persisted-data fingerprint, executes bounded candidate HTTP smoke, switches the existing release symlink back to `BASE_SHA` against the post-upgrade database, reruns smoke, and then redeploys the candidate and reruns smoke. Any migration, compatibility, data-integrity or smoke failure fails the release-validation job closed.
+
+The first implementation run had equal base/candidate migration counts because the validation PR itself contained no schema migration. That proves the release-validation mechanism and rollback-code compatibility for that candidate without pretending a schema delta existed. A future migration-bearing PR exercises the same required path against data created from its actual base SHA. Durable evidence is recorded in `docs/testing/E2E_MIGRATION_ROLLBACK_EVIDENCE.md`.
+
+This controlled path remains `STAGING_PROVEN`; it does not establish production migration duration, lock behavior, provider rollback mechanics, production RTO/RPO or universal backward compatibility for future destructive changes.
+
 ## Test data
 
 - use factories/seeders designed for test environments;
@@ -239,18 +245,18 @@ Dependabot is configured for bounded weekly update PRs for:
 
 Dependabot update automation complements but does not replace the required Composer advisory gate.
 
-The acceptance workflow currently provides:
+The acceptance and release-validation workflows currently provide:
 
 - a pull-request `critical` profile comprising primary Chromium smoke plus bounded Chromium/Firefox/WebKit portability and Chromium desktop/tablet/mobile responsive coverage;
 - full exact-SHA primary Chromium production-like functional acceptance on main/manual full execution;
 - full-profile visual/accessibility collection only on the `full` profile;
-- durable non-secret evidence artifacts tied to exact tested SHA, profile, browser/project, viewport and measured profile duration;
-- profile-specific JUnit evidence with project identity preserved in test names.
+- durable non-secret browser evidence artifacts tied to exact tested SHA, profile, browser/project, viewport and measured profile duration;
+- profile-specific JUnit evidence with project identity preserved in test names;
+- required Phase 7 exact-SHA representative existing-data upgrade/rollback/redeploy validation using the existing release-switch mechanism and an isolated synthetic-data database.
 
 Additional hardening profiles remain described in `docs/testing/E2E_COVERAGE_ROADMAP.md`:
 
 - `resilience` — controlled deterministic failure/recovery scenarios;
-- `migration` — representative existing-data upgrade/rollback validation;
 - `repeat` — repeated-run flakiness detection;
 - `soak` — scheduled/manual long-duration validation.
 
@@ -266,7 +272,8 @@ Do not broaden the complete secret-sensitive suite to every browser/viewport bef
 - document exact unavailable environments rather than claiming tests passed;
 - E2E evidence must identify the exact tested SHA and applicable browser/profile;
 - browser-specific skips require explicit justification and must not silently count as coverage;
-- newly added resilience tests must prove recovery, not only failure.
+- newly added resilience tests must prove recovery, not only failure;
+- migration-bearing candidates must pass the representative existing-data Phase 7 path or document a concrete safe rollout/rollback blocker rather than bypassing the check.
 
 ## Production readiness E2E matrix
 
