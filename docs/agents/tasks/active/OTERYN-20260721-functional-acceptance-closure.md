@@ -29,7 +29,7 @@ Reconcile the Functional Acceptance Matrix once all bounded follow-up evidence i
 - [x] Update `docs/testing/FUNCTIONAL_ACCEPTANCE_MATRIX.md` once from merged evidence only.
 - [x] Mark overall Functional Acceptance `STAGING_PROVEN` only after every staging-verifiable critical flow and required failure/authorization path is directly supported by the composed evidence set.
 - [x] Preserve all production smoke facts as non-passing until final production execution.
-- [ ] Pass required exact-head repository checks before merge.
+- [x] Pass required exact-head repository checks before merge.
 
 ## Ownership
 
@@ -58,11 +58,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T10:15:00+02:00
-head: 90efe71227a6199ac46a733554d51d1dadc25342
+updated_at: 2026-07-21T10:22:00+02:00
+head: 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
 branch: task/OTERYN-20260721-functional-acceptance-closure
 pr: 75
-status: validating
+status: ready
 context_routes:
   - testing
   - security
@@ -84,6 +84,8 @@ proven:
   - PR #73 merged as 06d8d94aafd73de996eb4ea93705e8a45fbadafb and issue #71 is closed with controlled Platform DB outage evidence classified STAGING_PROVEN for that staging failure path only.
   - PR #74 merged as 24eaa4ca5e38bb255db95a989c0ff02e954360f3 and issue #72 is closed; focused news/page publication-state and privileged-audit regressions passed without runtime product changes.
   - The Functional Acceptance Matrix has been reconciled from merged FAV-01 through FAV-05 evidence and now classifies the currently delivered staging-verifiable functional surface as STAGING_PROVEN while preserving production as UNKNOWN/pending.
+  - PR #75 validated content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd passed CI run 29813533874 / #864, Agent Governance run 29813533972 / #784, Phase 7 Production-Like Validation run 29813533997 / #104 and Platform DB Outage Validation run 29813533893 / #34.
+  - PR #75 has no review submissions or unresolved review threads and its changed-file set is limited to the functional-acceptance matrix and owned agent-governance task/index records.
   - Visual / UI / UX Acceptance remains a separate FAIL gate and was not promoted by this functional closure.
   - This task changes documentation/governance state only; no runtime application, authentication, authorization, session, database, Canary or login-server code is changed.
   - Trust boundary affected: none; this task records evidence for existing Platform Identity, administrator and Platform/Canary dependency boundaries without altering them.
@@ -101,7 +103,7 @@ unknown:
 conflicts: []
 first_failure:
   marker: none
-  evidence: all functional-acceptance follow-up evidence is merged and issues #68-#72 are closed; current PR #75 exact-head repository checks are the remaining merge gate
+  evidence: all functional-acceptance follow-up evidence is merged, issues #68-#72 are closed and required checks passed on validated PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
 rejected_hypotheses:
   - Aggregate Functional Acceptance must remain UNKNOWN after PR #67 merge: rejected by merged exact-SHA browser acceptance plus PR #73 and PR #74 focused evidence.
   - STAGING_PROVEN implies production readiness: rejected; production-only facts remain UNKNOWN and the Production Go-Live Gate remains pending.
@@ -122,12 +124,21 @@ validation:
   - command: merged follow-up verification for PR #73/#71 and PR #74/#72
     result: PASS
     evidence: both bounded follow-ups are merged and issues #71/#72 are closed
-  - command: PR #75 current-head required repository checks
-    result: NOT_RUN
-    evidence: pending after final reconciliation commits
+  - command: CI run 29813533874 / #864 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+    result: PASS
+    evidence: GitHub Actions conclusion success
+  - command: Agent Governance run 29813533972 / #784 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+    result: PASS
+    evidence: GitHub Actions conclusion success
+  - command: Phase 7 Production-Like Validation run 29813533997 / #104 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+    result: PASS
+    evidence: GitHub Actions conclusion success
+  - command: Platform DB Outage Validation run 29813533893 / #34 on PR #75 content head 76741b3bd1294d14db1d3f7aa1bb37a739f303fd
+    result: PASS
+    evidence: GitHub Actions conclusion success
 blockers:
   - none
-next_action: Inspect PR #75 required checks on the current head; if all required checks pass, mark the PR ready and squash-merge it without changing the functional, visual or production classifications.
+next_action: Verify required checks on the checkpoint-only PR #75 head, then mark the PR ready and squash-merge it if the merge gate remains satisfied.
 ```
 
 ## Notes
