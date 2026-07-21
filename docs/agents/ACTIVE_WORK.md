@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260721-e2e-accessibility-stability-soak` — issue #110; add bounded keyboard/focus accessibility interaction coverage plus scheduled/manual repeated-run flakiness and read-only soak profiles.
+None.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -21,6 +21,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 - PR #102 / `ee235cbbdd379a5047fede98ff79a0e35e22ce76` — issue #101 closed; Phase 7 now proves exact response `X-Request-ID` to matching structured request-completion log correlation with bounded method/status agreement and non-secret `STAGING_PROVEN` evidence.
 - PR #104 / `18bd5b2c3b4496677cc58df41fd50c6387e9e6f8` — archived the completed observability-correlation task and closed its governance lifecycle.
 - PR #106 / `8030f98d7280c16705f34f2d29c8ebd7fc85f285` — issue #105 closed; required acceptance now includes zero-retry Chromium public dependency resilience proving Canary DB and Redis failure, deterministic restoration and successful browser recovery.
+- PR #111 / `740d9879b341d98e4cf0ef0e7f076b43cd86cdaf` — issue #110 closed; required acceptance now includes bounded zero-retry Chromium keyboard/focus accessibility, while scheduled/manual three-iteration zero-retry critical stability and read-only public soak profiles provide future non-blocking evidence.
 
 ## Current project phase
 
@@ -42,7 +43,9 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-The active repository/staging E2E task is issue #110: bounded keyboard/focus accessibility interaction plus scheduled/manual repeated-run stability and read-only soak measurement. Accessibility may become a required bounded PR profile; repeat/soak must remain non-blocking until measured evidence justifies otherwise.
+No repository/staging E2E implementation task is currently active.
+
+The merged stability and soak workflows should accumulate scheduled/manual evidence. Their first multi-iteration and soak baselines are intentionally pending and remain non-blocking until measured variance justifies any stronger gate.
 
 Issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
