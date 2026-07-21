@@ -3,6 +3,7 @@
 namespace Tests\Feature\Identity\Recovery;
 
 use App\Audit\SecurityEventRecorder;
+use App\Identity\Actions\RevokeIdentityGameAuthorizations;
 use App\Identity\Actions\RevokeIdentityWebSessions;
 use App\Identity\Credentials\IdentityCredentialUpdater;
 use App\Identity\Credentials\PasswordResetCompleter;
@@ -27,7 +28,6 @@ final class PasswordRecoveryTest extends TestCase
         Notification::fake();
         $identity = $this->createIdentity();
         $token = null;
-
         $knownResponse = $this->post('/forgot-password', [
             'email' => '  PERSON@EXAMPLE.COM  ',
         ]);
@@ -118,6 +118,7 @@ final class PasswordRecoveryTest extends TestCase
         $fresh = Identity::query()->findOrFail($identity->id);
         self::assertTrue(Hash::check('Correct-Horse-9!Battery', $fresh->password));
         self::assertSame(0, $fresh->web_session_generation);
+        self::assertSame(0, $fresh->game_auth_generation);
     }
 
     public function test_successful_reset_is_single_use_and_replay_is_rejected(): void
@@ -136,6 +137,7 @@ final class PasswordRecoveryTest extends TestCase
         self::assertTrue(Hash::check('New-Correct-8!Password', $fresh->password));
         self::assertFalse(Hash::check('Correct-Horse-9!Battery', $fresh->password));
         self::assertSame(1, $fresh->web_session_generation);
+        self::assertSame(1, $fresh->game_auth_generation);
         $this->assertDatabaseMissing('password_reset_tokens', [
             'email' => $identity->email,
         ]);
@@ -146,6 +148,10 @@ final class PasswordRecoveryTest extends TestCase
         $this->assertDatabaseHas('identity_security_events', [
             'identity_id' => $identity->id,
             'event_type' => SecurityEventRecorder::IDENTITY_WEB_SESSIONS_REVOKED,
+        ]);
+        $this->assertDatabaseHas('identity_security_events', [
+            'identity_id' => $identity->id,
+            'event_type' => SecurityEventRecorder::IDENTITY_GAME_AUTHORIZATIONS_REVOKED,
         ]);
 
         $this->post('/reset-password', [
@@ -158,6 +164,7 @@ final class PasswordRecoveryTest extends TestCase
         $afterReplay = Identity::query()->findOrFail($identity->id);
         self::assertTrue(Hash::check('New-Correct-8!Password', $afterReplay->password));
         self::assertSame(1, $afterReplay->web_session_generation);
+        self::assertSame(1, $afterReplay->game_auth_generation);
     }
 
     public function test_reset_revokes_an_existing_platform_web_session(): void
@@ -169,6 +176,7 @@ final class PasswordRecoveryTest extends TestCase
         $completer = new PasswordResetCompleter(
             new IdentityCredentialUpdater(
                 new RevokeIdentityWebSessions($securityEvents),
+                new RevokeIdentityGameAuthorizations($securityEvents),
                 $securityEvents,
             ),
         );
@@ -184,6 +192,7 @@ final class PasswordRecoveryTest extends TestCase
 
         $this->get('/')->assertOk();
         $this->assertGuest('web');
+        self::assertSame(1, Identity::query()->findOrFail($identity->id)->game_auth_generation);
     }
 
     public function test_reset_rejects_weak_password_and_confirmation_mismatch_before_token_consumption(): void
