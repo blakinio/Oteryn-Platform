@@ -68,11 +68,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-21T09:56:11+02:00
-head: fd72b8540de5aae4f04f47ee732d12e37ffaafe1
+updated_at: 2026-07-21T10:03:00+02:00
+head: 3592abdccb1293e952eb8ae9b30e860270e2d674
 branch: task/OTERYN-20260721-ui-architecture-direction
 pr: 76
-status: ready
+status: validating
 context_routes:
   - architecture
   - web-cms
@@ -106,8 +106,8 @@ unknown:
   - final per-surface Visual / UX classifications after implementation and browser acceptance rerun
 conflicts: []
 first_failure:
-  marker: visual UX launch gate
-  evidence: docs/acceptance/VISUAL_UX_ACCEPTANCE_MATRIX.md classifies the currently delivered UI as FAIL and identifies navigation, account orientation, responsive overflow, error recovery and design-system blockers
+  marker: Agent Governance checkpoint validation on 3592abdccb1293e952eb8ae9b30e860270e2d674
+  evidence: run 29812365675 failed because the checkpoint used unsupported validation result PENDING; the governance contract permits PASS, FAIL, BLOCKED or NOT_RUN only
 rejected_hypotheses:
   - The OTERYN-20260721-ui-ux-launch-readiness implementation should be performed on the former PR #67 acceptance branch: rejected because governance requires a dedicated task branch for substantial implementation work.
   - Account Overview and provisioning status can be documented as CURRENT: rejected because no current route/view delivers those screens.
@@ -130,15 +130,21 @@ validation:
   - command: PR #76 changed-file review
     result: PASS
     evidence: only the owned task record, ADR 0008 and docs/design source-of-truth files are changed
-  - command: Agent Governance run 29812297209 / #774 on fd72b8540de5aae4f04f47ee732d12e37ffaafe1
+  - command: CI run 29812365552 / #855 on 3592abdccb1293e952eb8ae9b30e860270e2d674
     result: PASS
-    evidence: governance validation completed successfully before final checkpoint update
-  - command: CI / production-like validation on current documentation head
-    result: PENDING
-    evidence: CI, Phase 7 Production-Like Validation and Platform DB Outage Validation were still in progress on the pre-checkpoint documentation head; no PASS is claimed here
+    evidence: required CI completed successfully
+  - command: Phase 7 Production-Like Validation run 29812365458 / #97 on 3592abdccb1293e952eb8ae9b30e860270e2d674
+    result: PASS
+    evidence: established production-like validation remained green
+  - command: Platform DB Outage Validation run 29812365534 / #27 on 3592abdccb1293e952eb8ae9b30e860270e2d674
+    result: PASS
+    evidence: controlled Platform DB outage validation remained green
+  - command: Agent Governance run 29812365675 / #775 on 3592abdccb1293e952eb8ae9b30e860270e2d674
+    result: FAIL
+    evidence: checkpoint validation rejected unsupported result PENDING; this checkpoint update replaces that invalid state and requires a clean rerun on the new head
 blockers:
-  - none for design architecture completion; merge readiness remains subject to required current-head GitHub checks
-next_action: Verify required GitHub checks on the current PR #76 head and merge the documentation task only if the merge gate remains satisfied.
+  - current-head Agent Governance must pass after the checkpoint validation-state fix before merge readiness
+next_action: Verify Agent Governance on the checkpoint-fix head; if it passes and other required checks remain green, mark PR #76 ready for review.
 ```
 
 ## Notes
