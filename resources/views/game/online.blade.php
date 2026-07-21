@@ -14,9 +14,9 @@
             <article class="card">
                 <h2><a href="{{ route('game.characters.show', ['name' => $character->name]) }}">{{ $character->name }}</a></h2>
                 <dl>
-                    <dt>Level</dt><dd>{{ $character->level }}</dd>
-                    <dt>Vocation</dt><dd>{{ $character->vocation }}</dd>
-                    <dt>Channel</dt><dd>{{ $character->channel_name }} (ID {{ $character->channel_id }})</dd>
+                    <dt>Level:</dt><dd>{{ $character->level }}</dd>
+                    <dt>Vocation:</dt><dd>{{ $character->vocation }}</dd>
+                    <dt>Channel:</dt><dd>{{ $character->channel_name }} (ID {{ $character->channel_id }})</dd>
                 </dl>
             </article>
         @empty
