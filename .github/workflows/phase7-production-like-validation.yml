@@ -475,7 +475,7 @@ jobs:
             echo "- classification: STAGING_PROVEN"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Validate rollback, interrupted release isolation and redeploy
+      - name: Validate existing-data upgrade, rollback, interrupted release isolation and redeploy
         run: |
           mkdir -p "/tmp/phase7-releases/${BASE_SHA}"
           git archive "$BASE_SHA" | tar -x -C "/tmp/phase7-releases/${BASE_SHA}"
@@ -483,6 +483,8 @@ jobs:
             cd "/tmp/phase7-releases/${BASE_SHA}"
             composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-progress
           )
+
+          bash scripts/phase7/validate-existing-data-upgrade.sh
 
           ln -sfn "/tmp/phase7-releases/${BASE_SHA}" /tmp/phase7-current
           test "$(readlink -f /tmp/phase7-current)" = "/tmp/phase7-releases/${BASE_SHA}"
@@ -552,6 +554,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: phase7-production-like-evidence-${{ github.run_id }}
-          path: /tmp/phase7-production-like-evidence.json
+          path: |
+            /tmp/phase7-production-like-evidence.json
+            /tmp/phase7-existing-data-upgrade-evidence.json
           retention-days: 7
           if-no-files-found: error
