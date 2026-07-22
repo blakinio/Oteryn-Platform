@@ -1,5 +1,13 @@
 <?php
 
+$gatewayServiceTokenHashes = array_values(array_unique(array_filter(array_map(
+    static fn (string $hash): string => strtolower(trim($hash)),
+    array_merge(
+        explode(',', (string) env('GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256S', '')),
+        [(string) env('GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256', '')],
+    ),
+), static fn (string $hash): bool => $hash !== '')));
+
 return [
     'protocol_version' => 1,
 
@@ -17,6 +25,6 @@ return [
     ],
 
     'gateway' => [
-        'service_token_sha256' => env('GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256'),
+        'service_token_sha256s' => $gatewayServiceTokenHashes,
     ],
 ];
