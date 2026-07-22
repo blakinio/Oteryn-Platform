@@ -169,7 +169,10 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
      */
     private function oauthBootstrap(Identity $identity, Client $client, ?string $scope): array
     {
-        $this->actingAs($identity, 'web');
+        $this->post('/login', [
+            'email' => $identity->email,
+            'password' => 'Correct-Horse-9!Battery',
+        ])->assertRedirect(route('home'));
         [$verifier, $challenge] = $this->pkcePair();
         $redirectUri = 'http://127.0.0.1:'.random_int(49152, 60999).'/callback';
         $state = 'state-'.bin2hex(random_bytes(16));
