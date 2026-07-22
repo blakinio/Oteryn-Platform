@@ -7,11 +7,19 @@ use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Passport\Client;
+use Tests\Feature\GameAuth\OAuth\Concerns\ConfiguresEphemeralPassportKeys;
 use Tests\TestCase;
 
 final class PublicClientPkcePolicyTest extends TestCase
 {
+    use ConfiguresEphemeralPassportKeys;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->configureEphemeralPassportKeys();
+    }
 
     public function test_public_client_authorization_requires_s256_method(): void
     {
