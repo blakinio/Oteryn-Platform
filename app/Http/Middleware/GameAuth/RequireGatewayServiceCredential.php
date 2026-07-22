@@ -14,21 +14,49 @@ final class RequireGatewayServiceCredential
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $expectedHash = config('game-auth.gateway.service_token_sha256');
+        $expectedHashes = $this->configuredHashes(config('game-auth.gateway.service_token_sha256s'));
 
-        if (! is_string($expectedHash) || preg_match('/\A[a-f0-9]{64}\z/i', $expectedHash) !== 1) {
+        if ($expectedHashes === null) {
             return new JsonResponse(['error' => 'service_unavailable'], 503);
         }
 
         $credential = $request->bearerToken();
+        $credentialIsBounded = is_string($credential)
+            && strlen($credential) >= 32
+            && strlen($credential) <= 1024;
+        $presentedHash = hash('sha256', $credentialIsBounded ? $credential : '');
+        $authorized = false;
 
-        if (! is_string($credential)
-            || $credential === ''
-            || ! hash_equals(strtolower($expectedHash), hash('sha256', $credential))
-        ) {
+        foreach ($expectedHashes as $expectedHash) {
+            $authorized = hash_equals($expectedHash, $presentedHash) || $authorized;
+        }
+
+        if (! $credentialIsBounded || ! $authorized) {
             return new JsonResponse(['error' => 'unauthorized_service'], 401);
         }
 
         return $next($request);
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function configuredHashes(mixed $configuredHashes): ?array
+    {
+        if (! is_array($configuredHashes) || $configuredHashes === []) {
+            return null;
+        }
+
+        $hashes = [];
+
+        foreach ($configuredHashes as $configuredHash) {
+            if (! is_string($configuredHash) || preg_match('/\A[a-f0-9]{64}\z/', $configuredHash) !== 1) {
+                return null;
+            }
+
+            $hashes[] = $configuredHash;
+        }
+
+        return $hashes;
     }
 }
