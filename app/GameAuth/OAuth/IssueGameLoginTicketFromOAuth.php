@@ -6,6 +6,7 @@ use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\GameAuth\Tickets\IssuedGameLoginTicket;
 use App\Identity\Models\Identity;
 use Illuminate\Support\Facades\DB;
+use Laravel\Passport\AccessToken;
 use Laravel\Passport\Contracts\ScopeAuthorizable;
 use Laravel\Passport\RefreshToken;
 use Laravel\Passport\Token;
@@ -19,14 +20,12 @@ final class IssueGameLoginTicketFromOAuth
 
     public function execute(Identity $identity, ScopeAuthorizable $presentedToken): IssuedGameLoginTicket
     {
-        if (! $presentedToken instanceof Token) {
-            throw new GameOAuthBootstrapDenied;
-        }
+        $tokenId = $this->tokenId($presentedToken);
 
-        return DB::transaction(function () use ($identity, $presentedToken): IssuedGameLoginTicket {
+        return DB::transaction(function () use ($identity, $tokenId): IssuedGameLoginTicket {
             $token = Token::query()
                 ->lockForUpdate()
-                ->find($presentedToken->getKey());
+                ->find($tokenId);
             $client = $this->nativeClients->requireExisting(lockForUpdate: true);
             $scope = config('game-auth.oauth.scope');
 
@@ -57,5 +56,22 @@ final class IssueGameLoginTicketFromOAuth
 
             return $issued;
         });
+    }
+
+    private function tokenId(ScopeAuthorizable $presentedToken): string
+    {
+        if ($presentedToken instanceof Token) {
+            $tokenId = $presentedToken->getKey();
+        } elseif ($presentedToken instanceof AccessToken) {
+            $tokenId = $presentedToken->toArray()['oauth_access_token_id'] ?? null;
+        } else {
+            $tokenId = null;
+        }
+
+        if (! is_string($tokenId) || $tokenId === '') {
+            throw new GameOAuthBootstrapDenied;
+        }
+
+        return $tokenId;
     }
 }
