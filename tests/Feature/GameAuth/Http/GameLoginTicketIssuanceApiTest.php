@@ -57,8 +57,6 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
         self::assertSame(hash('sha256', $ticket), $stored->ticket_hash);
         self::assertSame($identity->id, $stored->identity_id);
         self::assertSame(1001, $stored->canary_account_id);
-        self::assertFalse((bool) DB::table('oauth_access_tokens')->where('id', $oauth['access_token_id'])->value('revoked'));
-        self::assertFalse((bool) DB::table('oauth_refresh_tokens')->where('id', $oauth['refresh_token_id'])->value('revoked'));
 
         $this->assertDatabaseHas('oauth_access_tokens', [
             'id' => $oauth['access_token_id'],
