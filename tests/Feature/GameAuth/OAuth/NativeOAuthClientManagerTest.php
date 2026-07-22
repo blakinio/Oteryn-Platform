@@ -4,6 +4,7 @@ namespace Tests\Feature\GameAuth\OAuth;
 
 use App\GameAuth\OAuth\NativeOAuthClientManager;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\PendingCommand;
 use Laravel\Passport\Client;
 use LogicException;
 use Tests\TestCase;
@@ -14,18 +15,19 @@ final class NativeOAuthClientManagerTest extends TestCase
 
     public function test_ensure_command_is_registered_and_idempotently_creates_one_public_client(): void
     {
-        $this->artisan('game-auth:oauth-client:ensure')
-            ->assertSuccessful();
-
-        $this->artisan('game-auth:oauth-client:ensure')
-            ->assertSuccessful();
+        $this->assertArtisanSuccess($this->artisan('game-auth:oauth-client:ensure'));
+        $this->assertArtisanSuccess($this->artisan('game-auth:oauth-client:ensure'));
 
         $client = Client::query()->sole();
+        $redirectUris = $client->getAttribute('redirect_uris');
 
         self::assertFalse($client->confidential());
         self::assertNull($client->getAttribute('secret'));
+        self::assertNull($client->getAttribute('owner_id'));
+        self::assertNull($client->getAttribute('owner_type'));
         self::assertTrue($client->hasGrantType('authorization_code'));
-        self::assertSame(['http://127.0.0.1/callback'], $client->redirectUris());
+        self::assertIsArray($redirectUris);
+        self::assertSame(['http://127.0.0.1/callback'], $redirectUris);
     }
 
     public function test_native_redirect_configuration_fails_closed_if_it_is_not_exact_loopback_contract(): void
@@ -40,7 +42,8 @@ final class NativeOAuthClientManagerTest extends TestCase
     {
         Client::query()->create([
             'id' => 'confidential-native-client',
-            'user_id' => null,
+            'owner_id' => null,
+            'owner_type' => null,
             'name' => 'Oteryn OTClient',
             'secret' => 'not-a-real-secret',
             'provider' => null,
@@ -51,5 +54,16 @@ final class NativeOAuthClientManagerTest extends TestCase
 
         $this->expectException(LogicException::class);
         $this->app->make(NativeOAuthClientManager::class)->ensure();
+    }
+
+    private function assertArtisanSuccess(PendingCommand|int $result): void
+    {
+        if (is_int($result)) {
+            self::assertSame(0, $result);
+
+            return;
+        }
+
+        $result->assertSuccessful();
     }
 }
