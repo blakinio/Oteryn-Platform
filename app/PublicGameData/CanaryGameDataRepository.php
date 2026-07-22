@@ -34,6 +34,20 @@ final class CanaryGameDataRepository
     }
 
     /**
+     * @return Collection<int, stdClass>
+     */
+    public function activeCharactersForAccount(int $accountId): Collection
+    {
+        return DB::connection('canary')
+            ->table('players')
+            ->select(['id', 'name', 'level', 'vocation'])
+            ->where('account_id', $accountId)
+            ->where('deletion', 0)
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
      * @return array{guild: stdClass, members: LengthAwarePaginator<int, stdClass>}|null
      */
     public function findGuild(string $name, int $perPage = 50): ?array
