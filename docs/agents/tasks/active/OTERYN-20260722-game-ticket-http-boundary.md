@@ -83,8 +83,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-22T07:38:00Z
-head: dc147403a42cc5a3eb1e8ec00fc051dd0ca575db
+updated_at: 2026-07-22T07:44:00Z
+head: 53ca596aa425634c3a3f9186ee9d3c856109c78d
 branch: task/OTERYN-20260722-game-ticket-http-boundary
 pr: 120
 status: validating
@@ -120,20 +120,21 @@ proven:
   - Public and private requests prohibit client-supplied Identity or Canary account ownership.
   - Controllers and service-authentication failures use bounded JSON envelopes and no-store/no-cache responses without echoing bearer material.
   - Focused feature tests exercise the real browser authorization, PKCE exchange, Passport bearer, ticket issuance, OAuth family revocation, service authentication and replay denial paths.
-  - A one-shot formatter applied repository Pint rules and removed its temporary workflow in commit dc147403a42cc5a3eb1e8ec00fc051dd0ca575db.
+  - Exact PHPStan diagnostics were captured once, all seven reported type errors were corrected, and the temporary report/workflow were removed.
+  - Repository Pint formatting was reapplied in 53ca596aa425634c3a3f9186ee9d3c856109c78d; the temporary formatter workflow removed itself.
 derived:
   - Thin HTTP orchestration over the Phase 1 domain preserves one authoritative ticket lifecycle implementation.
   - Locking is scoped to the presented access token and per-Identity ticket/binding state; the shared native-client row is not locked, avoiding global login serialization.
-  - A normal checkpoint commit is required after the bot formatter commit because GitHub-token pushes do not trigger downstream workflows.
+  - A normal checkpoint commit is required after bot formatting because GitHub-token pushes do not trigger downstream workflows.
 unknown:
   - Exact production Gateway service credential hashes remain secret deployment state and must not be committed.
   - Exact production internal ingress/TLS/mTLS mechanism remains a deployment verification concern; v1 application authentication uses rotatable bearer-secret hashes.
-  - Final PHP 8.5 static-analysis and feature-test results for the formatted implementation head are not yet known.
+  - Final PHP 8.5 runtime test results for the formatted implementation head are not yet known.
 conflicts:
   - none
 first_failure:
-  marker: final-formatted-head-not-yet-validated
-  evidence: the previous CI head stopped at Pint before static analysis/tests; formatting was then applied by a bot commit that did not trigger workflows
+  marker: final-formatted-runtime-validation-pending
+  evidence: previous heads stopped first at Pint and then at seven PHPStan type errors; both classes of failure are now corrected and require a clean rerun
 rejected_hypotheses:
   - Reimplementing ticket state in controllers is rejected because Phase 1 already owns atomic lifecycle correctness.
   - Using the OAuth access token directly at Gateway is rejected by ADR 0009 and both integration contracts.
@@ -160,25 +161,22 @@ changed_paths:
   - tests/Feature/GameAuth/Http/GameLoginTicketIssuanceApiTest.php
   - tests/Feature/GameAuth/Http/GameLoginTicketRedeemApiTest.php
 validation:
-  - command: Agent Governance on implementation heads through 806d7b3314535cd8a5c68e3825b06011c5467dcc
+  - command: Agent Governance on implementation heads
     result: PASS
     evidence: governance remained green throughout implementation
-  - command: Platform DB Outage Validation run 29900389109
+  - command: Platform DB Outage Validation on implementation heads
     result: PASS
-    evidence: fail-closed database-outage profile passed before the formatting-only change
-  - command: CI run 29900389106
+    evidence: fail-closed database-outage profile remained green on validated heads
+  - command: CI run 29900905853
     result: FAIL
-    evidence: stopped at Pint before static analysis/tests; formatter subsequently corrected the reported style delta
-  - command: Phase 7 Production-Like Validation run 29900389087
-    result: FAIL
-    evidence: critical regression suite failed on the pre-format/pre-final-runtime-fix head and requires rerun
+    evidence: Pint passed and PHPStan reported seven exact type errors; all seven are corrected
   - command: final formatted implementation validation
     result: NOT_RUN
     evidence: triggered by this checkpoint commit
 blockers:
   - final required workflows
   - deterministic concurrent redeem proof
-next_action: Inspect the first final-head CI failure marker, fix only proven defects, then add deterministic two-competitor redeem coverage and finalize the contracts/checkpoint.
+next_action: Inspect the first final-head CI failure marker, fix only proven runtime defects, then add deterministic two-competitor redeem coverage and finalize the contracts/checkpoint.
 ```
 
 ## Notes
