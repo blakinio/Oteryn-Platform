@@ -15,6 +15,8 @@ final class PublicClientPkcePolicyTest extends TestCase
     use ConfiguresEphemeralPassportKeys;
     use RefreshDatabase;
 
+    private const PASSWORD = 'Correct-Horse-9!Battery';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -25,18 +27,23 @@ final class PublicClientPkcePolicyTest extends TestCase
     {
         $identity = Identity::query()->create([
             'email' => 'person@example.com',
-            'password' => Hash::make('Correct-Horse-9!Battery'),
+            'password' => Hash::make(self::PASSWORD),
         ]);
         $client = $this->app->make(NativeOAuthClientManager::class)->ensure();
         $challenge = rtrim(strtr(base64_encode(hash('sha256', 'verifier', true)), '+/', '-_'), '=');
 
-        $this->actingAs($identity, 'web')->get($this->authorizationUrl($client, $challenge, 'plain'))
+        $this->post('/login', [
+            'email' => $identity->email,
+            'password' => self::PASSWORD,
+        ])->assertRedirect(route('home'));
+
+        $this->get($this->authorizationUrl($client, $challenge, 'plain'))
             ->assertStatus(400);
 
-        $this->actingAs($identity, 'web')->get($this->authorizationUrl($client, $challenge, null))
+        $this->get($this->authorizationUrl($client, $challenge, null))
             ->assertStatus(400);
 
-        $this->actingAs($identity, 'web')->get($this->authorizationUrl($client, $challenge, 'S256'))
+        $this->get($this->authorizationUrl($client, $challenge, 'S256'))
             ->assertOk();
     }
 
