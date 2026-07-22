@@ -6,12 +6,16 @@ use App\Accounts\Contracts\CanaryAccountProvisioningGateway;
 use App\CanaryIntegration\CanaryAccountProvisioner;
 use App\CanaryIntegration\CanaryCharacterCreator;
 use App\Characters\Contracts\CanaryCharacterCreationGateway;
+use App\GameAuth\OAuth\RequirePublicClientPkceS256;
 use App\Identity\Mfa\PendingMfaLogin;
 use App\Identity\Support\CanonicalEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Passport\Passport;
+use LogicException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,6 +26,36 @@ class AppServiceProvider extends ServiceProvider
     }
 
     public function boot(): void
+    {
+        $this->configureRateLimiters();
+        $this->configureNativeOAuth();
+    }
+
+    private function configureNativeOAuth(): void
+    {
+        Passport::authorizationView('game-auth.oauth.authorize');
+        Passport::tokensCan([
+            'game:ticket' => 'Request a one-time Oteryn game login ticket.',
+        ]);
+        Passport::tokensExpireIn(now()->addMinutes(
+            $this->boundedPositiveInt('game-auth.oauth.access_token_ttl_minutes', 30),
+        ));
+        Passport::refreshTokensExpireIn(now()->addMinutes(
+            $this->boundedPositiveInt('game-auth.oauth.refresh_token_ttl_minutes', 60),
+        ));
+
+        $this->app->booted(function (): void {
+            $authorizationRoute = Route::getRoutes()->getByName('passport.authorizations.authorize');
+
+            if ($authorizationRoute === null) {
+                throw new LogicException('Passport authorization route is not registered.');
+            }
+
+            $authorizationRoute->middleware(RequirePublicClientPkceS256::class);
+        });
+    }
+
+    private function configureRateLimiters(): void
     {
         RateLimiter::for('identity-registration', function (Request $request): Limit {
             return Limit::perMinute(5)->by($request->ip() ?? 'unknown');
@@ -76,6 +110,17 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('character-create', function (Request $request): Limit {
             return Limit::perMinute(5)->by($this->authenticatedIdentitySourceKey($request));
         });
+    }
+
+    private function boundedPositiveInt(string $key, int $maximum): int
+    {
+        $value = config($key);
+
+        if (! is_int($value) || $value < 1 || $value > $maximum) {
+            throw new LogicException("Invalid bounded integer configuration: {$key}.");
+        }
+
+        return $value;
     }
 
     private function emailSourceKey(Request $request): string
