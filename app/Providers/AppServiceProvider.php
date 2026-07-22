@@ -110,6 +110,14 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('character-create', function (Request $request): Limit {
             return Limit::perMinute(5)->by($this->authenticatedIdentitySourceKey($request));
         });
+
+        RateLimiter::for('game-auth-ticket-issue', function (Request $request): Limit {
+            return Limit::perMinute(5)->by($this->bearerSourceKey($request));
+        });
+
+        RateLimiter::for('game-auth-ticket-redeem', function (Request $request): Limit {
+            return Limit::perMinute(60)->by($this->bearerSourceKey($request));
+        });
     }
 
     private function boundedPositiveInt(string $key, int $maximum): int
@@ -151,5 +159,15 @@ class AppServiceProvider extends ServiceProvider
         return is_int($pendingIdentityId) || is_string($pendingIdentityId)
             ? hash('sha256', (string) $pendingIdentityId)
             : 'unknown';
+    }
+
+    private function bearerSourceKey(Request $request): string
+    {
+        $credential = $request->bearerToken();
+        $credentialKey = is_string($credential) && $credential !== ''
+            ? hash('sha256', $credential)
+            : 'missing';
+
+        return $credentialKey.'|'.($request->ip() ?? 'unknown');
     }
 }
