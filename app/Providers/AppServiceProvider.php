@@ -29,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureRateLimiters();
         $this->configureNativeOAuth();
+        $this->boundedPositiveInt('game-auth.protocol_version', 1);
     }
 
     private function configureNativeOAuth(): void
@@ -110,6 +111,18 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('character-create', function (Request $request): Limit {
             return Limit::perMinute(5)->by($this->authenticatedIdentitySourceKey($request));
         });
+
+        RateLimiter::for('game-ticket-issue', function (Request $request): Limit {
+            return Limit::perMinute(
+                $this->boundedPositiveInt('game-auth.rate_limits.issue_per_minute', 600),
+            )->by($this->authenticatedIdentitySourceKey($request, 'api'));
+        });
+
+        RateLimiter::for('game-ticket-redeem', function (Request $request): Limit {
+            return Limit::perMinute(
+                $this->boundedPositiveInt('game-auth.rate_limits.redeem_per_minute', 6000),
+            )->by(hash('sha256', $request->ip() ?? 'unknown'));
+        });
     }
 
     private function boundedPositiveInt(string $key, int $maximum): int
@@ -133,9 +146,9 @@ class AppServiceProvider extends ServiceProvider
         return $identityKey.'|'.$sourceIp;
     }
 
-    private function authenticatedIdentitySourceKey(Request $request): string
+    private function authenticatedIdentitySourceKey(Request $request, ?string $guard = null): string
     {
-        $identifier = $request->user()?->getAuthIdentifier();
+        $identifier = $request->user($guard)?->getAuthIdentifier();
         $identityKey = is_int($identifier) || is_string($identifier)
             ? hash('sha256', (string) $identifier)
             : 'unknown';
