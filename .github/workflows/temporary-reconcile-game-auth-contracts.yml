@@ -1,0 +1,55 @@
+name: Temporary Reconcile Game Auth Contracts
+
+on:
+  push:
+    branches:
+      - task/OTERYN-20260722-game-ticket-hardening
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v7
+        with:
+          ref: task/OTERYN-20260722-game-ticket-hardening
+          fetch-depth: 0
+
+      - name: Reconcile implementation status
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('docs/contracts/OTCLIENT_GAME_AUTH_CONTRACT.md'): (
+                  '`TARGET CONTRACT — NOT YET IMPLEMENTED IN OTCLIENT`',
+                  '`PARTIALLY IMPLEMENTED — PLATFORM AUTHORIZATION, TICKET ISSUANCE AND GAME GATEWAY MVP ARE LIVE; OTCLIENT CONSUMER AND PRODUCTION CANARY SESSION ADAPTER ARE NOT YET IMPLEMENTED`\n\n'
+                  'Platform producer-side support from Phases 2 and 3 and the Phase 4 Game Gateway MVP are implemented. The OTClient native-client consumer and production Game Session to Canary adapter remain unimplemented and require separately scoped tasks.',
+              ),
+              Path('docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md'): (
+                  '`TARGET CONTRACT — NOT YET IMPLEMENTED`',
+                  '`PARTIALLY IMPLEMENTED — PLATFORM TICKET APIS AND GAME GATEWAY MVP ARE LIVE; PRODUCTION GAME SESSION/CANARY ADAPTER IS NOT YET IMPLEMENTED`\n\n'
+                  'Platform-owned Game Login Ticket issuance and private atomic redeem are implemented. The separately deployable Game Gateway MVP consumes redeem and login-context contracts; production Game Session issuance and the Canary adapter remain unimplemented.',
+              ),
+          }
+
+          for path, (old, new) in replacements.items():
+              content = path.read_text()
+              if content.count(old) != 1:
+                  raise SystemExit(f'expected exactly one status marker in {path}')
+              path.write_text(content.replace(old, new, 1))
+          PY
+
+      - name: Commit status and remove temporary workflow
+        run: |
+          rm .github/workflows/temporary-reconcile-game-auth-contracts.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "docs(auth): reconcile Gateway MVP contract status"
+          git push origin HEAD:task/OTERYN-20260722-game-ticket-hardening
