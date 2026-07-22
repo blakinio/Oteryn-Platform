@@ -28,6 +28,10 @@ final class IssueGameLoginTicketFromOAuth
                 ->find($tokenId);
             $client = $this->nativeClients->requireExisting();
             $scope = config('game-auth.oauth.scope');
+            $tokenClientId = $token?->getAttribute('client_id');
+            $tokenUserId = $token?->getAttribute('user_id');
+            $clientId = $client->getKey();
+            $identityId = $identity->getAuthIdentifier();
 
             if (! $token instanceof Token
                 || $token->revoked
@@ -36,8 +40,12 @@ final class IssueGameLoginTicketFromOAuth
                 || ! is_string($scope)
                 || $scope === ''
                 || ! $token->can($scope)
-                || (string) $token->client_id !== (string) $client->getKey()
-                || (string) $token->user_id !== (string) $identity->getAuthIdentifier()
+                || ! is_string($tokenClientId)
+                || ! is_string($clientId)
+                || ! hash_equals($clientId, $tokenClientId)
+                || (! is_int($tokenUserId) && ! is_string($tokenUserId))
+                || (! is_int($identityId) && ! is_string($identityId))
+                || (string) $tokenUserId !== (string) $identityId
             ) {
                 throw new GameOAuthBootstrapDenied;
             }
