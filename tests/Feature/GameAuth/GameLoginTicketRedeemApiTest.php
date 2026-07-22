@@ -42,11 +42,21 @@ final class GameLoginTicketRedeemApiTest extends TestCase
             ->assertJsonStructure(['authorization' => ['redeemed_at']]);
 
         $payload = $response->json();
-        self::assertIsArray($payload);
+
+        if (! is_array($payload)) {
+            self::fail('Private redeem response was not a JSON object.');
+        }
+
+        $authorization = $payload['authorization'] ?? null;
+
+        if (! is_array($authorization)) {
+            self::fail('Private redeem response did not contain an authorization object.');
+        }
+
         self::assertArrayNotHasKey('password', $payload);
         self::assertArrayNotHasKey('oauth_token', $payload);
         self::assertArrayNotHasKey('ticket', $payload);
-        self::assertArrayNotHasKey('identity_id', $payload['authorization']);
+        self::assertArrayNotHasKey('identity_id', $authorization);
 
         $this->withToken(self::SERVICE_CREDENTIAL)
             ->postJson('/internal/v1/game-auth/tickets/redeem', [
