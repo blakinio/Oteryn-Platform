@@ -7,7 +7,6 @@ use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Testing\TestResponse;
 use Laravel\Passport\Client;
 use PragmaRX\Google2FA\Google2FA;
 use Tests\Feature\GameAuth\OAuth\Concerns\ConfiguresEphemeralPassportKeys;
@@ -168,14 +167,27 @@ final class NativeOAuthPkceTest extends TestCase
         $this->loginIdentity($identity);
         $client = $this->app->make(NativeOAuthClientManager::class)->ensure();
         [, $challenge] = $this->pkcePair();
+        $wrongPathUri = 'http://127.0.0.1:49155/not-callback';
+        $remoteUri = 'https://example.com/callback';
 
-        $this->get(
-            $this->authorizationUrl($client, 'http://127.0.0.1:49155/not-callback', $challenge, 'wrong-path-state'),
-        )->assertStatus(400);
+        $wrongPath = $this->get(
+            $this->authorizationUrl($client, $wrongPathUri, $challenge, 'wrong-path-state'),
+        );
+        $remote = $this->get(
+            $this->authorizationUrl($client, $remoteUri, $challenge, 'remote-state'),
+        );
 
-        $this->get(
-            $this->authorizationUrl($client, 'https://example.com/callback', $challenge, 'remote-state'),
-        )->assertStatus(400);
+        foreach ([[$wrongPath, $wrongPathUri], [$remote, $remoteUri]] as [$response, $untrustedUri]) {
+            self::assertGreaterThanOrEqual(400, $response->getStatusCode());
+            self::assertLessThan(500, $response->getStatusCode());
+            $location = $response->headers->get('Location');
+
+            if (is_string($location)) {
+                self::assertStringNotStartsWith($untrustedUri, $location);
+            }
+        }
+
+        self::assertSame(0, DB::table('oauth_auth_codes')->count());
     }
 
     public function test_unauthenticated_authorization_returns_through_existing_identity_login(): void
@@ -197,8 +209,13 @@ final class NativeOAuthPkceTest extends TestCase
             'email' => $identity->email,
             'password' => self::PASSWORD,
         ]);
+        $location = $response->headers->get('Location');
 
-        $this->assertEquivalentRedirect($response, url($authorizationUrl));
+        if (! is_string($location)) {
+            self::fail('Identity login did not return an intended redirect.');
+        }
+
+        $this->assertEquivalentRedirect($location, url($authorizationUrl));
     }
 
     public function test_mfa_challenge_preserves_interrupted_oauth_authorization_request(): void
@@ -231,8 +248,13 @@ final class NativeOAuthPkceTest extends TestCase
         $response = $this->post('/mfa/challenge', [
             'code' => $code,
         ]);
+        $location = $response->headers->get('Location');
 
-        $this->assertEquivalentRedirect($response, url($authorizationUrl));
+        if (! is_string($location)) {
+            self::fail('MFA challenge did not return an intended redirect.');
+        }
+
+        $this->assertEquivalentRedirect($location, url($authorizationUrl));
     }
 
     private function authorize(
@@ -278,14 +300,8 @@ final class NativeOAuthPkceTest extends TestCase
         ])->assertRedirect(route('home'));
     }
 
-    private function assertEquivalentRedirect(TestResponse $response, string $expected): void
+    private function assertEquivalentRedirect(string $actual, string $expected): void
     {
-        $actual = $response->headers->get('Location');
-
-        if (! is_string($actual)) {
-            self::fail('Expected redirect response did not contain a Location header.');
-        }
-
         self::assertSame(parse_url($expected, PHP_URL_SCHEME), parse_url($actual, PHP_URL_SCHEME));
         self::assertSame(parse_url($expected, PHP_URL_HOST), parse_url($actual, PHP_URL_HOST));
         self::assertSame(parse_url($expected, PHP_URL_PATH), parse_url($actual, PHP_URL_PATH));
