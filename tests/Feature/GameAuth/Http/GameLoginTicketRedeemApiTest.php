@@ -132,6 +132,9 @@ final class GameLoginTicketRedeemApiTest extends TestCase
         self::assertStringNotContainsString(self::SERVICE_TOKEN, $this->responseBody($response->getContent()));
     }
 
+    /**
+     * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
+     */
     private function redeem(string $ticket): TestResponse
     {
         return $this->postJson('/internal/v1/game-auth/tickets/redeem', [
