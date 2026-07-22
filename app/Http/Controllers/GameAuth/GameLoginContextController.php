@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\GameAuth;
 
+use App\GameAuth\Context\GameLoginCharacter;
 use App\GameAuth\Context\GameLoginContextProvider;
 use App\GameAuth\Context\GameLoginContextUnavailable;
 use Illuminate\Database\QueryException;
@@ -34,7 +35,7 @@ final class GameLoginContextController
                 'port' => $context->world->port,
             ]],
             'characters' => array_map(
-                static fn ($character): array => [
+                static fn (GameLoginCharacter $character): array => [
                     'id' => $character->id,
                     'name' => $character->name,
                     'level' => $character->level,
