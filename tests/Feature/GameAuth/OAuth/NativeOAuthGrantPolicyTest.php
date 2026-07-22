@@ -6,11 +6,19 @@ use App\GameAuth\OAuth\NativeOAuthClientManager;
 use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Tests\Feature\GameAuth\OAuth\Concerns\ConfiguresEphemeralPassportKeys;
 use Tests\TestCase;
 
 final class NativeOAuthGrantPolicyTest extends TestCase
 {
+    use ConfiguresEphemeralPassportKeys;
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->configureEphemeralPassportKeys();
+    }
 
     public function test_native_client_cannot_use_password_grant(): void
     {
