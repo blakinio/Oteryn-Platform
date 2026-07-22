@@ -18,7 +18,7 @@ final class GameLoginTicketRedeemController
             throw new LogicException('Game ticket audience is not configured.');
         }
 
-        $validated = $request->validate([
+        $request->validate([
             'protocol_version' => ['required', 'integer', 'in:1'],
             'ticket' => ['required', 'string', 'max:1024'],
             'audience' => ['required', 'string', 'in:'.$audience],
@@ -27,8 +27,14 @@ final class GameLoginTicketRedeemController
             'canary_account_id' => ['prohibited'],
         ]);
 
+        $ticket = $request->input('ticket');
+
+        if (! is_string($ticket)) {
+            return response()->json(['error' => 'invalid_request'], 422);
+        }
+
         try {
-            $redeemed = $redeemer->execute($validated['ticket'], $audience);
+            $redeemed = $redeemer->execute($ticket, $audience);
         } catch (GameLoginTicketDenied) {
             return response()->json(['error' => 'invalid_ticket'], 401);
         }
