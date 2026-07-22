@@ -29,7 +29,7 @@ final class NativeOAuthClientManager
         $existing = $matches->first();
 
         if ($existing instanceof Client) {
-            $this->assertExpectedClient($existing, $redirectUri);
+            $this->assertExpected($existing);
 
             return $existing;
         }
@@ -41,18 +41,20 @@ final class NativeOAuthClientManager
         );
     }
 
-    private function assertExpectedClient(Client $client, string $redirectUri): void
+    public function assertExpected(Client $client): void
     {
         $redirectUris = $client->getAttribute('redirect_uris');
 
         if (! is_array($redirectUris)
+            || $client->name !== $this->configString('game-auth.oauth.native_client_name')
+            || $client->revoked
             || $client->confidential()
             || $client->getAttribute('owner_id') !== null
             || $client->getAttribute('owner_type') !== null
             || ! $client->hasGrantType('authorization_code')
-            || $redirectUris !== [$redirectUri]
+            || $redirectUris !== [$this->nativeRedirectUri()]
         ) {
-            throw new LogicException('Existing Oteryn native OAuth client does not match the required public PKCE contract.');
+            throw new LogicException('OAuth client does not match the required Oteryn native public-client contract.');
         }
     }
 
