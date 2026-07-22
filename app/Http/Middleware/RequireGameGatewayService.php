@@ -14,9 +14,9 @@ final class RequireGameGatewayService
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $configuredHashes = config('game-auth.gateway.service_token_hashes');
+        $configuredHashes = $this->configuredHashes(config('game-auth.gateway.service_token_hashes'));
 
-        if (! $this->validConfiguration($configuredHashes)) {
+        if ($configuredHashes === null) {
             return $this->error(
                 code: 'temporarily_unavailable',
                 message: 'Game authentication service is unavailable.',
@@ -47,19 +47,26 @@ final class RequireGameGatewayService
         return $next($request);
     }
 
-    private function validConfiguration(mixed $configuredHashes): bool
+    /**
+     * @return list<string>|null
+     */
+    private function configuredHashes(mixed $configuredHashes): ?array
     {
         if (! is_array($configuredHashes) || $configuredHashes === []) {
-            return false;
+            return null;
         }
+
+        $hashes = [];
 
         foreach ($configuredHashes as $configuredHash) {
             if (! is_string($configuredHash) || preg_match('/^[a-f0-9]{64}$/', $configuredHash) !== 1) {
-                return false;
+                return null;
             }
+
+            $hashes[] = $configuredHash;
         }
 
-        return true;
+        return $hashes;
     }
 
     /**
