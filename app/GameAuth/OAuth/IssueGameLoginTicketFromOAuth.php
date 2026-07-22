@@ -2,8 +2,8 @@
 
 namespace App\GameAuth\OAuth;
 
-use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\GameAuth\Tickets\IssuedGameLoginTicket;
+use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\Identity\Models\Identity;
 use Illuminate\Support\Facades\DB;
 use Laravel\Passport\AccessToken;

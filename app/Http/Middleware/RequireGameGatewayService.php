@@ -47,9 +47,6 @@ final class RequireGameGatewayService
         return $next($request);
     }
 
-    /**
-     * @param  mixed  $configuredHashes
-     */
     private function validConfiguration(mixed $configuredHashes): bool
     {
         if (! is_array($configuredHashes) || $configuredHashes === []) {
