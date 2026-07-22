@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Passport\Client;
 use Laravel\Passport\RefreshToken;
 use Laravel\Passport\Token;
-use Throwable;
+use LogicException;
 
 final class IssueGameLoginTicketFromOAuth
 {
@@ -27,13 +27,15 @@ final class IssueGameLoginTicketFromOAuth
                 ->first();
 
             $tokenUserId = $accessToken?->getAttribute('user_id');
+            $identityId = $identity->getAuthIdentifier();
 
             if (! $accessToken instanceof Token
                 || (! is_int($tokenUserId) && ! is_string($tokenUserId))
+                || (! is_int($identityId) && ! is_string($identityId))
                 || $accessToken->revoked
                 || $accessToken->expires_at === null
                 || $accessToken->expires_at->lte(now())
-                || (string) $tokenUserId !== (string) $identity->getAuthIdentifier()
+                || (string) $tokenUserId !== (string) $identityId
                 || ! $accessToken->can('game:ticket')
             ) {
                 throw new OAuthBootstrapDenied;
@@ -50,7 +52,7 @@ final class IssueGameLoginTicketFromOAuth
 
             try {
                 $this->nativeClients->assertExpected($client);
-            } catch (Throwable) {
+            } catch (LogicException) {
                 throw new OAuthBootstrapDenied;
             }
 
