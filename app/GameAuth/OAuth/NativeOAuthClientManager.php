@@ -30,9 +30,9 @@ final class NativeOAuthClientManager
         );
     }
 
-    public function requireExisting(bool $lockForUpdate = false): Client
+    public function requireExisting(): Client
     {
-        $client = $this->findActive($lockForUpdate);
+        $client = $this->findActive();
 
         if (! $client instanceof Client) {
             throw new LogicException('The configured Oteryn native OAuth client does not exist.');
@@ -43,17 +43,12 @@ final class NativeOAuthClientManager
         return $client;
     }
 
-    private function findActive(bool $lockForUpdate = false): ?Client
+    private function findActive(): ?Client
     {
-        $query = Client::query()
+        $matches = Client::query()
             ->where('name', $this->configString('game-auth.oauth.native_client_name'))
-            ->where('revoked', false);
-
-        if ($lockForUpdate) {
-            $query->lockForUpdate();
-        }
-
-        $matches = $query->get();
+            ->where('revoked', false)
+            ->get();
 
         if ($matches->count() > 1) {
             throw new LogicException('Multiple active OAuth clients use the configured Oteryn native client name.');
