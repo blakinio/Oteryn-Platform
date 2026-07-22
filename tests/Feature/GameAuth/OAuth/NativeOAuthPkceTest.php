@@ -9,10 +9,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Passport\Client;
 use PragmaRX\Google2FA\Google2FA;
+use Tests\Feature\GameAuth\OAuth\Concerns\ConfiguresEphemeralPassportKeys;
 use Tests\TestCase;
 
 final class NativeOAuthPkceTest extends TestCase
 {
+    use ConfiguresEphemeralPassportKeys;
     use RefreshDatabase;
 
     private const PASSWORD = 'Correct-Horse-9!Battery';
@@ -29,13 +31,16 @@ final class NativeOAuthPkceTest extends TestCase
 
         $first = $manager->ensure();
         $second = $manager->ensure();
+        $redirectUris = $first->getAttribute('redirect_uris');
 
         self::assertSame($first->getKey(), $second->getKey());
         self::assertFalse($first->confidential());
-        self::assertNull($first->secret);
-        self::assertNull($first->user_id);
+        self::assertNull($first->getAttribute('secret'));
+        self::assertNull($first->getAttribute('owner_id'));
+        self::assertNull($first->getAttribute('owner_type'));
         self::assertTrue($first->hasGrantType('authorization_code'));
-        self::assertSame(['http://127.0.0.1/callback'], $first->redirectUris());
+        self::assertIsArray($redirectUris);
+        self::assertSame(['http://127.0.0.1/callback'], $redirectUris);
         self::assertSame(1, Client::query()->count());
     }
 
@@ -54,7 +59,7 @@ final class NativeOAuthPkceTest extends TestCase
         $authorization->assertSee('Authorize Oteryn game login');
         $authorization->assertSee('Request a one-time Oteryn game login ticket.');
 
-        $authToken = $this->extractAuthToken($authorization->getContent());
+        $authToken = $this->extractAuthToken($this->responseBody($authorization->getContent()));
         $approval = $this->actingAs($identity, 'web')->post(route('passport.authorizations.approve'), [
             'state' => $state,
             'client_id' => $client->getKey(),
@@ -62,17 +67,25 @@ final class NativeOAuthPkceTest extends TestCase
         ]);
 
         $location = $approval->headers->get('Location');
-        self::assertIsString($location);
+
+        if (! is_string($location)) {
+            self::fail('OAuth approval response did not contain a redirect location.');
+        }
+
         self::assertStringStartsWith($redirectUri, $location);
         $query = $this->redirectQuery($location);
         self::assertSame($state, $query['state'] ?? null);
-        self::assertArrayHasKey('code', $query);
+        $code = $query['code'] ?? null;
+
+        if (! is_string($code)) {
+            self::fail('OAuth approval redirect did not contain an authorization code.');
+        }
 
         $token = $this->post('/oauth/token', [
             'grant_type' => 'authorization_code',
             'client_id' => $client->getKey(),
             'redirect_uri' => $redirectUri,
-            'code' => $query['code'],
+            'code' => $code,
             'code_verifier' => $verifier,
         ]);
 
@@ -83,7 +96,14 @@ final class NativeOAuthPkceTest extends TestCase
                 'access_token',
                 'refresh_token',
             ]);
-        self::assertLessThanOrEqual(300, $token->json('expires_in'));
+
+        $expiresIn = $token->json('expires_in');
+
+        if (! is_int($expiresIn)) {
+            self::fail('OAuth token response did not contain an integer expires_in value.');
+        }
+
+        self::assertLessThanOrEqual(300, $expiresIn);
 
         $access = DB::table('oauth_access_tokens')
             ->where('client_id', $client->getKey())
@@ -165,7 +185,7 @@ final class NativeOAuthPkceTest extends TestCase
         $this->post('/login', [
             'email' => $identity->email,
             'password' => self::PASSWORD,
-        ])->assertRedirect($authorizationUrl);
+        ])->assertRedirect(url($authorizationUrl));
     }
 
     public function test_mfa_challenge_preserves_interrupted_oauth_authorization_request(): void
@@ -189,12 +209,16 @@ final class NativeOAuthPkceTest extends TestCase
         ])->assertRedirect(route('identity.mfa.challenge.create'));
 
         $secret = $identity->fresh()?->two_factor_secret;
-        self::assertIsString($secret);
+
+        if (! is_string($secret)) {
+            self::fail('MFA-enabled test identity did not contain a TOTP secret.');
+        }
+
         $code = (new Google2FA)->getCurrentOtp($secret);
 
         $this->post('/mfa/challenge', [
             'code' => $code,
-        ])->assertRedirect($authorizationUrl);
+        ])->assertRedirect(url($authorizationUrl));
     }
 
     private function authorize(
@@ -212,14 +236,21 @@ final class NativeOAuthPkceTest extends TestCase
         $approval = $this->actingAs($identity, 'web')->post(route('passport.authorizations.approve'), [
             'state' => $state,
             'client_id' => $client->getKey(),
-            'auth_token' => $this->extractAuthToken($authorization->getContent()),
+            'auth_token' => $this->extractAuthToken($this->responseBody($authorization->getContent())),
         ]);
 
         $location = $approval->headers->get('Location');
-        self::assertIsString($location);
+
+        if (! is_string($location)) {
+            self::fail('OAuth approval response did not contain a redirect location.');
+        }
+
         $query = $this->redirectQuery($location);
         $code = $query['code'] ?? null;
-        self::assertIsString($code);
+
+        if (! is_string($code)) {
+            self::fail('OAuth approval redirect did not contain an authorization code.');
+        }
 
         return $code;
     }
@@ -241,7 +272,10 @@ final class NativeOAuthPkceTest extends TestCase
     {
         preg_match('/name="auth_token" value="([^"]+)"/', $html, $matches);
         $authToken = $matches[1] ?? null;
-        self::assertIsString($authToken);
+
+        if (! is_string($authToken)) {
+            self::fail('OAuth authorization view did not contain an auth_token value.');
+        }
 
         return html_entity_decode($authToken, ENT_QUOTES | ENT_HTML5);
     }
@@ -252,10 +286,21 @@ final class NativeOAuthPkceTest extends TestCase
     private function redirectQuery(string $location): array
     {
         $queryString = parse_url($location, PHP_URL_QUERY);
-        self::assertIsString($queryString);
-        parse_str($queryString, $query);
 
-        return array_filter($query, 'is_string');
+        if (! is_string($queryString)) {
+            self::fail('OAuth redirect location did not contain a query string.');
+        }
+
+        parse_str($queryString, $query);
+        $strings = [];
+
+        foreach ($query as $key => $value) {
+            if (is_string($key) && is_string($value)) {
+                $strings[$key] = $value;
+            }
+        }
+
+        return $strings;
     }
 
     /**
@@ -288,24 +333,12 @@ final class NativeOAuthPkceTest extends TestCase
         return $identity;
     }
 
-    private function configureEphemeralPassportKeys(): void
+    private function responseBody(string|false $content): string
     {
-        $key = openssl_pkey_new([
-            'private_key_bits' => 2048,
-            'private_key_type' => OPENSSL_KEYTYPE_RSA,
-        ]);
-        self::assertNotFalse($key);
+        if (! is_string($content)) {
+            self::fail('HTTP response body was not a string.');
+        }
 
-        $privateKey = '';
-        self::assertTrue(openssl_pkey_export($key, $privateKey));
-        $details = openssl_pkey_get_details($key);
-        self::assertIsArray($details);
-        self::assertArrayHasKey('key', $details);
-        self::assertIsString($details['key']);
-
-        config([
-            'passport.private_key' => $privateKey,
-            'passport.public_key' => $details['key'],
-        ]);
+        return $content;
     }
 }
