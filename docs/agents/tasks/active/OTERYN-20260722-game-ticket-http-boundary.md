@@ -58,7 +58,7 @@ owned_paths:
   - app/Providers/AppServiceProvider.php
   - config/game-auth.php
   - .env.example
-  - tests/Feature/GameAuth/Http/
+  - tests/Feature/GameAuth/
   - docs/contracts/OTCLIENT_GAME_AUTH_CONTRACT.md
   - docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md
 modules:
@@ -83,8 +83,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-22T07:44:00Z
-head: 53ca596aa425634c3a3f9186ee9d3c856109c78d
+updated_at: 2026-07-22T07:56:00Z
+head: 4b6392a5e963442136838c25110362d21f218687
 branch: task/OTERYN-20260722-game-ticket-http-boundary
 pr: 120
 status: validating
@@ -107,7 +107,7 @@ owned_paths:
   - app/Providers/AppServiceProvider.php
   - config/game-auth.php
   - .env.example
-  - tests/Feature/GameAuth/Http/
+  - tests/Feature/GameAuth/
   - docs/contracts/OTCLIENT_GAME_AUTH_CONTRACT.md
   - docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md
 proven:
@@ -120,27 +120,28 @@ proven:
   - Public and private requests prohibit client-supplied Identity or Canary account ownership.
   - Controllers and service-authentication failures use bounded JSON envelopes and no-store/no-cache responses without echoing bearer material.
   - Focused feature tests exercise the real browser authorization, PKCE exchange, Passport bearer, ticket issuance, OAuth family revocation, service authentication and replay denial paths.
-  - Exact PHPStan diagnostics were captured once, all seven reported type errors were corrected, and the temporary report/workflow were removed.
-  - Repository Pint formatting was reapplied in 53ca596aa425634c3a3f9186ee9d3c856109c78d; the temporary formatter workflow removed itself.
+  - CI run 29901775989 passed Pint, PHPStan and the full existing test suite after the Passport guard replay fixture was corrected.
+  - Deterministic MariaDB concurrency coverage now coordinates two real processes and requires an observed INNODB_LOCK_WAITS entry before releasing the winning transaction.
 derived:
   - Thin HTTP orchestration over the Phase 1 domain preserves one authoritative ticket lifecycle implementation.
   - Locking is scoped to the presented access token and per-Identity ticket/binding state; the shared native-client row is not locked, avoiding global login serialization.
-  - A normal checkpoint commit is required after bot formatting because GitHub-token pushes do not trigger downstream workflows.
+  - The concurrency test must prove a real blocked database competitor rather than rely on scheduling delay.
 unknown:
   - Exact production Gateway service credential hashes remain secret deployment state and must not be committed.
   - Exact production internal ingress/TLS/mTLS mechanism remains a deployment verification concern; v1 application authentication uses rotatable bearer-secret hashes.
-  - Final PHP 8.5 runtime test results for the formatted implementation head are not yet known.
+  - Final PHP 8.5 static-analysis and runtime results for the new MariaDB concurrency test are not yet known.
 conflicts:
   - none
 first_failure:
-  marker: final-formatted-runtime-validation-pending
-  evidence: previous heads stopped first at Pint and then at seven PHPStan type errors; both classes of failure are now corrected and require a clean rerun
+  marker: concurrency-test-formatting
+  evidence: CI run 29901944286 stopped at Pint before PHPStan or runtime; a one-shot repository formatter is now active
 rejected_hypotheses:
   - Reimplementing ticket state in controllers is rejected because Phase 1 already owns atomic lifecycle correctness.
   - Using the OAuth access token directly at Gateway is rejected by ADR 0009 and both integration contracts.
   - Authenticating Gateway by private IP/network placement alone is rejected.
   - Treating Passport Identity token context as an Eloquent Token is rejected; Passport 13 attaches an AccessToken wrapper and the persisted token must be resolved by its authenticated identifier.
   - Locking the shared native OAuth client row during every issuance is rejected because it would serialize unrelated logins.
+  - A concurrency test based only on sleep timing or two sequential requests is rejected.
 changed_paths:
   - .env.example
   - app/GameAuth/OAuth/GameOAuthBootstrapDenied.php
@@ -158,25 +159,29 @@ changed_paths:
   - docs/agents/tasks/archive/OTERYN-20260722-native-oauth-pkce.md
   - routes/api.php
   - routes/internal.php
+  - tests/Feature/GameAuth/GameLoginTicketMariaDbConcurrencyTest.php
   - tests/Feature/GameAuth/Http/GameLoginTicketIssuanceApiTest.php
   - tests/Feature/GameAuth/Http/GameLoginTicketRedeemApiTest.php
 validation:
+  - command: CI run 29901775989
+    result: PASS
+    evidence: Pint, PHPStan and the full pre-concurrency test suite passed
   - command: Agent Governance on implementation heads
     result: PASS
     evidence: governance remained green throughout implementation
   - command: Platform DB Outage Validation on implementation heads
     result: PASS
-    evidence: fail-closed database-outage profile remained green on validated heads
-  - command: CI run 29900905853
+    evidence: fail-closed database-outage validation remained green on validated heads
+  - command: CI run 29901944286
     result: FAIL
-    evidence: Pint passed and PHPStan reported seven exact type errors; all seven are corrected
-  - command: final formatted implementation validation
+    evidence: the newly added concurrency test required repository Pint formatting before static or runtime validation
+  - command: formatted concurrency validation
     result: NOT_RUN
-    evidence: triggered by this checkpoint commit
+    evidence: triggered by this checkpoint commit and the one-shot formatter
 blockers:
+  - formatted concurrency test validation
   - final required workflows
-  - deterministic concurrent redeem proof
-next_action: Inspect the first final-head CI failure marker, fix only proven runtime defects, then add deterministic two-competitor redeem coverage and finalize the contracts/checkpoint.
+next_action: Inspect the first post-format CI failure marker, fix only proven defects, then finalize contracts and checkpoint evidence.
 ```
 
 ## Notes
