@@ -28,13 +28,14 @@ final class GameLoginTicketIssueController
         }
 
         $accessToken = $identity->currentAccessToken();
+        $accessTokenId = $accessToken?->getKey();
 
-        if (! $accessToken instanceof Token) {
+        if (! $accessToken instanceof Token || (! is_int($accessTokenId) && ! is_string($accessTokenId))) {
             return response()->json(['error' => 'unauthenticated'], 401);
         }
 
         try {
-            $issued = $issuer->execute($identity, (string) $accessToken->getKey());
+            $issued = $issuer->execute($identity, (string) $accessTokenId);
         } catch (OAuthBootstrapDenied|GameLoginTicketDenied) {
             return response()->json(['error' => 'game_login_unavailable'], 401);
         }
