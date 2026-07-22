@@ -1,5 +1,13 @@
 <?php
 
+$gatewayServiceTokenHashes = array_values(array_filter(
+    array_map(
+        static fn (string $hash): string => strtolower(trim($hash)),
+        explode(',', (string) env('GAME_AUTH_GATEWAY_SERVICE_TOKEN_HASHES', '')),
+    ),
+    static fn (string $hash): bool => $hash !== '',
+));
+
 return [
     'protocol_version' => 1,
 
@@ -14,5 +22,14 @@ return [
     'ticket' => [
         'audience' => 'oteryn-game-gateway',
         'ttl_seconds' => (int) env('GAME_AUTH_TICKET_TTL_SECONDS', 60),
+    ],
+
+    'gateway' => [
+        'service_token_hashes' => $gatewayServiceTokenHashes,
+    ],
+
+    'rate_limits' => [
+        'issue_per_minute' => (int) env('GAME_AUTH_TICKET_ISSUE_PER_MINUTE', 10),
+        'redeem_per_minute' => (int) env('GAME_AUTH_TICKET_REDEEM_PER_MINUTE', 120),
     ],
 ];
