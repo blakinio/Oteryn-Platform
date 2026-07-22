@@ -2,8 +2,8 @@
 
 namespace App\GameAuth\OAuth;
 
-use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\GameAuth\Tickets\IssuedGameLoginTicket;
+use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\Identity\Models\Identity;
 use Illuminate\Support\Facades\DB;
 use Laravel\Passport\Client;
@@ -26,11 +26,14 @@ final class IssueGameLoginTicketFromOAuth
                 ->lockForUpdate()
                 ->first();
 
+            $tokenUserId = $accessToken?->getAttribute('user_id');
+
             if (! $accessToken instanceof Token
+                || (! is_int($tokenUserId) && ! is_string($tokenUserId))
                 || $accessToken->revoked
                 || $accessToken->expires_at === null
                 || $accessToken->expires_at->lte(now())
-                || (string) $accessToken->user_id !== (string) $identity->getAuthIdentifier()
+                || (string) $tokenUserId !== (string) $identity->getAuthIdentifier()
                 || ! $accessToken->can('game:ticket')
             ) {
                 throw new OAuthBootstrapDenied;
