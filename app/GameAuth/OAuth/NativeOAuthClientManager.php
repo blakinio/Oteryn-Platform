@@ -43,10 +43,14 @@ final class NativeOAuthClientManager
 
     private function assertExpectedClient(Client $client, string $redirectUri): void
     {
-        if ($client->confidential()
-            || $client->user_id !== null
+        $redirectUris = $client->getAttribute('redirect_uris');
+
+        if (! is_array($redirectUris)
+            || $client->confidential()
+            || $client->getAttribute('owner_id') !== null
+            || $client->getAttribute('owner_type') !== null
             || ! $client->hasGrantType('authorization_code')
-            || $client->redirectUris() !== [$redirectUri]
+            || $redirectUris !== [$redirectUri]
         ) {
             throw new LogicException('Existing Oteryn native OAuth client does not match the required public PKCE contract.');
         }
