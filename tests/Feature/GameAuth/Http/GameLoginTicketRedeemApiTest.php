@@ -8,6 +8,7 @@ use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 final class GameLoginTicketRedeemApiTest extends TestCase
@@ -85,7 +86,7 @@ final class GameLoginTicketRedeemApiTest extends TestCase
 
         $response = $this->redeem($issued->ticket);
 
-        $response->assertServiceUnavailable()
+        $response->assertStatus(503)
             ->assertJsonPath('error.code', 'temporarily_unavailable');
         self::assertNull(GameLoginTicket::query()->sole()->used_at);
         self::assertStringNotContainsString($issued->ticket, $this->responseBody($response->getContent()));
@@ -131,7 +132,7 @@ final class GameLoginTicketRedeemApiTest extends TestCase
         self::assertStringNotContainsString(self::SERVICE_TOKEN, $this->responseBody($response->getContent()));
     }
 
-    private function redeem(string $ticket)
+    private function redeem(string $ticket): TestResponse
     {
         return $this->postJson('/internal/v1/game-auth/tickets/redeem', [
             'protocol_version' => 1,
