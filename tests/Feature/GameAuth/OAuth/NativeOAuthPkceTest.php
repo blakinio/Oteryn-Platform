@@ -183,7 +183,7 @@ final class NativeOAuthPkceTest extends TestCase
             $location = $response->headers->get('Location');
 
             if (is_string($location)) {
-                self::assertStringNotStartsWith($untrustedUri, $location);
+                self::assertFalse(str_starts_with($location, $untrustedUri));
             }
         }
 
