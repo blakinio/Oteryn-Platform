@@ -8,7 +8,7 @@ use App\GameAuth\Tickets\GameLoginTicketDenied;
 use App\Identity\Models\Identity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Laravel\Passport\Token;
+use Laravel\Passport\AccessToken;
 
 final class GameLoginTicketIssueController
 {
@@ -28,14 +28,20 @@ final class GameLoginTicketIssueController
         }
 
         $accessToken = $identity->currentAccessToken();
-        $accessTokenId = $accessToken?->getKey();
 
-        if (! $accessToken instanceof Token || (! is_int($accessTokenId) && ! is_string($accessTokenId))) {
+        if (! $accessToken instanceof AccessToken) {
+            return response()->json(['error' => 'unauthenticated'], 401);
+        }
+
+        $attributes = $accessToken->toArray();
+        $accessTokenId = $attributes['oauth_access_token_id'] ?? null;
+
+        if (! is_string($accessTokenId) || $accessTokenId === '') {
             return response()->json(['error' => 'unauthenticated'], 401);
         }
 
         try {
-            $issued = $issuer->execute($identity, (string) $accessTokenId);
+            $issued = $issuer->execute($identity, $accessTokenId);
         } catch (OAuthBootstrapDenied|GameLoginTicketDenied) {
             return response()->json(['error' => 'game_login_unavailable'], 401);
         }
