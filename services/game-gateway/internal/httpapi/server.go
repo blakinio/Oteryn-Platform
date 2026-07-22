@@ -14,7 +14,7 @@ import (
 	"github.com/blakinio/oteryn-platform/services/game-gateway/internal/gateway"
 )
 
-var safeRequestID = regexp.MustCompile(`\A[A-Za-z0-9._-]{1,64}\z`)
+var safeRequestID = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 
 type Server struct {
 	service *gateway.Service
