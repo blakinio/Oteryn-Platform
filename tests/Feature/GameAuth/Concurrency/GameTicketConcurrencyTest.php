@@ -149,8 +149,13 @@ final class GameTicketConcurrencyTest extends TestCase
         file_put_contents($directory.'/start', '1');
 
         foreach ($children as $pid) {
-            $status = 0;
+            $status = null;
             pcntl_waitpid($pid, $status);
+
+            if (! is_int($status)) {
+                self::fail('Child process status was not an integer.');
+            }
+
             self::assertTrue(pcntl_wifexited($status));
             self::assertSame(0, pcntl_wexitstatus($status));
         }
