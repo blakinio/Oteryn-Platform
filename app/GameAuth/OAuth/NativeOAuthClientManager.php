@@ -2,6 +2,7 @@
 
 namespace App\GameAuth\OAuth;
 
+use Illuminate\Database\Eloquent\Builder;
 use Laravel\Passport\Client;
 use Laravel\Passport\ClientRepository;
 use LogicException;
@@ -30,9 +31,9 @@ final class NativeOAuthClientManager
         );
     }
 
-    public function requireExisting(): Client
+    public function requireExisting(bool $lockForUpdate = false): Client
     {
-        $client = $this->findActive();
+        $client = $this->findActive($lockForUpdate);
 
         if (! $client instanceof Client) {
             throw new LogicException('The configured Oteryn native OAuth client does not exist.');
@@ -43,12 +44,17 @@ final class NativeOAuthClientManager
         return $client;
     }
 
-    private function findActive(): ?Client
+    private function findActive(bool $lockForUpdate = false): ?Client
     {
-        $matches = Client::query()
+        $query = Client::query()
             ->where('name', $this->configString('game-auth.oauth.native_client_name'))
-            ->where('revoked', false)
-            ->get();
+            ->where('revoked', false);
+
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        $matches = $query->get();
 
         if ($matches->count() > 1) {
             throw new LogicException('Multiple active OAuth clients use the configured Oteryn native client name.');
