@@ -8,6 +8,7 @@ use App\GameAuth\Tickets\GameLoginTicketDenied;
 use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\GameAuth\Tickets\RedeemGameLoginTicket;
 use App\Identity\Models\Identity;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -337,7 +338,7 @@ final class GameLoginTicketMariaDbConcurrencyTest extends TestCase
         }
     }
 
-    private function rollBackAll(\Illuminate\Database\Connection $connection): void
+    private function rollBackAll(Connection $connection): void
     {
         while ($connection->transactionLevel() > 0) {
             $connection->rollBack();
