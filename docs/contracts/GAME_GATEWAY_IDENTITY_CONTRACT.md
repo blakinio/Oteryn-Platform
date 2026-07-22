@@ -2,7 +2,9 @@
 
 ## Status
 
-`TARGET CONTRACT — NOT YET IMPLEMENTED`
+`PARTIALLY IMPLEMENTED — PLATFORM TICKET APIS AND GAME GATEWAY MVP ARE LIVE; PRODUCTION GAME SESSION/CANARY ADAPTER IS NOT YET IMPLEMENTED`
+
+Platform-owned Game Login Ticket issuance and private atomic redeem are implemented. The separately deployable Game Gateway MVP consumes redeem and login-context contracts; production Game Session issuance and the Canary adapter remain unimplemented.
 
 This contract defines the security boundary between the separately deployable Oteryn Game Gateway and Oteryn Platform Identity.
 

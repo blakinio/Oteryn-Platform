@@ -2,7 +2,9 @@
 
 ## Status
 
-`TARGET CONTRACT — NOT YET IMPLEMENTED IN OTCLIENT`
+`PARTIALLY IMPLEMENTED — PLATFORM AUTHORIZATION, TICKET ISSUANCE AND GAME GATEWAY MVP ARE LIVE; OTCLIENT CONSUMER AND PRODUCTION CANARY SESSION ADAPTER ARE NOT YET IMPLEMENTED`
+
+Platform producer-side support from Phases 2 and 3 and the Phase 4 Game Gateway MVP are implemented. The OTClient native-client consumer and production Game Session to Canary adapter remain unimplemented and require separately scoped tasks.
 
 This contract defines the first-party Oteryn native-client behavior required by ADR 0009.
 
