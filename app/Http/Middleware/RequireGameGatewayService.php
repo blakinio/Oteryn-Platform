@@ -75,6 +75,9 @@ final class RequireGameGatewayService
                 'code' => $code,
                 'message' => $message,
             ],
-        ], $status, $headers);
+        ], $status, array_merge([
+            'Cache-Control' => 'no-store, private',
+            'Pragma' => 'no-cache',
+        ], $headers));
     }
 }
