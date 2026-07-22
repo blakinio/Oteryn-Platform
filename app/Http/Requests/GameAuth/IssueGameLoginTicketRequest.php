@@ -4,6 +4,7 @@ namespace App\Http\Requests\GameAuth;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use LogicException;
 
 final class IssueGameLoginTicketRequest extends FormRequest
 {
@@ -29,6 +30,10 @@ final class IssueGameLoginTicketRequest extends FormRequest
     {
         $version = config('game-auth.protocol_version');
 
-        return is_int($version) ? $version : 1;
+        if (! is_int($version) || $version < 1) {
+            throw new LogicException('Invalid game authentication protocol version configuration.');
+        }
+
+        return $version;
     }
 }
