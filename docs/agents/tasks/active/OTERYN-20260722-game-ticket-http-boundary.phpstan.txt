@@ -1,0 +1,56 @@
+Note: Using configuration file /home/runner/work/Oteryn-Platform/Oteryn-Platform/phpstan.neon.dist.
+   0/208 [░░░░░░░░░░░░░░░░░░░░░░░░░░░░]   0%
+ 208/208 [▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓] 100%
+
+::error file=app/GameAuth/OAuth/IssueGameLoginTicketFromOAuth.php,line=39,col=0::Cannot cast mixed to string.
+::error file=app/GameAuth/OAuth/IssueGameLoginTicketFromOAuth.php,line=40,col=0::Cannot cast mixed to string.
+::error file=app/Http/Controllers/GameAuth/RedeemGameLoginTicketController.php,line=22,col=0::Parameter $ticket of method App\GameAuth\Tickets\RedeemGameLoginTicket::execute() expects string, mixed given.
+::error file=app/Http/Controllers/GameAuth/RedeemGameLoginTicketController.php,line=23,col=0::Parameter $audience of method App\GameAuth\Tickets\RedeemGameLoginTicket::execute() expects string, mixed given.
+::error file=app/Http/Middleware/RequireGameGatewayService.php,line=34,col=0::Argument of an invalid type mixed supplied for foreach, only iterables are supported.
+::error file=app/Http/Middleware/RequireGameGatewayService.php,line=35,col=0::Parameter #1 $known_string of function hash_equals expects string, mixed given.
+::error file=tests/Feature/GameAuth/Http/GameLoginTicketRedeemApiTest.php,line=135,col=0::Method Tests\Feature\GameAuth\Http\GameLoginTicketRedeemApiTest::redeem() return type with generic class Illuminate\Testing\TestResponse does not specify its types: TResponse
+ ------ ------------------------------------------------------ 
+  Line   app/GameAuth/OAuth/IssueGameLoginTicketFromOAuth.php  
+ ------ ------------------------------------------------------ 
+  39     Cannot cast mixed to string.                          
+         🪪  cast.string                                       
+  40     Cannot cast mixed to string.                          
+         🪪  cast.string                                       
+ ------ ------------------------------------------------------ 
+
+ ------ ----------------------------------------------------------------------- 
+  Line   app/Http/Controllers/GameAuth/RedeemGameLoginTicketController.php      
+ ------ ----------------------------------------------------------------------- 
+  22     Parameter $ticket of method                                            
+         App\GameAuth\Tickets\RedeemGameLoginTicket::execute() expects string,  
+         mixed given.                                                           
+         🪪  argument.type                                                      
+  23     Parameter $audience of method                                          
+         App\GameAuth\Tickets\RedeemGameLoginTicket::execute() expects string,  
+         mixed given.                                                           
+         🪪  argument.type                                                      
+ ------ ----------------------------------------------------------------------- 
+
+ ------ -------------------------------------------------------------------- 
+  Line   app/Http/Middleware/RequireGameGatewayService.php                   
+ ------ -------------------------------------------------------------------- 
+  34     Argument of an invalid type mixed supplied for foreach, only        
+         iterables are supported.                                            
+         🪪  foreach.nonIterable                                             
+  35     Parameter #1 $known_string of function hash_equals expects string,  
+         mixed given.                                                        
+         🪪  argument.type                                                   
+ ------ -------------------------------------------------------------------- 
+
+ ------ --------------------------------------------------------------------- 
+  Line   tests/Feature/GameAuth/Http/GameLoginTicketRedeemApiTest.php         
+ ------ --------------------------------------------------------------------- 
+  135    Method                                                               
+         Tests\Feature\GameAuth\Http\GameLoginTicketRedeemApiTest::redeem()   
+         return type with generic class Illuminate\Testing\TestResponse does  
+         not specify its types: TResponse                                     
+         🪪  missingType.generics                                             
+ ------ --------------------------------------------------------------------- 
+
+ [ERROR] Found 7 errors                                                         
+
