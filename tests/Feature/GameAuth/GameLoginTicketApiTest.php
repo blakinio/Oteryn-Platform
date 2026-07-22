@@ -34,18 +34,30 @@ final class GameLoginTicketApiTest extends TestCase
                 'protocol_version' => 1,
             ]);
 
-        $response->assertOk()
-            ->assertJsonPath('protocol_version', 1)
+        if ($response->getStatusCode() !== 200) {
+            self::fail('Game ticket issuance failed: '.$response->getContent());
+        }
+
+        $response->assertJsonPath('protocol_version', 1)
             ->assertJsonStructure(['ticket', 'expires_in']);
 
-        $ticket = $response->json('ticket');
-        $expiresIn = $response->json('expires_in');
-        self::assertIsString($ticket);
-        self::assertIsInt($expiresIn);
+        $payload = $response->json();
+
+        if (! is_array($payload)) {
+            self::fail('Game ticket issuance response was not a JSON object.');
+        }
+
+        $ticket = $payload['ticket'] ?? null;
+        $expiresIn = $payload['expires_in'] ?? null;
+
+        if (! is_string($ticket) || ! is_int($expiresIn)) {
+            self::fail('Game ticket issuance response did not contain typed ticket expiry data.');
+        }
+
         self::assertGreaterThan(0, $expiresIn);
         self::assertLessThanOrEqual(60, $expiresIn);
-        self::assertArrayNotHasKey('identity_id', $response->json());
-        self::assertArrayNotHasKey('canary_account_id', $response->json());
+        self::assertArrayNotHasKey('identity_id', $payload);
+        self::assertArrayNotHasKey('canary_account_id', $payload);
         self::assertSame(1, GameLoginTicket::query()->count());
         self::assertSame(hash('sha256', $ticket), GameLoginTicket::query()->value('ticket_hash'));
 
