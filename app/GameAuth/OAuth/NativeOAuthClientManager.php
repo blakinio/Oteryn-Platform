@@ -2,7 +2,6 @@
 
 namespace App\GameAuth\OAuth;
 
-use Illuminate\Database\Eloquent\Builder;
 use Laravel\Passport\Client;
 use Laravel\Passport\ClientRepository;
 use LogicException;
