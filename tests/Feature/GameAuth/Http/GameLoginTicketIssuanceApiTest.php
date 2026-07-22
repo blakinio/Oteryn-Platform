@@ -7,6 +7,7 @@ use App\GameAuth\OAuth\NativeOAuthClientManager;
 use App\GameAuth\Tickets\GameLoginTicket;
 use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Passport\Client;
@@ -66,6 +67,8 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
             'id' => $oauth['refresh_token_id'],
             'revoked' => true,
         ]);
+
+        Auth::forgetGuards();
 
         $this->postJson('/api/v1/game-auth/tickets', [
             'protocol_version' => 1,
