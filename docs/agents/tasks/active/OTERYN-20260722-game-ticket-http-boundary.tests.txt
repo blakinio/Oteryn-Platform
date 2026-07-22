@@ -1,0 +1,23 @@
+
+   FAIL  Tests\Feature\GameAuth\Http\GameLoginTicketIssuanceApiTest
+  ⨯ native oauth bootstrap mints one ticket and revokes access and refr… 0.79s  
+  ────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\GameAuth\Http\GameLoginTicketIssuanceApiTest > nati…   
+  Expected response status code [401] but received 403.
+Failed asserting that 403 is identical to 401.
+
+  at tests/Feature/GameAuth/Http/GameLoginTicketIssuanceApiTest.php:74
+     70▕         $this->postJson('/api/v1/game-auth/tickets', [
+     71▕             'protocol_version' => 1,
+     72▕         ], [
+     73▕             'Authorization' => 'Bearer '.$oauth['access_token'],
+  ➜  74▕         ])->assertUnauthorized();
+     75▕ 
+     76▕         self::assertSame(1, GameLoginTicket::query()->count());
+     77▕     }
+     78▕
+
+
+  Tests:    1 failed, [2m9 pending[22m (26 assertions)
+  Duration: 0.88s
+
