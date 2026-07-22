@@ -30,7 +30,7 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
         $identity = $this->createIdentity();
         $this->createReadyBinding($identity, 1001);
         $client = $this->app->make(NativeOAuthClientManager::class)->ensure();
-        $oauth = $this->oauthBootstrap($identity, $client, 'game:ticket');
+        $oauth = $this->oauthBootstrap($identity, $client);
 
         $response = $this->postJson('/api/v1/game-auth/tickets', [
             'protocol_version' => 1,
@@ -76,17 +76,20 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
         self::assertSame(1, GameLoginTicket::query()->count());
     }
 
-    public function test_non_native_oauth_client_is_denied_without_consuming_its_token_family(): void
+    public function test_persisted_token_rebound_to_non_native_client_is_denied_without_consuming_family(): void
     {
         $identity = $this->createIdentity();
         $this->createReadyBinding($identity, 1001);
-        $this->app->make(NativeOAuthClientManager::class)->ensure();
+        $nativeClient = $this->app->make(NativeOAuthClientManager::class)->ensure();
         $otherClient = $this->app->make(ClientRepository::class)->createAuthorizationCodeGrantClient(
             name: 'Other Public Client',
             redirectUris: ['http://127.0.0.1/callback'],
             confidential: false,
         );
-        $oauth = $this->oauthBootstrap($identity, $otherClient, 'game:ticket');
+        $oauth = $this->oauthBootstrap($identity, $nativeClient);
+        DB::table('oauth_access_tokens')
+            ->where('id', $oauth['access_token_id'])
+            ->update(['client_id' => $otherClient->getKey()]);
 
         $this->postJson('/api/v1/game-auth/tickets', [
             'protocol_version' => 1,
@@ -106,12 +109,15 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
         ]);
     }
 
-    public function test_missing_game_ticket_scope_is_denied_without_consuming_token_family(): void
+    public function test_persisted_token_without_game_ticket_scope_is_denied_without_consuming_family(): void
     {
         $identity = $this->createIdentity();
         $this->createReadyBinding($identity, 1001);
         $client = $this->app->make(NativeOAuthClientManager::class)->ensure();
-        $oauth = $this->oauthBootstrap($identity, $client, null);
+        $oauth = $this->oauthBootstrap($identity, $client);
+        DB::table('oauth_access_tokens')
+            ->where('id', $oauth['access_token_id'])
+            ->update(['scopes' => json_encode([], JSON_THROW_ON_ERROR)]);
 
         $this->postJson('/api/v1/game-auth/tickets', [
             'protocol_version' => 1,
@@ -136,7 +142,7 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
         $identity = $this->createIdentity();
         $this->createReadyBinding($identity, 1001);
         $client = $this->app->make(NativeOAuthClientManager::class)->ensure();
-        $oauth = $this->oauthBootstrap($identity, $client, 'game:ticket');
+        $oauth = $this->oauthBootstrap($identity, $client);
 
         $this->postJson('/api/v1/game-auth/tickets', [
             'protocol_version' => 1,
@@ -167,7 +173,7 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
     /**
      * @return array{access_token: string, access_token_id: string, refresh_token_id: string}
      */
-    private function oauthBootstrap(Identity $identity, Client $client, ?string $scope): array
+    private function oauthBootstrap(Identity $identity, Client $client): array
     {
         $this->post('/login', [
             'email' => $identity->email,
@@ -180,14 +186,11 @@ final class GameLoginTicketIssuanceApiTest extends TestCase
             'client_id' => $client->getKey(),
             'redirect_uri' => $redirectUri,
             'response_type' => 'code',
+            'scope' => 'game:ticket',
             'state' => $state,
             'code_challenge' => $challenge,
             'code_challenge_method' => 'S256',
         ];
-
-        if ($scope !== null) {
-            $query['scope'] = $scope;
-        }
 
         $authorization = $this->get('/oauth/authorize?'.http_build_query($query, '', '&', PHP_QUERY_RFC3986));
         $authorization->assertOk();
