@@ -67,7 +67,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var request struct {
-		ProtocolVersion  int    `json:"protocol_version"`
+		ProtocolVersion int    `json:"protocol_version"`
 		GameLoginTicket string `json:"game_login_ticket"`
 	}
 	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))

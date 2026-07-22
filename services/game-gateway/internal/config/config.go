@@ -9,13 +9,13 @@ import (
 )
 
 type Config struct {
-	ListenAddress       string
-	PlatformBaseURL     string
+	ListenAddress        string
+	PlatformBaseURL      string
 	PlatformServiceToken string
-	SessionBaseURL      string
-	SessionServiceToken string
-	RequestTimeout      time.Duration
-	Version             string
+	SessionBaseURL       string
+	SessionServiceToken  string
+	RequestTimeout       time.Duration
+	Version              string
 }
 
 func Load() (Config, error) {

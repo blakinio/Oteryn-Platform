@@ -30,11 +30,11 @@ func (f *fakePlatform) LoginContext(context.Context, int64) (LoginContext, error
 func (f *fakePlatform) Ready(context.Context) error { return f.readyErr }
 
 type fakeSessionIssuer struct {
-	session Session
-	err     error
+	session  Session
+	err      error
 	readyErr error
-	calls   int
-	request SessionRequest
+	calls    int
+	request  SessionRequest
 }
 
 func (f *fakeSessionIssuer) Create(_ context.Context, request SessionRequest) (Session, error) {
@@ -50,7 +50,7 @@ func TestLoginSuccess(t *testing.T) {
 	platform := &fakePlatform{
 		authorization: Authorization{CanaryAccountID: 1001, SecurityGeneration: 7},
 		loginContext: LoginContext{
-			Worlds: []World{{ID: 1, Slug: "oteryn", Name: "Oteryn", Region: "EU", Host: "game.example.test", Port: 7172}},
+			Worlds:     []World{{ID: 1, Slug: "oteryn", Name: "Oteryn", Region: "EU", Host: "game.example.test", Port: 7172}},
 			Characters: []Character{{ID: 10, Name: "Alpha", Level: 100, Vocation: 4, WorldID: 1}},
 		},
 	}
@@ -111,7 +111,7 @@ func TestLoginFailsClosedForCharacterWorldMismatch(t *testing.T) {
 	platform := &fakePlatform{
 		authorization: Authorization{CanaryAccountID: 1001},
 		loginContext: LoginContext{
-			Worlds: []World{{ID: 1, Host: "one.test", Port: 7172}},
+			Worlds:     []World{{ID: 1, Host: "one.test", Port: 7172}},
 			Characters: []Character{{ID: 1, Name: "Alpha", WorldID: 2}},
 		},
 	}

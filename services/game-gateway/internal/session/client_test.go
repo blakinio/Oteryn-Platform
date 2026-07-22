@@ -38,7 +38,7 @@ func TestCreateUsesServiceAuthenticationAndBoundedSessionContract(t *testing.T) 
 			"protocol_version": 1,
 			"session": map[string]any{
 				"credential": "session-secret",
-				"expires_at":  expiresAt,
+				"expires_at": expiresAt,
 			},
 		})
 	}))
