@@ -26,7 +26,7 @@ final class IssueGameLoginTicketFromOAuth
             $token = Token::query()
                 ->lockForUpdate()
                 ->find($tokenId);
-            $client = $this->nativeClients->requireExisting(lockForUpdate: true);
+            $client = $this->nativeClients->requireExisting();
             $scope = config('game-auth.oauth.scope');
 
             if (! $token instanceof Token
