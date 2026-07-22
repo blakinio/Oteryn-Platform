@@ -176,7 +176,7 @@ validation:
     evidence: required critical browser, responsive, portability, resilience and accessibility acceptance completed successfully
 blockers:
   - none
-next_action: Merge PR 119 by squash after the checkpoint-only commit receives its required checks, then archive this task and start the separately bounded Phase 3 Game Login Ticket HTTP issuance and private redeem task from current main.
+next_action: Phase 3 Game Login Ticket HTTP issuance and private redeem starts from merged main commit 27fa277c5def0e151d7ee013acef188dbfd6f463.
 ```
 
 ## Notes

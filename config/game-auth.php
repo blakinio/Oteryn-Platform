@@ -15,4 +15,8 @@ return [
         'audience' => 'oteryn-game-gateway',
         'ttl_seconds' => (int) env('GAME_AUTH_TICKET_TTL_SECONDS', 60),
     ],
+
+    'gateway' => [
+        'service_token_sha256' => env('GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256'),
+    ],
 ];
