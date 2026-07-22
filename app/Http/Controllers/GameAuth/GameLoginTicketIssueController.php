@@ -49,7 +49,7 @@ final class GameLoginTicketIssueController
         return response()->json([
             'protocol_version' => 1,
             'ticket' => $issued->ticket,
-            'expires_in' => max(0, now()->diffInSeconds($issued->expiresAt, false)),
+            'expires_in' => max(0, (int) floor(now()->diffInSeconds($issued->expiresAt, false))),
         ]);
     }
 }
