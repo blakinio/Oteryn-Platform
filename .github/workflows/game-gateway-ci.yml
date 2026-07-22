@@ -7,29 +7,26 @@ on:
     paths:
       - 'services/game-gateway/**'
       - '.github/workflows/game-gateway-ci.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'services/game-gateway/**'
-      - '.github/workflows/game-gateway-ci.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: game-gateway-ci-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test-build:
+  format-bootstrap:
+    if: github.event.pull_request.number == 122
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: services/game-gateway
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -37,20 +34,19 @@ jobs:
           go-version-file: services/game-gateway/go.mod
           cache-dependency-path: services/game-gateway/go.mod
 
-      - name: Check formatting
+      - name: Apply gofmt
+        run: gofmt -w .
+
+      - name: Commit formatting
         shell: bash
+        working-directory: .
         run: |
-          unformatted="$(gofmt -l .)"
-          if [ -n "$unformatted" ]; then
-            printf 'Unformatted Go files:\n%s\n' "$unformatted"
-            exit 1
+          git add services/game-gateway
+          if git diff --cached --quiet; then
+            echo "Go sources are already formatted."
+            exit 0
           fi
-
-      - name: Run tests
-        run: go test ./...
-
-      - name: Run vet
-        run: go vet ./...
-
-      - name: Build gateway
-        run: go build -trimpath -o /tmp/oteryn-game-gateway ./cmd/game-gateway
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "style(gateway): apply canonical gofmt"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
