@@ -16,11 +16,17 @@ final class RedeemGameLoginTicketController
         RedeemGameLoginTicket $redeemer,
     ): JsonResponse {
         $validated = $request->validated();
+        $ticket = $validated['ticket'] ?? null;
+        $audience = $validated['audience'] ?? null;
+
+        if (! is_string($ticket) || ! is_string($audience)) {
+            return $this->error('invalid_request', 'The request is invalid.', Response::HTTP_BAD_REQUEST);
+        }
 
         try {
             $redeemed = $redeemer->execute(
-                ticket: $validated['ticket'],
-                audience: $validated['audience'],
+                ticket: $ticket,
+                audience: $audience,
             );
         } catch (GameLoginTicketDenied) {
             return $this->error('invalid_ticket', 'The game login ticket is invalid or expired.', Response::HTTP_UNAUTHORIZED);
