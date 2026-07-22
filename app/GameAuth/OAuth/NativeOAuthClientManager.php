@@ -14,19 +14,8 @@ final class NativeOAuthClientManager
 
     public function ensure(): Client
     {
-        $name = $this->configString('game-auth.oauth.native_client_name');
         $redirectUri = $this->nativeRedirectUri();
-
-        $matches = Client::query()
-            ->where('name', $name)
-            ->where('revoked', false)
-            ->get();
-
-        if ($matches->count() > 1) {
-            throw new LogicException('Multiple active OAuth clients use the configured Oteryn native client name.');
-        }
-
-        $existing = $matches->first();
+        $existing = $this->findActive();
 
         if ($existing instanceof Client) {
             $this->assertExpectedClient($existing, $redirectUri);
@@ -35,10 +24,39 @@ final class NativeOAuthClientManager
         }
 
         return $this->clients->createAuthorizationCodeGrantClient(
-            name: $name,
+            name: $this->configString('game-auth.oauth.native_client_name'),
             redirectUris: [$redirectUri],
             confidential: false,
         );
+    }
+
+    public function requireExisting(): Client
+    {
+        $client = $this->findActive();
+
+        if (! $client instanceof Client) {
+            throw new LogicException('The configured Oteryn native OAuth client does not exist.');
+        }
+
+        $this->assertExpectedClient($client, $this->nativeRedirectUri());
+
+        return $client;
+    }
+
+    private function findActive(): ?Client
+    {
+        $matches = Client::query()
+            ->where('name', $this->configString('game-auth.oauth.native_client_name'))
+            ->where('revoked', false)
+            ->get();
+
+        if ($matches->count() > 1) {
+            throw new LogicException('Multiple active OAuth clients use the configured Oteryn native client name.');
+        }
+
+        $client = $matches->first();
+
+        return $client instanceof Client ? $client : null;
     }
 
     private function assertExpectedClient(Client $client, string $redirectUri): void
