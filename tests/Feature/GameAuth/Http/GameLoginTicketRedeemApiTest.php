@@ -9,6 +9,7 @@ use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 final class GameLoginTicketRedeemApiTest extends TestCase
@@ -133,7 +134,7 @@ final class GameLoginTicketRedeemApiTest extends TestCase
     }
 
     /**
-     * @return TestResponse<\Symfony\Component\HttpFoundation\Response>
+     * @return TestResponse<Response>
      */
     private function redeem(string $ticket): TestResponse
     {
