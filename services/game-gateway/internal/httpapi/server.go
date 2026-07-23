@@ -61,6 +61,8 @@ func (s *Server) versionInfo(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	setSensitiveResponseNoCache(w)
+
 	if r.URL.RawQuery != "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_request"})
 		return
@@ -105,6 +107,12 @@ func ensureJSONEOF(decoder *json.Decoder) error {
 		return errors.New("request contains trailing JSON")
 	}
 	return nil
+}
+
+func setSensitiveResponseNoCache(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, private")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
