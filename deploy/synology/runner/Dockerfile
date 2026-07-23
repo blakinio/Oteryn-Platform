@@ -15,6 +15,7 @@ RUN apt-get update \
     && chown -R runner:runner /opt/actions-runner-dist /runner /work
 
 COPY --chown=runner:runner deploy/synology/runner/entrypoint.sh /usr/local/bin/oteryn-runner-entrypoint
+RUN chmod 0755 /usr/local/bin/oteryn-runner-entrypoint
 
 USER runner
 WORKDIR /runner
