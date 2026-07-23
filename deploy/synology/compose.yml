@@ -149,7 +149,7 @@ services:
     restart: "no"
     environment:
       TLS_DIR: /tls
-    command: ["/bin/sh", "-ec", "apk add --no-cache openssl >/dev/null && /init.sh"]
+    command: ["/bin/sh", "-ec", "apk add --no-cache openssl >/dev/null && sh /init.sh"]
     volumes:
       - ./tls/init.sh:/init.sh:ro
       - internal_tls:/tls
