@@ -242,7 +242,7 @@ jobs:
             -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
 
       - name: Build exact OTClient release
-        uses: lukka/run-cmake@5d55ea7949e25b3c022a9a03bd7a427fb6a2
+        uses: lukka/run-cmake@5d55ea7949e25f69f0ecb516d8d572297e03a956
         with:
           configurePreset: linux-release
           buildPreset: linux-release
