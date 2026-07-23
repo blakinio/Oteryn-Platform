@@ -2,16 +2,16 @@
 task_id: OTERYN-20260723-native-auth-deployment-targeted-e2e
 program_id: ""
 coordination_id: OTS-20260721-oteryn-identity-auth
-status: implementing
+status: validating
 agent: "GPT-5.6 Thinking"
 branch: test/OTERYN-20260723-native-auth-deployment-targeted-e2e
 base_branch: main
 created: 2026-07-23T19:30:00+02:00
-updated: 2026-07-23T19:30:00+02:00
-last_verified_commit: 53158217a6c6017230301cf4daa783b04fcc13d5
+updated: 2026-07-23T19:34:00+02:00
+last_verified_commit: 74db3153b0de3e222a8f4cc1caa7ea6a8c3e393a
 risk: high
 related_issue: "91"
-related_pr: ""
+related_pr: "125"
 depends_on:
   - "Oteryn Platform PR #124 merged as 53158217a6c6017230301cf4daa783b04fcc13d5"
   - "Canary PR #807 merged as 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e"
@@ -55,11 +55,11 @@ Execute a fail-closed deployment-targeted native-auth preflight against the real
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-23T19:30:00+02:00
-head: 53158217a6c6017230301cf4daa783b04fcc13d5
+updated_at: 2026-07-23T19:34:00+02:00
+head: 74db3153b0de3e222a8f4cc1caa7ea6a8c3e393a
 branch: test/OTERYN-20260723-native-auth-deployment-targeted-e2e
-pr: null
-status: implementing
+pr: 125
+status: validating
 context_routes:
   - testing
   - security
@@ -71,11 +71,13 @@ owned_paths:
   - .github/workflows/native-auth-deployment-targeted-e2e.yml
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260723-native-auth-deployment-targeted-e2e.md
+  - .github/workflows/native-auth-deployment-targeted-e2e.yml
 proven:
   - Platform main is 53158217a6c6017230301cf4daa783b04fcc13d5 at task start.
   - Existing Phase 7 and acceptance workflows use isolated local production-like services and do not target a real deployed environment.
   - Production topology evidence still marks actual host/provider/DNS/TLS/deployment mechanism as UNKNOWN.
   - Hardened native-auth physical E2E and production-like TLS/rotation simulation already pass on exact merged revisions.
+  - Draft validation-only PR #125 now carries the production-Environment fail-closed target preflight.
 derived:
   - A deployment-targeted run must obtain target metadata from an external environment boundary rather than repository defaults.
 unknown:
@@ -85,9 +87,9 @@ unknown:
   - whether production mutation-smoke authorization and backup/restore evidence are available
 conflicts: []
 first_failure:
-  marker: deployment-target-preflight-not-run
-  evidence: real production Environment configuration has not yet been evaluated by Actions
+  marker: deployment-target-preflight-running
+  evidence: PR #125 GitHub Actions validation is being evaluated against the production Environment
 validation: []
 blockers: []
-next_action: Add and run a validation-only GitHub Actions preflight against the production Environment; continue to physical native-auth smoke only if every fail-closed prerequisite passes.
+next_action: Inspect PR #125 deployment-targeted workflow result and sanitized artifact; continue to physical native-auth smoke only if every fail-closed prerequisite passes.
 ```
