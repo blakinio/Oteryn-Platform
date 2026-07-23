@@ -185,7 +185,7 @@ final class GameLoginTicketRedeemApiTest extends TestCase
     }
 
     /**
-     * @param TestResponse<\Symfony\Component\HttpFoundation\Response> $response
+     * @param  TestResponse<\Symfony\Component\HttpFoundation\Response>  $response
      */
     private function assertSensitiveResponseIsNotCacheable(TestResponse $response): void
     {
