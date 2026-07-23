@@ -15,6 +15,7 @@ final class GameLoginTicketRedeemApiTest extends TestCase
     use RefreshDatabase;
 
     private const SERVICE_CREDENTIAL = 'test-gateway-service-credential-with-sufficient-entropy';
+
     private const PREVIOUS_SERVICE_CREDENTIAL = 'previous-gateway-service-credential-with-sufficient-entropy';
 
     protected function setUp(): void
