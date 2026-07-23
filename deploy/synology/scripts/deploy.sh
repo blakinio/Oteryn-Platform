@@ -1,0 +1,213 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+DEPLOY_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+REPO_ROOT="$(cd -- "$DEPLOY_DIR/../.." && pwd)"
+ENV_FILE="${OTERYN_ENV_FILE:-$DEPLOY_DIR/.env}"
+COMPOSE_FILE="$DEPLOY_DIR/compose.yml"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo "Missing staging environment file: $ENV_FILE" >&2
+    exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+set +a
+
+required_vars=(
+    PLATFORM_IMAGE GATEWAY_IMAGE CANARY_IMAGE
+    APP_KEY MARIADB_ROOT_PASSWORD PLATFORM_DB_NAME PLATFORM_DB_USER PLATFORM_DB_PASSWORD
+    CANARY_DB_NAME CANARY_DB_USER CANARY_DB_PASSWORD
+    CANARY_READONLY_DB_USER CANARY_READONLY_DB_PASSWORD
+    CANARY_PROVISIONING_DB_USER CANARY_PROVISIONING_DB_PASSWORD
+    CANARY_CHARACTER_CREATE_DB_USER CANARY_CHARACTER_CREATE_DB_PASSWORD
+    REDIS_PASSWORD CANARY_RUNTIME_REDIS_USERNAME CANARY_RUNTIME_REDIS_PASSWORD
+    OTERYN_PLATFORM_SERVICE_TOKEN GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256
+    GAME_SESSION_SERVICE_TOKEN CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256
+)
+
+for name in "${required_vars[@]}"; do
+    value="${!name:-}"
+    if [[ -z "$value" || "$value" == REQUIRED_* ]]; then
+        echo "Required staging value is missing: $name" >&2
+        exit 1
+    fi
+done
+
+safe_db_vars=(
+    PLATFORM_DB_NAME PLATFORM_DB_USER PLATFORM_DB_PASSWORD
+    CANARY_DB_NAME CANARY_DB_USER CANARY_DB_PASSWORD
+    CANARY_READONLY_DB_USER CANARY_READONLY_DB_PASSWORD
+    CANARY_PROVISIONING_DB_USER CANARY_PROVISIONING_DB_PASSWORD
+    CANARY_CHARACTER_CREATE_DB_USER CANARY_CHARACTER_CREATE_DB_PASSWORD
+)
+for name in "${safe_db_vars[@]}"; do
+    value="${!name}"
+    if [[ ! "$value" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+        echo "$name contains unsupported characters; use generated hex/alphanumeric staging values." >&2
+        exit 1
+    fi
+done
+
+expected_platform_hash="$(printf '%s' "$OTERYN_PLATFORM_SERVICE_TOKEN" | sha256sum | awk '{print $1}')"
+expected_session_hash="$(printf '%s' "$GAME_SESSION_SERVICE_TOKEN" | sha256sum | awk '{print $1}')"
+if [[ "$expected_platform_hash" != "${GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256,,}" ]]; then
+    echo "Gateway -> Platform service token/hash mismatch." >&2
+    exit 1
+fi
+if [[ "$expected_session_hash" != "${CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256,,}" ]]; then
+    echo "Gateway -> Canary service token/hash mismatch." >&2
+    exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+    echo "docker is required on the deployment runner." >&2
+    exit 1
+fi
+if ! docker compose version >/dev/null 2>&1; then
+    echo "Docker Compose v2 plugin is required on the deployment runner." >&2
+    exit 1
+fi
+
+compose=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
+state_dir="${OTERYN_STATE_DIR:-/var/lib/oteryn-staging-state}"
+mkdir -p "$state_dir"
+chmod 700 "$state_dir"
+
+snapshot_current_images() {
+    local tmp="$state_dir/last-good.env.tmp"
+    local found=0
+    : > "$tmp"
+    chmod 600 "$tmp"
+
+    for service in platform gateway canary; do
+        container_id="$(${compose[@]} ps -q "$service" 2>/dev/null || true)"
+        if [[ -n "$container_id" ]]; then
+            image="$(docker inspect --format '{{.Config.Image}}' "$container_id")"
+            case "$service" in
+                platform) printf 'PLATFORM_IMAGE=%q\n' "$image" >> "$tmp" ;;
+                gateway) printf 'GATEWAY_IMAGE=%q\n' "$image" >> "$tmp" ;;
+                canary) printf 'CANARY_IMAGE=%q\n' "$image" >> "$tmp" ;;
+            esac
+            found=1
+        fi
+    done
+
+    if [[ "$found" -eq 1 ]]; then
+        mv "$tmp" "$state_dir/last-good.env"
+    else
+        rm -f "$tmp"
+    fi
+}
+
+apply_sql_template() {
+    local template="$1"
+    shift
+    awk_script="$1"
+
+    awk "$awk_script" "$template" \
+        | "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb \
+            mariadb -uroot
+}
+
+snapshot_current_images
+
+"${compose[@]}" config --quiet
+"${compose[@]}" pull
+"${compose[@]}" up -d mariadb redis tls-init
+
+for _ in $(seq 1 60); do
+    if "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb \
+        mariadb -uroot -N -e 'SELECT 1' >/dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+
+"${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb mariadb -uroot <<SQL
+CREATE DATABASE IF NOT EXISTS \`$PLATFORM_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '$PLATFORM_DB_USER'@'%' IDENTIFIED BY '$PLATFORM_DB_PASSWORD';
+ALTER USER '$PLATFORM_DB_USER'@'%' IDENTIFIED BY '$PLATFORM_DB_PASSWORD';
+GRANT ALL PRIVILEGES ON \`$PLATFORM_DB_NAME\`.* TO '$PLATFORM_DB_USER'@'%';
+CREATE DATABASE IF NOT EXISTS \`$CANARY_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '$CANARY_DB_USER'@'%' IDENTIFIED BY '$CANARY_DB_PASSWORD';
+ALTER USER '$CANARY_DB_USER'@'%' IDENTIFIED BY '$CANARY_DB_PASSWORD';
+GRANT ALL PRIVILEGES ON \`$CANARY_DB_NAME\`.* TO '$CANARY_DB_USER'@'%';
+FLUSH PRIVILEGES;
+SQL
+
+"${compose[@]}" exec -T redis redis-cli -a "$REDIS_PASSWORD" \
+    ACL SETUSER "$CANARY_RUNTIME_REDIS_USERNAME" on \
+    ">${CANARY_RUNTIME_REDIS_PASSWORD}" resetkeys '~cluster:channel:*:runtime' \
+    -@all +hmget +pttl +ping +select >/dev/null
+
+"${compose[@]}" up -d canary
+
+schema_ready=0
+for _ in $(seq 1 90); do
+    if "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb \
+        mariadb -uroot -N -e \
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$CANARY_DB_NAME' AND table_name IN ('accounts','players','guilds','guild_membership','guild_ranks','channels','cluster_sessions');" \
+        | grep -qx '7'; then
+        schema_ready=1
+        break
+    fi
+    sleep 2
+done
+if [[ "$schema_ready" -ne 1 ]]; then
+    echo "Canary schema did not become ready; refusing to start Platform/Gateway." >&2
+    exit 1
+fi
+
+export OTERYN_CANARY_DB_USER="$CANARY_READONLY_DB_USER"
+export OTERYN_CANARY_DB_HOST="%"
+export OTERYN_CANARY_DB_PASSWORD="$CANARY_READONLY_DB_PASSWORD"
+export OTERYN_CANARY_PROVISIONING_DB_USER="$CANARY_PROVISIONING_DB_USER"
+export OTERYN_CANARY_PROVISIONING_DB_HOST="%"
+export OTERYN_CANARY_PROVISIONING_DB_PASSWORD="$CANARY_PROVISIONING_DB_PASSWORD"
+export OTERYN_CANARY_CHARACTER_CREATE_DB_USER="$CANARY_CHARACTER_CREATE_DB_USER"
+export OTERYN_CANARY_CHARACTER_CREATE_DB_HOST="%"
+export OTERYN_CANARY_CHARACTER_CREATE_DB_PASSWORD="$CANARY_CHARACTER_CREATE_DB_PASSWORD"
+
+apply_sql_template "$REPO_ROOT/database/provisioning/canary-readonly.sql.template" '
+    !/^SHOW GRANTS/ {
+        gsub(/\{\{OTERYN_CANARY_DB_USER\}\}/, ENVIRON["OTERYN_CANARY_DB_USER"])
+        gsub(/\{\{OTERYN_CANARY_DB_HOST\}\}/, ENVIRON["OTERYN_CANARY_DB_HOST"])
+        gsub(/\{\{OTERYN_CANARY_DB_PASSWORD\}\}/, ENVIRON["OTERYN_CANARY_DB_PASSWORD"])
+        gsub(/\{\{CANARY_DB_NAME\}\}/, ENVIRON["CANARY_DB_NAME"])
+        print
+    }'
+
+apply_sql_template "$REPO_ROOT/database/provisioning/canary-provisioning.sql.template" '
+    !/^SHOW GRANTS/ {
+        gsub(/\{\{OTERYN_CANARY_PROVISIONING_DB_USER\}\}/, ENVIRON["OTERYN_CANARY_PROVISIONING_DB_USER"])
+        gsub(/\{\{OTERYN_CANARY_PROVISIONING_DB_HOST\}\}/, ENVIRON["OTERYN_CANARY_PROVISIONING_DB_HOST"])
+        gsub(/\{\{OTERYN_CANARY_PROVISIONING_DB_PASSWORD\}\}/, ENVIRON["OTERYN_CANARY_PROVISIONING_DB_PASSWORD"])
+        gsub(/\{\{CANARY_DB_NAME\}\}/, ENVIRON["CANARY_DB_NAME"])
+        print
+    }'
+
+apply_sql_template "$REPO_ROOT/database/provisioning/canary-character-create.sql.template" '
+    !/^SHOW GRANTS/ {
+        gsub(/\{\{OTERYN_CANARY_CHARACTER_CREATE_DB_USER\}\}/, ENVIRON["OTERYN_CANARY_CHARACTER_CREATE_DB_USER"])
+        gsub(/\{\{OTERYN_CANARY_CHARACTER_CREATE_DB_HOST\}\}/, ENVIRON["OTERYN_CANARY_CHARACTER_CREATE_DB_HOST"])
+        gsub(/\{\{OTERYN_CANARY_CHARACTER_CREATE_DB_PASSWORD\}\}/, ENVIRON["OTERYN_CANARY_CHARACTER_CREATE_DB_PASSWORD"])
+        gsub(/\{\{CANARY_DB_NAME\}\}/, ENVIRON["CANARY_DB_NAME"])
+        print
+    }'
+
+"${compose[@]}" up -d platform
+"${compose[@]}" exec -T platform php artisan migrate --force --no-interaction
+"${compose[@]}" exec -T platform php artisan game-auth:oauth-client:ensure
+"${compose[@]}" exec -T platform php artisan canary:verify-db-privileges
+"${compose[@]}" exec -T platform php artisan canary:verify-provisioning-db-privileges
+"${compose[@]}" exec -T platform php artisan canary:verify-character-create-db-privileges
+
+"${compose[@]}" up -d internal-proxy gateway
+
+OTERYN_ENV_FILE="$ENV_FILE" "$SCRIPT_DIR/health-check.sh"
+
+echo "Oteryn Synology staging deployment is healthy."
