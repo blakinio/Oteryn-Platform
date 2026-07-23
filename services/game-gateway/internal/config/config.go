@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"strings"
@@ -64,7 +65,18 @@ func validateBaseURL(raw string) error {
 	if parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
 		return fmt.Errorf("URL must contain only scheme, host and optional path")
 	}
+	if parsed.Scheme == "http" && !isLoopbackHost(parsed.Hostname()) {
+		return fmt.Errorf("non-loopback dependencies must use https")
+	}
 	return nil
+}
+
+func isLoopbackHost(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func valueOrDefault(key, fallback string) string {

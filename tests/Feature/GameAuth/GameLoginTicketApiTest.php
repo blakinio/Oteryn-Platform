@@ -5,8 +5,10 @@ namespace Tests\Feature\GameAuth;
 use App\Accounts\Models\IdentityCanaryAccount;
 use App\GameAuth\Tickets\GameLoginTicket;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Laravel\Passport\RefreshToken;
 use Laravel\Passport\Token;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Feature\GameAuth\OAuth\Concerns\ConfiguresEphemeralPassportKeys;
 use Tests\Feature\GameAuth\OAuth\Concerns\CreatesNativeOAuthBootstrapToken;
 use Tests\TestCase;
@@ -38,6 +40,7 @@ final class GameLoginTicketApiTest extends TestCase
             self::fail('Game ticket issuance failed: '.$response->getContent());
         }
 
+        $this->assertSensitiveResponseIsNotCacheable($response);
         $response->assertJsonPath('protocol_version', 1)
             ->assertJsonStructure(['ticket', 'expires_in']);
 
@@ -67,9 +70,10 @@ final class GameLoginTicketApiTest extends TestCase
             ->where('access_token_id', $accessToken->getKey())
             ->value('revoked'));
 
-        $this->withToken($bootstrap['access_token'])
-            ->postJson('/api/v1/game-auth/tickets', ['protocol_version' => 1])
-            ->assertStatus(401);
+        $revokedResponse = $this->withToken($bootstrap['access_token'])
+            ->postJson('/api/v1/game-auth/tickets', ['protocol_version' => 1]);
+        $revokedResponse->assertStatus(401);
+        $this->assertSensitiveResponseIsNotCacheable($revokedResponse);
         self::assertSame(1, GameLoginTicket::query()->count());
     }
 
@@ -79,13 +83,15 @@ final class GameLoginTicketApiTest extends TestCase
         $this->createReadyBinding($identity->id, 1001);
         $bootstrap = $this->issueNativeOAuthBootstrapToken($identity);
 
-        $this->withToken($bootstrap['access_token'])
+        $response = $this->withToken($bootstrap['access_token'])
             ->postJson('/api/v1/game-auth/tickets', [
                 'protocol_version' => 1,
                 'identity_id' => 999,
                 'canary_account_id' => 999,
-            ])
-            ->assertStatus(422);
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertSensitiveResponseIsNotCacheable($response);
 
         self::assertSame(0, GameLoginTicket::query()->count());
         self::assertFalse(Token::query()->where('user_id', $identity->id)->firstOrFail()->revoked);
@@ -97,17 +103,36 @@ final class GameLoginTicketApiTest extends TestCase
         $this->createReadyBinding($identity->id, 1001);
         $bootstrap = $this->issueNativeOAuthBootstrapToken($identity, []);
 
-        $this->withToken($bootstrap['access_token'])
-            ->postJson('/api/v1/game-auth/tickets', ['protocol_version' => 1])
-            ->assertStatus(401);
+        $response = $this->withToken($bootstrap['access_token'])
+            ->postJson('/api/v1/game-auth/tickets', ['protocol_version' => 1]);
+
+        $response->assertStatus(401);
+        $this->assertSensitiveResponseIsNotCacheable($response);
 
         self::assertSame(0, GameLoginTicket::query()->count());
     }
 
     public function test_ticket_issuance_requires_oauth_authentication(): void
     {
-        $this->postJson('/api/v1/game-auth/tickets', ['protocol_version' => 1])
-            ->assertStatus(401);
+        $response = $this->postJson('/api/v1/game-auth/tickets', ['protocol_version' => 1]);
+
+        $response->assertStatus(401);
+        $this->assertSensitiveResponseIsNotCacheable($response);
+    }
+
+    /**
+     * @param  TestResponse<Response>  $response
+     */
+    private function assertSensitiveResponseIsNotCacheable(TestResponse $response): void
+    {
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+
+        self::assertStringContainsString('no-store', $cacheControl);
+        self::assertStringContainsString('no-cache', $cacheControl);
+        self::assertStringContainsString('must-revalidate', $cacheControl);
+        self::assertStringContainsString('private', $cacheControl);
+        $response->assertHeader('Pragma', 'no-cache')
+            ->assertHeader('Expires', '0');
     }
 
     private function createReadyBinding(int $identityId, int $canaryAccountId): IdentityCanaryAccount

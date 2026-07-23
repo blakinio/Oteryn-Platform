@@ -18,5 +18,6 @@ return [
 
     'gateway' => [
         'service_token_sha256' => env('GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256'),
+        'previous_service_token_sha256' => env('GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256'),
     ],
 ];
