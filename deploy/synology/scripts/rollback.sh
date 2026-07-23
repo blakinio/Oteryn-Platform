@@ -6,25 +6,18 @@ DEPLOY_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="${OTERYN_ENV_FILE:-$DEPLOY_DIR/.env}"
 COMPOSE_FILE="$DEPLOY_DIR/compose.yml"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-    echo "Missing staging environment file: $ENV_FILE" >&2
-    exit 1
-fi
+# shellcheck source=deploy/synology/scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
+load_oteryn_env_file "$ENV_FILE"
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
-
-state_dir="${OTERYN_STATE_DIR:-$HOME/.local/state/oteryn-staging}"
+state_dir="${OTERYN_STATE_DIR:-/var/lib/oteryn-staging-state}"
 state_file="$state_dir/last-good.env"
 if [[ ! -f "$state_file" ]]; then
     echo "No previous runtime image snapshot exists at $state_file" >&2
     exit 1
 fi
 
-# shellcheck disable=SC1090
-source "$state_file"
+load_oteryn_env_file "$state_file"
 
 for name in PLATFORM_IMAGE GATEWAY_IMAGE CANARY_IMAGE; do
     if [[ -z "${!name:-}" ]]; then
