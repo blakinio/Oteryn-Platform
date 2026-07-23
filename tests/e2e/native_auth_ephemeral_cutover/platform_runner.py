@@ -100,16 +100,34 @@ def main() -> int:
             "run", "-d", "--name", self.container("redis"), "--network", self.networks["data"], "--network-alias", "redis",
             "-v", f"{redis_conf}:/usr/local/etc/redis/redis.conf:ro", "redis:7.4-alpine", "redis-server", "/usr/local/etc/redis/redis.conf",
         )
+
+        init_complete = False
+        for _ in range(120):
+            logs = harness.docker("logs", self.container("mariadb"), check=False)
+            log_text = ((logs.stdout or b"") + (logs.stderr or b"")).decode("utf-8", errors="replace")
+            if "MariaDB init process done" in log_text:
+                init_complete = True
+                break
+            time.sleep(1)
+        if not init_complete:
+            raise harness.RehearsalError("MariaDB image initialization did not complete")
+
+        stable_pings = 0
         for _ in range(90):
             ping = harness.docker(
                 "exec", "-e", f"MARIADB_PWD={self.db_root_password}", self.container("mariadb"),
                 "mariadb-admin", "--skip-ssl", "-uroot", "ping", check=False,
             )
             if ping.returncode == 0:
-                break
+                stable_pings += 1
+                if stable_pings >= 2:
+                    break
+            else:
+                stable_pings = 0
             time.sleep(1)
         else:
-            raise harness.RehearsalError("MariaDB did not become ready")
+            raise harness.RehearsalError("MariaDB final server did not become stably ready")
+
         redis_ping = harness.docker("exec", self.container("redis"), "redis-cli", "-a", self.redis_admin_password, "PING", check=False)
         if redis_ping.returncode != 0:
             raise harness.RehearsalError("Redis did not become ready")
@@ -168,9 +186,9 @@ FLUSH PRIVILEGES;
     # Canary PR #841 owns the production-like orchestration harness. The
     # Platform-hosted runner adapts harness-only execution details: safe argv
     # passing for curl probes, normal system trust installation of the
-    # ephemeral CA, and deterministic local-socket MariaDB schema provisioning.
-    # It never disables TLS verification and does not alter pinned product
-    # component source revisions.
+    # ephemeral CA, and deterministic MariaDB provisioning after the image's
+    # initialization server has handed off to the final server. It never
+    # disables TLS verification and does not alter pinned product revisions.
     harness.Rehearsal.curl_status = safe_curl_status
     harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
     harness.Rehearsal.start_data_services = start_data_services_deterministically
