@@ -4,11 +4,19 @@ set -eu
 TLS_DIR="${TLS_DIR:-/tls}"
 mkdir -p "$TLS_DIR"
 
-if [ -s "$TLS_DIR/ca.crt" ] \
-    && [ -s "$TLS_DIR/platform-internal.crt" ] \
-    && [ -s "$TLS_DIR/platform-internal.key" ] \
-    && [ -s "$TLS_DIR/canary-session-internal.crt" ] \
-    && [ -s "$TLS_DIR/canary-session-internal.key" ]; then
+certificates_are_current() {
+    [ -s "$TLS_DIR/ca.crt" ] \
+        && [ -s "$TLS_DIR/ca.key" ] \
+        && [ -s "$TLS_DIR/platform-internal.crt" ] \
+        && [ -s "$TLS_DIR/platform-internal.key" ] \
+        && [ -s "$TLS_DIR/canary-session-internal.crt" ] \
+        && [ -s "$TLS_DIR/canary-session-internal.key" ] \
+        && openssl x509 -checkend 604800 -noout -in "$TLS_DIR/ca.crt" >/dev/null 2>&1 \
+        && openssl x509 -checkend 604800 -noout -in "$TLS_DIR/platform-internal.crt" >/dev/null 2>&1 \
+        && openssl x509 -checkend 604800 -noout -in "$TLS_DIR/canary-session-internal.crt" >/dev/null 2>&1
+}
+
+if certificates_are_current; then
     exit 0
 fi
 
