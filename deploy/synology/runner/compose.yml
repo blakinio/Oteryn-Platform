@@ -1,0 +1,24 @@
+name: oteryn-deploy-runner
+
+services:
+  runner:
+    image: ${RUNNER_IMAGE:-ghcr.io/blakinio/oteryn-deploy-runner:main}
+    restart: unless-stopped
+    user: "0:0"
+    environment:
+      RUNNER_ALLOW_RUNASROOT: "1"
+      RUNNER_URL: https://github.com/blakinio/Oteryn-Platform
+      RUNNER_NAME: ${RUNNER_NAME:-oteryn-synology-staging}
+      RUNNER_LABELS: oteryn-staging
+      RUNNER_TOKEN: ${RUNNER_TOKEN:-}
+      RUNNER_WORKDIR: /work
+      RUNNER_CONFIG_DIR: /runner
+    volumes:
+      - runner_config:/runner
+      - runner_work:/work
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${OTERYN_STATE_HOST_PATH:-/volume1/docker/oteryn/state}:/var/lib/oteryn-staging-state
+
+volumes:
+  runner_config:
+  runner_work:
