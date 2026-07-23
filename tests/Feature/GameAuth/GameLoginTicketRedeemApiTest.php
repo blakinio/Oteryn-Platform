@@ -8,6 +8,7 @@ use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 final class GameLoginTicketRedeemApiTest extends TestCase
@@ -185,7 +186,7 @@ final class GameLoginTicketRedeemApiTest extends TestCase
     }
 
     /**
-     * @param  TestResponse<\Symfony\Component\HttpFoundation\Response>  $response
+     * @param  TestResponse<Response>  $response
      */
     private function assertSensitiveResponseIsNotCacheable(TestResponse $response): void
     {
