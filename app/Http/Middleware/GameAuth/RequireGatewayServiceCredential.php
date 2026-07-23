@@ -49,14 +49,14 @@ final class RequireGatewayServiceCredential
         $currentHash = config('game-auth.gateway.service_token_sha256');
         $previousHash = config('game-auth.gateway.previous_service_token_sha256');
 
-        if (! $this->isValidHash($currentHash)) {
+        if (! is_string($currentHash) || ! $this->isValidHash($currentHash)) {
             return null;
         }
 
         $hashes = [strtolower($currentHash)];
 
         if ($previousHash !== null && $previousHash !== '') {
-            if (! $this->isValidHash($previousHash)) {
+            if (! is_string($previousHash) || ! $this->isValidHash($previousHash)) {
                 return null;
             }
 
@@ -69,8 +69,8 @@ final class RequireGatewayServiceCredential
         return $hashes;
     }
 
-    private function isValidHash(mixed $hash): bool
+    private function isValidHash(string $hash): bool
     {
-        return is_string($hash) && preg_match('/\A[a-f0-9]{64}\z/i', $hash) === 1;
+        return preg_match('/\A[a-f0-9]{64}\z/i', $hash) === 1;
     }
 }
