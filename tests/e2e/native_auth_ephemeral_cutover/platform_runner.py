@@ -5,6 +5,7 @@ import importlib.util
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -84,13 +85,95 @@ def main() -> int:
             capture=False,
         )
 
+    def start_data_services_deterministically(self: Any) -> None:
+        harness.docker(
+            "run", "-d", "--name", self.container("mariadb"), "--network", self.networks["data"], "--network-alias", "mariadb",
+            "-e", f"MARIADB_ROOT_PASSWORD={self.db_root_password}", "mariadb:11.4",
+        )
+        redis_conf = self.temp / "redis.conf"
+        redis_conf.write_text(
+            "bind 0.0.0.0\nprotected-mode yes\nport 6379\n"
+            f"requirepass {self.redis_admin_password}\n",
+            encoding="utf-8",
+        )
+        harness.docker(
+            "run", "-d", "--name", self.container("redis"), "--network", self.networks["data"], "--network-alias", "redis",
+            "-v", f"{redis_conf}:/usr/local/etc/redis/redis.conf:ro", "redis:7.4-alpine", "redis-server", "/usr/local/etc/redis/redis.conf",
+        )
+        for _ in range(90):
+            ping = harness.docker(
+                "exec", "-e", f"MARIADB_PWD={self.db_root_password}", self.container("mariadb"),
+                "mariadb-admin", "--skip-ssl", "-uroot", "ping", check=False,
+            )
+            if ping.returncode == 0:
+                break
+            time.sleep(1)
+        else:
+            raise harness.RehearsalError("MariaDB did not become ready")
+        redis_ping = harness.docker("exec", self.container("redis"), "redis-cli", "-a", self.redis_admin_password, "PING", check=False)
+        if redis_ping.returncode != 0:
+            raise harness.RehearsalError("Redis did not become ready")
+
+        grants = f"""
+CREATE DATABASE platform CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE canary CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'platform_app'@'%' IDENTIFIED BY '{self.db_platform_password}';
+GRANT ALL PRIVILEGES ON platform.* TO 'platform_app'@'%';
+CREATE USER 'canary_game'@'%' IDENTIFIED BY '{self.db_canary_password}';
+GRANT ALL PRIVILEGES ON canary.* TO 'canary_game'@'%';
+CREATE USER 'oteryn_readonly'@'%' IDENTIFIED BY '{self.db_readonly_password}';
+GRANT SELECT ON canary.* TO 'oteryn_readonly'@'%';
+FLUSH PRIVILEGES;
+""".encode()
+        harness.docker(
+            "exec", "-i", "-e", f"MARIADB_PWD={self.db_root_password}", self.container("mariadb"),
+            "mariadb", "--skip-ssl", "-uroot", input_bytes=grants,
+        )
+
+        sources = [
+            self.canary_source / "schema.sql",
+            self.canary_source / "docker/data/01-test_account.sql",
+            self.canary_source / "docker/data/02-test_account_players.sql",
+        ]
+        for index, source in enumerate(sources):
+            target = f"/tmp/rehearsal-{index}.sql"
+            harness.docker("cp", str(source), f"{self.container('mariadb')}:{target}")
+            imported = harness.docker(
+                "exec", "-e", f"MARIADB_PWD={self.db_root_password}", self.container("mariadb"),
+                "sh", "-c", f"mariadb --skip-ssl -uroot canary < {target}", check=False,
+            )
+            harness.docker("exec", self.container("mariadb"), "rm", "-f", target, check=False)
+            if imported.returncode != 0:
+                logs = harness.docker("logs", self.container("mariadb"), check=False)
+                server_tail = ((logs.stdout or b"") + (logs.stderr or b"")).decode("utf-8", errors="replace")[-4000:]
+                raise harness.RehearsalError(f"MariaDB schema import {source.name} failed; server tail: {server_tail}")
+
+        harness.docker(
+            "exec", "-e", f"MARIADB_PWD={self.db_root_password}", self.container("mariadb"),
+            "mariadb", "--skip-ssl", "-uroot", "canary", "-e", "DELETE FROM players_online; DELETE FROM boosted_boss;",
+        )
+        harness.docker(
+            "exec", self.container("redis"), "redis-cli", "-a", self.redis_admin_password,
+            "ACL", "SETUSER", "oteryn_runtime", "on", f">{self.redis_readonly_password}",
+            "~cluster:channel:*:runtime", "+get", "+mget", "+exists", "+ping",
+        )
+        denied = harness.docker(
+            "run", "--rm", "--network", self.networks["data"], "redis:7.4-alpine",
+            "redis-cli", "-h", "redis", "--user", "oteryn_runtime", "-a", self.redis_readonly_password,
+            "SET", "forbidden", "1", check=False,
+        )
+        self.runtime["redis_readonly_acl_write_rejected"] = denied.returncode != 0
+        self.runtime["database_schema_import"] = "PASS"
+
     # Canary PR #841 owns the production-like orchestration harness. The
-    # Platform-hosted runner adapts two harness-only execution details: safe
-    # argument passing for curl probes and normal system trust installation of
-    # the ephemeral CA for OTClient. It never disables TLS verification and it
-    # does not alter any pinned product component source revision.
+    # Platform-hosted runner adapts harness-only execution details: safe argv
+    # passing for curl probes, normal system trust installation of the
+    # ephemeral CA, and deterministic local-socket MariaDB schema provisioning.
+    # It never disables TLS verification and does not alter pinned product
+    # component source revisions.
     harness.Rehearsal.curl_status = safe_curl_status
     harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
+    harness.Rehearsal.start_data_services = start_data_services_deterministically
     return harness.main()
 
 
