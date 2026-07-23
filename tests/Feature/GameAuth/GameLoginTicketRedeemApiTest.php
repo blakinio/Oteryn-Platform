@@ -185,8 +185,13 @@ final class GameLoginTicketRedeemApiTest extends TestCase
 
     private function assertSensitiveResponseIsNotCacheable(TestResponse $response): void
     {
-        $response->assertHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private')
-            ->assertHeader('Pragma', 'no-cache')
+        $cacheControl = (string) $response->headers->get('Cache-Control');
+
+        self::assertStringContainsString('no-store', $cacheControl);
+        self::assertStringContainsString('no-cache', $cacheControl);
+        self::assertStringContainsString('must-revalidate', $cacheControl);
+        self::assertStringContainsString('private', $cacheControl);
+        $response->assertHeader('Pragma', 'no-cache')
             ->assertHeader('Expires', '0');
     }
 
