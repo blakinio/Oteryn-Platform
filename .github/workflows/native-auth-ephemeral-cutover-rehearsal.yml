@@ -1,0 +1,432 @@
+name: Native Auth Ephemeral Cutover Rehearsal
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/native-auth-ephemeral-cutover-rehearsal.yml"
+      - "tests/e2e/native_auth_ephemeral_cutover/**"
+      - "docs/agents/tasks/active/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal.md"
+
+permissions:
+  contents: read
+  actions: read
+  packages: read
+
+concurrency:
+  group: platform-native-auth-ephemeral-cutover-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  PLATFORM_REF: 53158217a6c6017230301cf4daa783b04fcc13d5
+  GATEWAY_REF: 53158217a6c6017230301cf4daa783b04fcc13d5
+  CANARY_REF: 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e
+  OTCLIENT_REF: bb87346f6c516a19d19497d82bb01fb389334ff5
+  CANARY_HARNESS_REF: f1e1664f9ad0097ede7a0a9b023251561ff24cf2
+
+jobs:
+  build-gateway:
+    name: Build exact Game Gateway revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact Platform/Gateway source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.GATEWAY_REF }}
+          persist-credentials: false
+
+      - name: Verify exact Gateway revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${GATEWAY_REF}"
+          git rev-parse HEAD | tee gateway-commit.txt
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.24.x"
+          cache: false
+
+      - name: Test and build Gateway
+        working-directory: services/game-gateway
+        run: |
+          set -euo pipefail
+          go test ./...
+          go vet ./...
+          CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o ../../game-gateway ./cmd/game-gateway
+          cd ../..
+          sha256sum game-gateway | tee gateway-build-sha256.txt
+
+      - name: Upload exact Gateway binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-auth-rehearsal-gateway
+          path: |
+            game-gateway
+            gateway-commit.txt
+            gateway-build-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  build-canary:
+    name: Build exact Canary native-auth revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CC: gcc-13
+      CXX: g++-13
+      VCPKG_BINARY_CACHE_ACCESS: read
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,read;nugettimeout,600"
+      VCPKG_NUGET_REPOSITORY: https://github.com/blakinio/canary.git
+      VCPKG_NUGET_API_KEY: ${{ github.token }}
+    steps:
+      - name: Checkout exact Canary source
+        uses: actions/checkout@v6
+        with:
+          repository: blakinio/canary
+          ref: ${{ env.CANARY_REF }}
+          persist-credentials: false
+
+      - name: Verify exact Canary revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${CANARY_REF}"
+          git rev-parse HEAD | tee canary-commit.txt
+
+      - name: Install Canary build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache ninja-build gcc-13 g++-13 mono-complete
+          sudo ln -sf /usr/bin/ninja /usr/bin/ninja-build
+
+      - name: Read Canary vcpkg baseline
+        run: |
+          set -euo pipefail
+          vcpkg_commit_id="$(grep '.builtin-baseline' vcpkg.json | awk -F: '{print $2}' | tr -d ',\" ')"
+          test -n "${vcpkg_commit_id}"
+          echo "VCPKG_GIT_COMMIT_ID=${vcpkg_commit_id}" >> "${GITHUB_ENV}"
+
+      - name: Set up Canary vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
+        with:
+          vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
+          vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
+
+      - name: Configure Canary NuGet package cache
+        env:
+          NUGET_AUTH_TOKEN: ${{ env.VCPKG_NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          unset VCPKG_FORCE_SYSTEM_BINARIES
+          nuget_path="$(vcpkg fetch nuget 2>&1 | grep -E '^/' | tail -n 1)"
+          test -n "${nuget_path}"
+          test -f "${nuget_path}"
+          mono "${nuget_path}" sources remove -name "GitHubPackages" >/dev/null 2>&1 || true
+          mono "${nuget_path}" sources add \
+            -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            -storepasswordincleartext \
+            -name "GitHubPackages" \
+            -username "${{ github.repository_owner }}" \
+            -password "${NUGET_AUTH_TOKEN}"
+          mono "${nuget_path}" setapikey "${NUGET_AUTH_TOKEN}" \
+            -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+      - name: Build exact Canary release
+        run: |
+          set -euo pipefail
+          cmake --preset linux-release \
+            -DTOGGLE_BIN_FOLDER=ON \
+            -DOPTIONS_ENABLE_CCACHE=ON \
+            -DOPTIONS_ENABLE_SCCACHE=OFF
+          cmake --build --preset linux-release --parallel 2
+          CANARY_PATH="$(find build/linux-release/bin -maxdepth 2 -type f -name canary -perm -111 | head -n 1)"
+          test -n "${CANARY_PATH}"
+          cp "${CANARY_PATH}" canary-rehearsal
+          chmod +x canary-rehearsal
+          sha256sum canary-rehearsal | tee canary-build-sha256.txt
+
+      - name: Upload exact Canary binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-auth-rehearsal-canary
+          path: |
+            canary-rehearsal
+            canary-commit.txt
+            canary-build-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  build-otclient:
+    name: Build exact controlled OTClient revision
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      VCPKG_BINARY_CACHE_ACCESS: read
+      VCPKG_BINARY_SOURCES: "clear;nuget,https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json,read;nugettimeout,600"
+      VCPKG_NUGET_REPOSITORY: https://github.com/blakinio/otclient.git
+      VCPKG_NUGET_API_KEY: ${{ github.token }}
+    steps:
+      - name: Checkout exact OTClient source
+        uses: actions/checkout@v6
+        with:
+          repository: blakinio/otclient
+          ref: ${{ env.OTCLIENT_REF }}
+          persist-credentials: false
+
+      - name: Verify exact OTClient revision
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${OTCLIENT_REF}"
+          git rev-parse HEAD | tee otclient-commit.txt
+
+      - name: Install OTClient build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf autoconf-archive automake ccache gcc-14 g++-14 \
+            libgl1-mesa-dev libglu1-mesa-dev libltdl-dev libtool libtool-bin \
+            libx11-dev libxcursor-dev libxi-dev libxinerama-dev libxrandr-dev \
+            linux-libc-dev make mono-complete ninja-build perl pkg-config
+          sudo ln -sf /usr/bin/ninja /usr/bin/ninja-build
+
+      - name: Read OTClient vcpkg baseline
+        run: |
+          set -euo pipefail
+          vcpkg_commit_id="$(grep '.builtin-baseline' vcpkg.json | awk -F: '{print $2}' | tr -d ',\" ')"
+          test -n "${vcpkg_commit_id}"
+          echo "VCPKG_GIT_COMMIT_ID=${vcpkg_commit_id}" >> "${GITHUB_ENV}"
+
+      - name: Set up OTClient vcpkg
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2
+        with:
+          vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
+          vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
+
+      - name: Seed verified FreeType source fallback
+        env:
+          FREETYPE_SOURCE_URL: https://github.com/freetype/freetype/archive/refs/tags/VER-2-14-3.tar.gz
+          FREETYPE_SOURCE_SHA512: c3b6b0cc4b428c9c647ab2148386901dfd315273b68051940e8fea6010d46fdd2913467c3ef58be0d499b8e2ef5a0f1a4cc5e739756155587f4f7dff08ef9695
+        run: |
+          set -euo pipefail
+          vcpkg_root="${VCPKG_ROOT:-$(dirname "$(command -v vcpkg)")}"
+          downloads_dir="${VCPKG_DOWNLOADS:-${vcpkg_root}/downloads}"
+          archive="${downloads_dir}/freetype-freetype-VER-2-14-3.tar.gz"
+          mkdir -p "${downloads_dir}"
+          if [[ ! -f "${archive}" ]] || ! printf '%s  %s\n' "${FREETYPE_SOURCE_SHA512}" "${archive}" | sha512sum --check --status; then
+            rm -f "${archive}"
+            curl --fail --location --retry 3 --retry-delay 5 "${FREETYPE_SOURCE_URL}" --output "${archive}"
+            printf '%s  %s\n' "${FREETYPE_SOURCE_SHA512}" "${archive}" | sha512sum --check -
+          fi
+
+      - name: Configure OTClient NuGet package cache
+        env:
+          NUGET_AUTH_TOKEN: ${{ env.VCPKG_NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+          unset VCPKG_FORCE_SYSTEM_BINARIES
+          nuget_path="$(vcpkg fetch nuget 2>&1 | grep -E '^/' | tail -n 1)"
+          test -n "${nuget_path}"
+          test -f "${nuget_path}"
+          mono "${nuget_path}" sources remove -name "GitHubPackages" >/dev/null 2>&1 || true
+          mono "${nuget_path}" sources add \
+            -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            -storepasswordincleartext \
+            -name "GitHubPackages" \
+            -username "${{ github.repository_owner }}" \
+            -password "${NUGET_AUTH_TOKEN}"
+          mono "${nuget_path}" setapikey "${NUGET_AUTH_TOKEN}" \
+            -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+      - name: Build exact OTClient release
+        uses: lukka/run-cmake@5d55ea7949e25b3c022a9a03bd7a427fb6a2
+        with:
+          configurePreset: linux-release
+          buildPreset: linux-release
+          configurePresetAdditionalArgs: "['-DTOGGLE_BIN_FOLDER=ON', '-DOPTIONS_ENABLE_IPO=OFF']"
+
+      - name: Verify OTClient executable
+        run: |
+          set -euo pipefail
+          OTCLIENT_PATH="$(find build/linux-release/bin -maxdepth 2 -type f -name otclient -perm -111 | head -n 1)"
+          test -n "${OTCLIENT_PATH}"
+          cp "${OTCLIENT_PATH}" otclient-rehearsal
+          chmod +x otclient-rehearsal
+          sha256sum otclient-rehearsal | tee otclient-build-sha256.txt
+
+      - name: Upload exact OTClient binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-auth-rehearsal-otclient
+          path: |
+            otclient-rehearsal
+            otclient-commit.txt
+            otclient-build-sha256.txt
+          if-no-files-found: error
+          retention-days: 30
+
+  rehearsal:
+    name: Full ephemeral production-like native-auth cutover
+    needs: [build-gateway, build-canary, build-otclient]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Checkout validation runner head
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Checkout exact Platform runtime source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.PLATFORM_REF }}
+          path: platform-source
+          persist-credentials: false
+
+      - name: Checkout exact Canary runtime source
+        uses: actions/checkout@v6
+        with:
+          repository: blakinio/canary
+          ref: ${{ env.CANARY_REF }}
+          path: canary-runtime-source
+          persist-credentials: false
+
+      - name: Checkout exact OTClient runtime source
+        uses: actions/checkout@v6
+        with:
+          repository: blakinio/otclient
+          ref: ${{ env.OTCLIENT_REF }}
+          path: otclient-source
+          persist-credentials: false
+
+      - name: Checkout exact Canary rehearsal harness
+        uses: actions/checkout@v6
+        with:
+          repository: blakinio/canary
+          ref: ${{ env.CANARY_HARNESS_REF }}
+          path: canary-harness
+          persist-credentials: false
+
+      - name: Checkout matching Tibia client assets
+        uses: actions/checkout@v6
+        with:
+          repository: dudantas/tibia-client
+          path: tibia-client-assets
+          lfs: true
+          persist-credentials: false
+
+      - name: Download exact Gateway build
+        uses: actions/download-artifact@v4
+        with:
+          name: native-auth-rehearsal-gateway
+          path: gateway-artifact
+
+      - name: Download exact Canary build
+        uses: actions/download-artifact@v4
+        with:
+          name: native-auth-rehearsal-canary
+          path: canary-artifact
+
+      - name: Download exact OTClient build
+        uses: actions/download-artifact@v4
+        with:
+          name: native-auth-rehearsal-otclient
+          path: otclient-artifact
+
+      - name: Verify all declared exact revisions
+        run: |
+          set -euo pipefail
+          test "$(git -C platform-source rev-parse HEAD)" = "${PLATFORM_REF}"
+          test "$(git -C canary-runtime-source rev-parse HEAD)" = "${CANARY_REF}"
+          test "$(git -C otclient-source rev-parse HEAD)" = "${OTCLIENT_REF}"
+          test "$(git -C canary-harness rev-parse HEAD)" = "${CANARY_HARNESS_REF}"
+          test "$(tr -d '\r\n' < gateway-artifact/gateway-commit.txt)" = "${GATEWAY_REF}"
+          test "$(tr -d '\r\n' < canary-artifact/canary-commit.txt)" = "${CANARY_REF}"
+          test "$(tr -d '\r\n' < otclient-artifact/otclient-commit.txt)" = "${OTCLIENT_REF}"
+
+      - name: Resolve executable artifacts
+        run: |
+          set -euo pipefail
+          chmod +x gateway-artifact/game-gateway canary-artifact/canary-rehearsal otclient-artifact/otclient-rehearsal
+          echo "REHEARSAL_GATEWAY_BIN=${GITHUB_WORKSPACE}/gateway-artifact/game-gateway" >> "${GITHUB_ENV}"
+          echo "REHEARSAL_CANARY_BIN=${GITHUB_WORKSPACE}/canary-artifact/canary-rehearsal" >> "${GITHUB_ENV}"
+          echo "REHEARSAL_OTCLIENT_BIN=${GITHUB_WORKSPACE}/otclient-artifact/otclient-rehearsal" >> "${GITHUB_ENV}"
+
+      - name: Validate exact harness and runner syntax
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            tests/e2e/native_auth_ephemeral_cutover/platform_runner.py \
+            canary-harness/tests/e2e/native_auth_ephemeral_cutover/run_rehearsal.py \
+            canary-harness/tests/e2e/native_auth_ephemeral_cutover/browser_driver.py \
+            canary-harness/tests/e2e/native_auth_ephemeral_cutover/oauth_probe.py
+          bash -n canary-harness/tests/e2e/native_auth_ephemeral_cutover/capture-xdg-open.sh
+
+      - name: Run full ephemeral cutover rehearsal
+        env:
+          REHEARSAL_CANARY_HARNESS_ROOT: ${{ github.workspace }}/canary-harness/tests/e2e/native_auth_ephemeral_cutover
+          REHEARSAL_HARNESS_ROOT: ${{ github.workspace }}/canary-harness/tests/e2e/native_auth_ephemeral_cutover
+          REHEARSAL_PLATFORM_SOURCE: ${{ github.workspace }}/platform-source
+          REHEARSAL_CANARY_SOURCE: ${{ github.workspace }}/canary-runtime-source
+          REHEARSAL_OTCLIENT_SOURCE: ${{ github.workspace }}/otclient-source
+          REHEARSAL_ASSETS_SOURCE: ${{ github.workspace }}/tibia-client-assets/assets
+          REHEARSAL_CANARY_BIN: ${{ env.REHEARSAL_CANARY_BIN }}
+          REHEARSAL_GATEWAY_BIN: ${{ env.REHEARSAL_GATEWAY_BIN }}
+          REHEARSAL_OTCLIENT_BIN: ${{ env.REHEARSAL_OTCLIENT_BIN }}
+          REHEARSAL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/native-auth-ephemeral-cutover
+        run: |
+          set -euo pipefail
+          mkdir -p "${REHEARSAL_EVIDENCE_DIR}"
+          python3 tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
+
+      - name: Assert retained result classification
+        if: success()
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path("artifacts/native-auth-ephemeral-cutover/result.json").read_text())
+          assert result["overall_status"] == "PRODUCTION_LIKE_PROVEN", result
+          assert result["evidence_classification"] == "PRODUCTION_LIKE_PROVEN", result
+          assert result["successful_world_entries"] == 1, result
+          assert result["replay_rejection_status"] is True, result
+          assert result["logout_status"] is True, result
+          assert result["credential_rotation_status"] is True, result
+          assert result["tls_validation_status"] is True, result
+          assert result["rollback_status"] is True, result
+          assert result["sensitive_log_scan_status"] == "PASS", result
+          PY
+
+      - name: Upload sanitized rehearsal evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-auth-ephemeral-cutover-evidence
+          path: artifacts/native-auth-ephemeral-cutover/
+          if-no-files-found: warn
+          retention-days: 30
+
+  required:
+    name: Required native-auth ephemeral cutover rehearsal
+    if: always()
+    needs: [build-gateway, build-canary, build-otclient, rehearsal]
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Enforce rehearsal result
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          jobs = json.loads(os.environ["NEEDS_JSON"])
+          failed = {name: data.get("result") for name, data in jobs.items() if data.get("result") != "success"}
+          if failed:
+              raise SystemExit(f"native-auth ephemeral cutover did not pass: {failed}")
+          PY
