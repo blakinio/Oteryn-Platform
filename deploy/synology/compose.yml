@@ -92,6 +92,8 @@ services:
       GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256: ${GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256:-}
     ports:
       - ${OTERYN_BIND_ADDRESS}:${PLATFORM_PORT}:8000
+    volumes:
+      - platform_storage:/var/www/html/storage
     networks:
       - private
     depends_on:
@@ -200,6 +202,7 @@ services:
 volumes:
   mariadb_data:
   redis_data:
+  platform_storage:
   canary_data:
   internal_tls:
 
