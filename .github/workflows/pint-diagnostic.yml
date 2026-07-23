@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - task/OTERYN-20260723-native-auth-production-cutover
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
