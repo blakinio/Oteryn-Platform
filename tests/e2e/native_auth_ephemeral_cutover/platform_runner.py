@@ -63,11 +63,34 @@ def main() -> int:
         match = re.search(r"([0-9]{3})$", output)
         return (int(match.group(1)) if match else 0, output)
 
-    # Canary PR #841 introduced the production-like orchestration harness. The
-    # Platform-hosted runner replaces only its shell-assembled curl invocation
-    # with argument-safe Docker execution; product component source stays pinned
-    # to the exact revisions declared by the harness and workflow.
+    original_build_runtime_images = harness.Rehearsal.build_runtime_images
+
+    def build_runtime_images_with_client_ca(self: Any) -> None:
+        original_build_runtime_images(self)
+        trust_dockerfile = self.temp / "OTClientTrust.Dockerfile"
+        trust_dockerfile.write_text(
+            f"FROM {self.prefix}-otclient:latest\n"
+            "COPY tls/ca.crt /usr/local/share/ca-certificates/oteryn-ephemeral-rehearsal.crt\n"
+            "RUN update-ca-certificates\n",
+            encoding="utf-8",
+        )
+        harness.docker(
+            "build",
+            "-f",
+            str(trust_dockerfile),
+            "-t",
+            f"{self.prefix}-otclient:latest",
+            str(self.temp),
+            capture=False,
+        )
+
+    # Canary PR #841 owns the production-like orchestration harness. The
+    # Platform-hosted runner adapts two harness-only execution details: safe
+    # argument passing for curl probes and normal system trust installation of
+    # the ephemeral CA for OTClient. It never disables TLS verification and it
+    # does not alter any pinned product component source revision.
     harness.Rehearsal.curl_status = safe_curl_status
+    harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
     return harness.main()
 
 
