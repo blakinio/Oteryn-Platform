@@ -19,7 +19,7 @@ set +a
 compose=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 
 for service in mariadb redis canary platform internal-proxy gateway; do
-    container_id="$(${compose[@]} ps -q "$service")"
+    container_id="$("${compose[@]}" ps -q "$service")"
     if [[ -z "$container_id" ]]; then
         echo "Service is not created: $service" >&2
         exit 1
@@ -51,7 +51,7 @@ probe_url "http://${OTERYN_BIND_ADDRESS}:${GATEWAY_PORT}/health" "Gateway /healt
 probe_url "http://${OTERYN_BIND_ADDRESS}:${GATEWAY_PORT}/ready" "Gateway /ready"
 probe_url "http://${OTERYN_BIND_ADDRESS}:${GATEWAY_PORT}/version" "Gateway /version"
 
-if ! curl --silent --show-error --max-time 3 "telnet://${OTERYN_BIND_ADDRESS}:${CANARY_GAME_PORT}" </dev/null >/dev/null 2>&1; then
+if ! timeout 3 bash -c "exec 3<>/dev/tcp/${OTERYN_BIND_ADDRESS}/${CANARY_GAME_PORT}" 2>/dev/null; then
     echo "Canary game TCP port is not reachable on the configured staging bind address." >&2
     exit 1
 fi
