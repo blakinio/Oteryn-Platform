@@ -12,13 +12,14 @@ Maximum evidence classification is `PRODUCTION_LIKE_PROVEN`. This task performs 
 owned_paths:
   - docs/agents/tasks/active/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal.md
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
+  - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 modules:
   - native-auth production-like validation runner
 dependencies:
   - Oteryn Platform 53158217a6c6017230301cf4daa783b04fcc13d5
   - Canary 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e
   - OTClient bb87346f6c516a19d19497d82bb01fb389334ff5
-  - Canary rehearsal harness branch test/CAN-20260723-native-auth-ephemeral-cutover-rehearsal
+  - Canary rehearsal harness f1e1664f9ad0097ede7a0a9b023251561ff24cf2
 blocks:
   - PRODUCTION_LIKE_PROVEN native-auth rehearsal evidence
 cross_repository_tasks:
@@ -39,7 +40,7 @@ cross_repository_tasks:
 ## Security boundaries
 
 - Trust boundary: OTClient -> Platform public HTTPS -> Gateway public HTTPS -> Platform private HTTPS -> Canary private issuer HTTPS -> Canary game protocol.
-- Actions access: no PAT or production secret is introduced; the workflow relies only on the repo-scoped Platform token for its own private repository and unauthenticated/read-only public repository checkout for Canary/OTClient.
+- Actions access: no PAT or production secret is introduced; the workflow relies only on the repo-scoped Platform token for its own private repository and read-only public repository checkout for Canary/OTClient.
 - Runtime secrets: generated ephemerally inside the job and excluded from retained evidence.
 - Rollback: native issuer/routing activation is rehearsal-only and torn down with the ephemeral environment.
 
@@ -47,10 +48,10 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-23T23:40:00+02:00
-head: 53158217a6c6017230301cf4daa783b04fcc13d5
+updated_at: 2026-07-23T23:45:00+02:00
+head: 44cbd150dccaeca9641646970a69b6b60118a189
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
-pr: null
+pr: 126
 status: implementing
 context_routes:
   - auth-identity
@@ -60,15 +61,18 @@ context_routes:
 owned_paths:
   - docs/agents/tasks/active/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal.md
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
+  - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 proven:
   - Oteryn Platform is private while Canary and OTClient are public.
   - Canary-hosted run 30046697940 job 89339475081 failed at checkout of private Oteryn Platform before Gateway build because the Canary-scoped GITHUB_TOKEN cannot access the private sibling repository.
-  - The same exact Platform/Gateway source is the base of this repository and can be built here with the repository-scoped token.
+  - Draft PR 126 hosts the execution boundary in Oteryn Platform without adding a cross-repository PAT.
+  - Workflow source pins Platform and Gateway 53158217a6c6017230301cf4daa783b04fcc13d5, Canary 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e, OTClient bb87346f6c516a19d19497d82bb01fb389334ff5 and Canary harness f1e1664f9ad0097ede7a0a9b023251561ff24cf2.
+  - Platform runner replaces only the harness shell-assembled curl probe with argument-safe Docker curl execution; component source revisions are unchanged.
 derived:
   - The execution boundary belongs in Oteryn Platform even though the physical E2E harness remains maintained in Canary.
 unknown:
-  - final exact Canary harness commit after runtime repair
   - final workflow run/job/artifact identifiers
+  - first runtime failure after exact component builds complete
 conflicts: []
 first_failure:
   marker: cross-private-repository-checkout
@@ -77,9 +81,14 @@ rejected_hypotheses:
   - native-auth product code caused the checkout failure: disproven because failure occurred in actions/checkout before source verification/build
   - add a cross-repository PAT: rejected because no additional long-lived credential is required when the workflow runs from the private Platform repository
 changed_paths:
+  - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
   - docs/agents/tasks/active/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal.md
-validation: []
+  - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
+validation:
+  - command: Canary Native Auth Ephemeral Cutover Rehearsal run 30046697940 / job 89339475081
+    result: FAIL
+    evidence: environment defect; private Platform checkout rejected before build
 blockers:
-  - Canary rehearsal harness must reach a stable exact commit before the Platform-hosted runner can be classified PRODUCTION_LIKE_PROVEN
-next_action: open a draft validation PR, add the Platform-hosted full rehearsal workflow pinned to exact public Canary/OTClient/harness revisions, and execute it.
+  - Platform-hosted exact-revision rehearsal has not completed yet
+next_action: execute the Platform-hosted workflow from PR 126 and repair the first concrete build, harness, environment or product failure it reports.
 ```
