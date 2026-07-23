@@ -59,8 +59,8 @@ cross_repository_tasks:
 ## Context checkpoint
 
 ```yaml
-checkpoint_version: 2
-updated_at: 2026-07-23T22:12:00Z
+checkpoint_version: 1
+updated_at: 2026-07-23T22:15:00Z
 head: a1ad36067f8bd26fd49ebf29234e19fbd9efb5d0
 branch: feat/OTERYN-20260723-synology-staging-deployment
 pr: 127
@@ -125,10 +125,10 @@ validation:
   - command: Phase 7 Production-Like Validation / run 30048939555
     result: PASS
     evidence: existing production-like validation remained green
-activation_gates:
-  - obtain one-time self-hosted runner registration token and start the supplied runner project in Synology Container Manager
-  - configure synology-staging GitHub Environment secrets/variables
-  - provide a compatible prebuilt Canary native-auth image before first full-stack deploy
+blockers:
+  - staging activation still requires one-time Synology runner registration outside Git
+  - first full native-auth deployment still requires a compatible prebuilt Canary image reference
+  - synology-staging Environment secrets and variables must be configured outside Git before deployment
 next_action: merge PR 127 after current checkpoint-head checks pass, verify trusted-main GHCR image publication, then perform the one-time Synology runner registration outside Git.
 ```
 
