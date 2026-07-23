@@ -68,36 +68,107 @@ jobs:
           timeout --version >/dev/null
 
       - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
         run: |
           set -euo pipefail
-          printf '%s' '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io --username '${{ github.actor }}' --password-stdin
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
 
       - name: Validate deployment configuration
         if: inputs.action == 'deploy'
         env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
           CANARY_IMAGE_INPUT: ${{ inputs.canary_image }}
+          OTERYN_BIND_ADDRESS_INPUT: ${{ vars.OTERYN_STAGING_BIND_ADDRESS }}
+          OTERYN_STATE_DIR_INPUT: ${{ vars.OTERYN_STAGING_STATE_DIR }}
+          APP_URL_INPUT: ${{ vars.OTERYN_STAGING_APP_URL }}
         run: |
           set -euo pipefail
-          if [ -z "$CANARY_IMAGE_INPUT" ]; then
-            echo "canary_image is required for deploy." >&2
+
+          if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "release_tag is not a valid bounded Docker tag." >&2
             exit 1
           fi
-          for name in \
-            APP_KEY \
-            MARIADB_ROOT_PASSWORD \
-            PLATFORM_DB_PASSWORD \
-            CANARY_DB_PASSWORD \
-            CANARY_READONLY_DB_PASSWORD \
-            CANARY_PROVISIONING_DB_PASSWORD \
-            CANARY_CHARACTER_CREATE_DB_PASSWORD \
-            REDIS_PASSWORD \
-            CANARY_RUNTIME_REDIS_PASSWORD \
-            OTERYN_PLATFORM_SERVICE_TOKEN \
-            GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256 \
-            GAME_SESSION_SERVICE_TOKEN \
-            CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256; do
-            if [ -z "${!name:-}" ]; then
+          if [[ -z "$CANARY_IMAGE_INPUT" || ! "$CANARY_IMAGE_INPUT" =~ ^[A-Za-z0-9./:@_-]+$ ]]; then
+            echo "canary_image is required and must be a bounded container image reference." >&2
+            exit 1
+          fi
+
+          bind_address="${OTERYN_BIND_ADDRESS_INPUT:-127.0.0.1}"
+          state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
+          app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
+          if [[ ! "$bind_address" =~ ^[0-9.]+$ ]]; then
+            echo "OTERYN_STAGING_BIND_ADDRESS must currently be an IPv4 address." >&2
+            exit 1
+          fi
+          if [[ ! "$state_dir" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "OTERYN_STAGING_STATE_DIR must be an absolute simple path." >&2
+            exit 1
+          fi
+          if [[ ! "$app_url" =~ ^https?://[A-Za-z0-9._:-]+$ ]]; then
+            echo "OTERYN_STAGING_APP_URL must be a simple HTTP(S) origin." >&2
+            exit 1
+          fi
+
+          required_names=(
+            APP_KEY
+            MARIADB_ROOT_PASSWORD
+            PLATFORM_DB_PASSWORD
+            CANARY_DB_PASSWORD
+            CANARY_READONLY_DB_PASSWORD
+            CANARY_PROVISIONING_DB_PASSWORD
+            CANARY_CHARACTER_CREATE_DB_PASSWORD
+            REDIS_PASSWORD
+            CANARY_RUNTIME_REDIS_PASSWORD
+            OTERYN_PLATFORM_SERVICE_TOKEN
+            GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256
+            GAME_SESSION_SERVICE_TOKEN
+            CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256
+          )
+          for name in "${required_names[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
               echo "Required synology-staging secret is missing: $name" >&2
+              exit 1
+            fi
+          done
+
+          safe_names=(
+            MARIADB_ROOT_PASSWORD
+            PLATFORM_DB_PASSWORD
+            CANARY_DB_PASSWORD
+            CANARY_READONLY_DB_PASSWORD
+            CANARY_PROVISIONING_DB_PASSWORD
+            CANARY_CHARACTER_CREATE_DB_PASSWORD
+            REDIS_PASSWORD
+            CANARY_RUNTIME_REDIS_PASSWORD
+            OTERYN_PLATFORM_SERVICE_TOKEN
+            GAME_SESSION_SERVICE_TOKEN
+          )
+          for name in "${safe_names[@]}"; do
+            if [[ ! "${!name}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+              echo "$name must use generated hex/alphanumeric staging-safe characters." >&2
+              exit 1
+            fi
+          done
+
+          if [[ ! "$APP_KEY" =~ ^base64:[A-Za-z0-9+/=]+$ ]]; then
+            echo "OTERYN_STAGING_APP_KEY must be a Laravel base64 application key." >&2
+            exit 1
+          fi
+          if [[ ! "$GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+            echo "Platform service-token hash must be a SHA-256 hex digest." >&2
+            exit 1
+          fi
+          if [[ ! "$CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+            echo "Canary session service-token hash must be a SHA-256 hex digest." >&2
+            exit 1
+          fi
+          for optional_hash in \
+            "$GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256" \
+            "$CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256"; do
+            if [[ -n "$optional_hash" && ! "$optional_hash" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+              echo "Optional previous service-token hashes must be empty or SHA-256 hex digests." >&2
               exit 1
             fi
           done
