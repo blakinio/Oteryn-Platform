@@ -32,11 +32,7 @@ concurrency:
 jobs:
   deploy:
     if: github.ref == 'refs/heads/main'
-    runs-on:
-      - self-hosted
-      - linux
-      - x64
-      - oteryn-staging
+    runs-on: oteryn-staging
     environment: synology-staging
     timeout-minutes: 30
     env:
@@ -69,6 +65,7 @@ jobs:
           docker compose version >/dev/null
           curl --version >/dev/null
           sha256sum --version >/dev/null
+          timeout --version >/dev/null
 
       - name: Log in to GHCR
         run: |
@@ -117,7 +114,7 @@ jobs:
           set -euo pipefail
           umask 077
           bind_address="${OTERYN_BIND_ADDRESS_INPUT:-127.0.0.1}"
-          state_dir="${OTERYN_STATE_DIR_INPUT:-$HOME/.local/state/oteryn-staging}"
+          state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
           app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
 
           cat > deploy/synology/.env <<EOF
