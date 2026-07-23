@@ -16,6 +16,7 @@ on:
       - routes/**
       - services/game-gateway/**
       - deploy/synology/docker/**
+      - deploy/synology/runner/**
       - .github/workflows/build-synology-staging-images.yml
   push:
     branches:
@@ -32,6 +33,7 @@ on:
       - routes/**
       - services/game-gateway/**
       - deploy/synology/docker/**
+      - deploy/synology/runner/**
       - .github/workflows/build-synology-staging-images.yml
   workflow_dispatch:
 
@@ -57,6 +59,9 @@ jobs:
           - name: game-gateway
             image: ghcr.io/blakinio/oteryn-game-gateway
             dockerfile: deploy/synology/docker/gateway.Dockerfile
+          - name: deploy-runner
+            image: ghcr.io/blakinio/oteryn-deploy-runner
+            dockerfile: deploy/synology/runner/Dockerfile
 
     steps:
       - name: Checkout exact source
@@ -102,8 +107,14 @@ jobs:
         run: |
           set -euo pipefail
           docker image inspect "$IMAGE_REF" >/dev/null
-          if [ "$IMAGE_NAME" = "platform" ]; then
-            docker run --rm --entrypoint php "$IMAGE_REF" -v
-          else
-            docker run --rm --entrypoint /bin/sh "$IMAGE_REF" -ec 'test -x /usr/local/bin/game-gateway'
-          fi
+          case "$IMAGE_NAME" in
+            platform)
+              docker run --rm --entrypoint php "$IMAGE_REF" -v
+              ;;
+            game-gateway)
+              docker run --rm --entrypoint /bin/sh "$IMAGE_REF" -ec 'test -x /usr/local/bin/game-gateway'
+              ;;
+            deploy-runner)
+              docker run --rm --entrypoint /bin/bash "$IMAGE_REF" -ec 'docker --version && docker compose version && test -x /usr/local/bin/oteryn-runner-entrypoint'
+              ;;
+          esac
