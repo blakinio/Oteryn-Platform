@@ -2,459 +2,321 @@
 
 ## Status
 
-`TARGET CONTRACT — CANARY COMPATIBILITY ADAPTER NOT YET SELECTED`
+`CANDIDATE B SELECTED — IMPLEMENTED, BOUNDED E2E PROVEN, PRODUCTION ACTIVATION GATED`
 
-This contract defines the required boundary between Oteryn Game Gateway authorization and Canary world-entry authentication.
+This document is the authoritative current contract between Oteryn Identity/Game Gateway and Canary world-entry authentication.
 
-It deliberately separates:
+It supersedes the earlier pre-selection Candidate A/Candidate B analysis in this file. That exploratory history remains available in Git history; it is no longer the active implementation contract.
 
-1. required target semantics;
-2. proven current Canary-compatible mechanisms;
-3. candidate compatibility approaches;
-4. unresolved facts that block implementation claims.
+## Selected architecture
 
-No Canary or upstream login-server write is authorized by this document.
+The selected compatibility path is a direct Canary Game Session issuer built on Canary's process-local `LoginSessionManager`.
 
-## Evidence baseline
-
-Existing Oteryn auth discovery proves the current repository-supported landscape includes:
-
-- native Canary password authentication;
-- Canary `LoginSessionManager` short-lived single-use process-local tokens in `authType=session` mode;
-- DB-backed `account_sessions` lookup/validation;
-- current upstream login-server creation of `account_sessions` with a random raw session key, SHA-256 stored identifier and approximately 24-hour expiry;
-- DB `account_sessions` are replayable until expiry or external deletion/revocation;
-- Canary game-world authentication still checks character ownership/deletion state after session/password authentication;
-- Canary account-ban/name-lock/runtime entry gates remain separate game-server checks.
-
-The current upstream login-server source pin remains:
+The supported flow is:
 
 ```text
-2612930de4d97123a397f8f2cd0d5f784094af40
+OTClient
+  -> Oteryn Identity / OAuth + PKCE
+  -> one-time Game Login Ticket
+  -> Oteryn Game Gateway
+  -> authoritative ticket redeem
+  -> authoritative Canary account + world context
+  -> POST exact Canary process /internal/v1/game-sessions
+  -> opaque short-lived Game Session credential
+  -> OTClient
+  -> existing GameSessionKey world-login field
+  -> Canary ProtocolGame / IOLoginData admission checks
 ```
 
-Current Canary architecture-discovery revalidation head:
+The supported native-auth path does not send or validate the user's Oteryn password at the Gateway -> Canary boundary.
+
+## Delivered components
+
+### Oteryn Platform / Game Gateway
+
+Gateway protocol v1 is delivered by Oteryn Platform PR #122, merged as:
 
 ```text
-d760ce44c55b9aa6f01e80d2d407f6833938bdce
+8006534108d835474dadd208b0ec934e4a12528b
 ```
 
-The compare delta from the original auth-contract Canary pin did not list authentication/runtime source files, but the exact selected adapter must still be revalidated against the final Canary head before implementation.
-
-## Required target outcome
-
-After successful Game Login Ticket redeem, Gateway must be able to authorize Canary world entry without:
-
-- Oteryn user password;
-- Canary sink password;
-- Platform password hash;
-- OAuth authorization code;
-- OAuth access/refresh token;
-- Game Login Ticket itself.
-
-Canary receives only the game-specific credential/context required by the selected adapter.
-
-## Logical Game Session model
-
-Independent of storage representation, the Gateway domain treats a Game Session as logically containing:
+Production hardening is delivered by Oteryn Platform PR #124. The exact repository-hardening head validated before final documentation is:
 
 ```text
-session_id
-session_secret_hash
-canary_account_id
-world_id
-created_at
-expires_at
-revoked_at
+2e664c440379af45b6413a26c9c0ee968275d049
 ```
 
-Optional future fields:
+That hardening adds:
+
+- private ticket-redeem source throttling before Gateway service-credential authentication;
+- one required current and one optional previous Gateway service-credential SHA-256 hash for bounded overlap rotation;
+- `no-store` / `no-cache` response policy for sensitive ticket issue/redeem and Gateway native-login responses, including bounded error paths;
+- fail-closed Gateway configuration that requires HTTPS for non-loopback Platform and Game Session service dependencies;
+- explicit credential-rotation sequencing without committing plaintext secrets.
+
+### Canary
+
+The disabled-by-default Canary Game Session issuer is delivered by Canary PR #722, merged as:
 
 ```text
-channel_id
-security_generation
-client_protocol_profile
+b8a88f073b2609b444fa15370aae30ac9f80b908
 ```
 
-The raw session secret is returned only where the client/Canary protocol requires it and must never be logged.
+Gateway -> Canary bounded overlap credential rotation is implemented by Canary PR #807. The exact current validated implementation/checkpoint head before final documentation is:
 
-## Core invariants
+```text
+c8503b7d35fe15015e89b9d0067a8614e7a9d7a9
+```
 
-1. **Server generated.** Client cannot select the Game Session secret.
-2. **Exact account.** Session is created only from `canary_account_id` returned by successful authoritative ticket redeem.
-3. **No password fallback.** Failure to create/validate a Game Session does not fall back to user/sink password.
-4. **World scoped.** Logical session is bound to one World Registry `world_id` in the target model.
-5. **Bounded lifetime.** Session has explicit finite expiry.
-6. **Revocable where adapter permits.** Required security events have explicit behavior; unknown behavior is not called implemented.
-7. **Least privilege.** Session persistence uses a dedicated operation-specific capability, never generic Canary writes.
-8. **No plaintext-at-rest by default.** Store a cryptographic hash of the presented session secret where the Canary compatibility mechanism supports it.
-9. **Final Canary checks remain.** Successful session authentication does not bypass character ownership/deletion/ban/runtime admission.
-10. **Retry semantics are explicit.** Ambiguous session persistence cannot create unbounded duplicate sessions silently.
+### OTClient
 
-## Separation from Game Login Ticket
+The maintained OTClient native-auth consumer is delivered by PR #17, merged as:
+
+```text
+bb87346f6c516a19d19497d82bb01fb389334ff5
+```
+
+## Gateway -> Canary protocol v1
+
+### Endpoint
+
+```text
+POST /internal/v1/game-sessions
+Authorization: Bearer <Gateway -> Canary service credential>
+Content-Type: application/json
+```
+
+### Request
+
+```json
+{
+  "protocol_version": 1,
+  "canary_account_id": 101,
+  "world_id": 1,
+  "login_attempt_id": "00112233445566778899aabbccddeeff"
+}
+```
+
+Requirements:
+
+- `protocol_version` is exactly `1`;
+- `canary_account_id` is the numeric Canary account obtained from authoritative Platform ticket redeem/context;
+- `world_id` is the Platform `game_worlds.id` configured for the exact target Canary issuer process;
+- `login_attempt_id` is a server-generated 32-hex-character idempotency/replay-guard identifier, not a bearer credential.
+
+Platform `game_worlds.id` is not Canary `ChannelContext::channel_id`.
+
+### Response
+
+```json
+{
+  "protocol_version": 1,
+  "session": {
+    "credential": "<opaque-single-use-secret>",
+    "expires_at": "2026-07-23T12:00:00Z"
+  }
+}
+```
+
+The raw Game Session credential is returned only to the client path that needs it and must never be logged.
+
+## Canary authorization semantics
+
+The Canary issuer:
+
+- is disabled by default;
+- is bound to one exact process/listener configuration;
+- loads the authoritative Canary account by numeric account ID without user-password authentication;
+- loads the account's allowed character-name set;
+- binds issued sessions to `ProtocolProfileId::Current`;
+- uses process-local `LoginSessionManager` storage;
+- stores only the SHA-256 representation used by the existing session manager;
+- uses the existing 60-second `LoginSessionManager` TTL;
+- consumes a matching Game Session atomically once;
+- burns the credential on wrong character/profile consumption attempts according to existing manager semantics;
+- rejects duplicate successful issuance for the same `login_attempt_id` within the bounded TTL;
+- releases the `login_attempt_id` reservation when issuance itself fails;
+- invalidates all unconsumed process-local credentials on process restart.
+
+After Game Session authentication, existing `ProtocolGame` and `IOLoginData` ownership, deletion, ban and runtime admission checks remain authoritative.
+
+## Capability boundary
+
+Protocol v1 is intentionally limited to:
+
+- one configured Platform world mapped to one exact Canary process;
+- Canary `ProtocolProfileId::Current`;
+- one process-local Game Session store per issuer process.
+
+Not claimed by protocol v1:
+
+- multi-world issuer selection;
+- same-world horizontal issuer replicas without exact sticky/process routing;
+- shared Game Session storage across Canary processes;
+- immediate `security_generation`-based revocation of already-issued unconsumed Game Sessions;
+- active-player disconnection on Identity security events.
+
+Those require separate explicit contracts before they are claimed.
+
+## Replay and retry semantics
+
+A Game Login Ticket and a Canary Game Session are separate credentials.
 
 ```text
 Game Login Ticket
   owner: Oteryn Identity
-  purpose: authorize one Gateway login orchestration
-  TTL: ~60s default
-  consume: single-use atomic
+  TTL: ~60 seconds by current policy
+  consume: atomic single-use
 
 Game Session
-  owner: Gateway/Canary compatibility boundary
-  purpose: authenticate selected world entry
-  TTL: adapter/product policy
-  consume/replay: adapter-specific and explicitly documented
+  owner: Canary issuer process
+  TTL: 60 seconds
+  consume: atomic single-use
 ```
 
-A Game Login Ticket must never be stored in `account_sessions` as the Game Session credential.
+One successful Game Session issuance is permitted per `login_attempt_id` per issuer process/TTL.
 
-## Candidate A — bounded DB `account_sessions` adapter
+If Gateway successfully creates a Game Session but loses the HTTP response, retrying the same `login_attempt_id` does not mint a second credential. The orphan credential expires and the client starts a fresh native-login attempt.
 
-### Status
+## Service credential rotation
 
-`CANDIDATE — NOT APPROVED UNTIL REVALIDATED AND OPERATION-SPECIFIC PRIVILEGES ARE PROVEN`
+Gateway -> Platform and Gateway -> Canary use separate secrets. Never reuse one credential across both boundaries.
 
-This approach attempts to reuse current Canary DB-session authentication without changing Canary code.
+### Gateway -> Platform
 
-### Proven compatibility direction
-
-Current evidence indicates:
-
-- login-server generates random raw session key;
-- SHA-256 of the raw key is stored in `account_sessions.id`;
-- Canary hashes the presented raw session key and can resolve its account;
-- Canary checks expiry;
-- session is not automatically consumed on successful game authentication.
-
-### Required adapter behavior
-
-Gateway/session adapter would:
-
-1. receive exact `canary_account_id` from redeemed ticket result;
-2. choose authorized `world_id`;
-3. generate >=256-bit random session secret;
-4. compute the exact hash representation required by current Canary;
-5. persist a new bounded `account_sessions` record through a dedicated least-privilege connection;
-6. use a substantially shorter TTL than the current upstream login-server 24-hour default, subject to exact compatibility testing;
-7. return raw session secret once to OTClient;
-8. provide routing for the selected world;
-9. support explicit deletion/revocation/cleanup if schema and privileges permit.
-
-### Required proof before approval
-
-- exact current `account_sessions` schema/constraints;
-- exact current Canary lookup hash algorithm and fallback behavior;
-- whether expiry precision/unit permits desired short TTL;
-- whether Canary lookup is global or world-aware;
-- whether multiple rows per account are permitted/expected;
-- whether deletion while in use affects only future authentication or active sessions;
-- exact transaction/ambiguous-commit recovery behavior;
-- dedicated privilege set sufficient for INSERT and required SELECT/DELETE only;
-- no trigger/side effect requiring broader privileges;
-- no password/sink credential involved;
-- real MariaDB integration tests against exact schema;
-- exact Canary runtime E2E.
-
-### Known limitation
-
-Current evidence says DB `account_sessions` are replayable until expiry/deletion.
-
-Therefore Candidate A does **not** provide the same single-use semantics as the Game Login Ticket.
-
-Acceptance requires an explicit risk decision and bounded session lifetime/revocation policy.
-
-If the replay window or world-scoping limitation is unacceptable, Candidate A is rejected.
-
-## Candidate B — direct Canary one-time/bounded session integration
-
-### Status
-
-`FUTURE OPTION — REQUIRES SEPARATELY AUTHORIZED CANARY CHANGE IF SELECTED`
-
-Possible direction:
-
-- Gateway/Identity creates a shared session authorization recognized directly by Canary;
-- Canary atomically consumes or validates it with explicit account/world/audience binding;
-- shared store supports multiple Canary/Gateway processes;
-- no direct password verification;
-- deterministic revocation.
-
-### Why current process-local LoginSessionManager is insufficient as-is for the Gateway target
-
-Current evidence indicates its authoritative token store is process-local memory.
-
-Without guaranteed sticky routing or shared state, a token issued outside the exact target Canary process cannot be assumed redeemable across horizontally scaled/multiworld/multichannel topology.
-
-A future Canary task could adapt or replace this primitive, but this Platform task cannot assume such work exists.
-
-## Candidate selection rule
-
-Choose Candidate A only if all required safety/compatibility tests pass and the resulting replay/revocation/world semantics are accepted.
-
-Otherwise choose Candidate B and open a separately authorized Canary task.
-
-The selection must be recorded by updating this contract and, if architecture materially changes, ADR 0009.
-
-## Session creation interface — Gateway domain
-
-Gateway-facing logical interface:
+Platform runtime configuration:
 
 ```text
-CreateSession(
-  canary_account_id,
-  world_id,
-  login_attempt_id
-) -> {
-  session_credential,
-  expires_at,
-  world_route
-}
+GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256=<new/current hash>
+GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256=<retiring hash, optional>
 ```
 
-`login_attempt_id` is a server-generated idempotency/recovery identifier, not a bearer credential.
+Safe rotation:
 
-Its exact persistence/use is adapter-specific.
+1. generate a new high-entropy credential in the approved secret manager;
+2. configure the new hash as current and the retiring hash as previous;
+3. deploy/reload Platform and verify both credentials during the overlap window;
+4. roll Gateway instances to the new plaintext runtime secret;
+5. verify all Gateway instances use the new credential;
+6. remove the previous hash and redeploy/reload Platform.
 
-## Session creation preconditions
+### Gateway -> Canary
+
+Canary runtime configuration:
 
 ```text
-Game Login Ticket successfully redeemed
-AND exact canary_account_id obtained from Identity
-AND requested/selected world exists
-AND world login_enabled = true
-AND account is authorized for world
-AND session persistence dependency is available
+CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256=<new/current hash>
+CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256=<retiring hash, optional>
 ```
 
-Gateway must not create a session before successful ticket redeem.
+Use the same bounded overlap order:
 
-## World selection timing
+1. configure Canary current=new and previous=retiring;
+2. restart/reload the exact issuer process using the approved deployment mechanism;
+3. roll Gateway `GAME_SESSION_SERVICE_TOKEN` to the new plaintext secret;
+4. verify the new credential through health/readiness/native-auth evidence;
+5. remove the previous hash from Canary and restart/reload the issuer process.
 
-Two accepted first-release patterns:
+Malformed configured hashes fail closed.
 
-### Pattern 1 — session created before character selection
+## Transport boundary
 
-Gateway creates one session scoped to an allowed world and returns characters for that world.
+Repository-level Gateway configuration enforces:
 
-Suitable for single-world MVP.
+- `https://` for non-loopback `OTERYN_PLATFORM_BASE_URL`;
+- `https://` for non-loopback `GAME_SESSION_SERVICE_BASE_URL`;
+- plain HTTP only for loopback development/test dependencies;
+- standard Go TLS certificate and hostname verification;
+- no credentials in dependency URLs;
+- bounded request timeout.
 
-### Pattern 2 — authenticated Gateway context then session created after world/character selection
+A private network is defense in depth, not a replacement for TLS or service authentication.
 
-Requires an additional bounded Gateway-side selection authorization/context.
+Production activation additionally requires direct evidence that:
 
-More flexible for multiworld but adds protocol/state complexity.
+- Platform private endpoints are reachable only through the intended internal ingress/firewall boundary;
+- the Canary issuer listener is reachable only from the intended Gateway/deployment network;
+- deployed TLS certificates and hostnames validate from the Gateway runtime;
+- plaintext service credentials are injected through the approved secret manager and are not stored in Git/logs;
+- the deployed revisions match the approved release evidence.
 
-Initial implementation may use Pattern 1 for the single-world MVP, but the data model/API must not hard-code a permanent singleton world.
+Repository tests cannot by themselves prove those external deployment facts.
 
-The exact chosen pattern must be reflected in OTClient/Gateway response contracts before implementation.
+## HTTP caching boundary
 
-## Character list contract interaction
+Sensitive native-auth responses must not be cacheable.
 
-Game Session creation does not establish character ownership by itself.
-
-Gateway character list must be loaded using exact redeemed `canary_account_id` and active/listable filtering.
-
-At world entry, Canary must still verify that selected character:
-
-- belongs to authenticated session account;
-- is not deleted/unavailable;
-- satisfies game-server admission rules.
-
-## Canary game connection semantic input
-
-Target semantic input:
+Platform ticket issue/redeem and Gateway native-login responses use:
 
 ```text
-game_session_credential
-selected_character_name_or_id_as_supported_by_protocol
-protocol/version context
+Cache-Control: no-store, no-cache, must-revalidate, private
+Pragma: no-cache
+Expires: 0
 ```
 
-Canary must not require the Oteryn password in the target supported path.
+The Canary issuer returns `Cache-Control: no-store` and `Pragma: no-cache` on its HTTP responses.
 
-The exact legacy protocol field carrying the session credential is adapter-specific and must be proven against the exact OTClient/Canary version.
+## Proven E2E baseline
 
-## Session TTL
+The pre-hardening bounded native-auth path is proven by Universal Agent E2E:
 
-The final TTL is not fixed in Phase 0.
+- behavior run `29988893301`;
+- final evidence run `29992417296`;
+- scenario `login/oteryn-native-auth`;
+- Canary adapter revision `285dec6a034aa3620ae5ca12549fb9e8e1b35631`;
+- OTClient revision `bb87346f6c516a19d19497d82bb01fb389334ff5`;
+- Gateway revision `8006534108d835474dadd208b0ec934e4a12528b`.
 
-Requirements:
+The evidence proves:
 
-- finite;
-- long enough for normal character selection/network connection;
-- short enough to bound theft/replay risk;
-- compatible with reconnect policy if reconnect is intentionally supported;
-- independently configurable from the 60-second Game Login Ticket TTL.
+- a maintained OTClient submits a fresh Game Login Ticket to the real Gateway;
+- Gateway obtains a Canary Game Session;
+- `Knight 1` enters the world exactly once;
+- logout completes;
+- replay of the same Game Session is rejected;
+- `successful_world_entries=1`.
 
-A 24-hour default inherited blindly from upstream login-server is rejected for the target without explicit product/security justification.
+This baseline predates PR #124 / PR #807 hardening and therefore is not, by itself, proof of the hardened production boundary.
 
-## Replay semantics
+## Hardened E2E gate
 
-### Required documentation
+Before production activation, rerun the same `login/oteryn-native-auth` scenario with exact merged hardened revisions for:
 
-The selected adapter must classify Game Session as one of:
+- Oteryn Platform PR #124;
+- Canary PR #807;
+- maintained OTClient `bb87346f6c516a19d19497d82bb01fb389334ff5`.
 
-```text
-single-use
-bounded reusable until expiry
-reusable until explicit revoke/expiry
-```
+Required behavior remains:
 
-It must then test exactly that behavior.
-
-Game Login Ticket remains single-use regardless of Game Session classification.
-
-## Revocation matrix — target decision required
-
-| Event | Pending ticket | New Game Session issuance | Existing unconsumed/reusable Game Session | Active player connection |
-|---|---|---|---|---|
-| Password change | Revoke via generation | Deny until fresh auth | Target: revoke | Explicit product/Canary decision |
-| Password reset | Revoke via generation | Deny until fresh auth | Target: revoke | Recommended disconnect/re-auth; exact mechanism UNKNOWN |
-| MFA reset/recovery | Policy-driven revoke | Fresh auth required | Target: revoke when security-sensitive | Explicit policy |
-| Identity disabled | Revoke/deny | Deny | Revoke/deny future use | Recommended deny/disconnect; exact mechanism UNKNOWN |
-| Canary account banned | Ticket issuance may precheck if authoritative data available | Prefer deny | Future use must fail at Canary at minimum | Canary admission gate; immediate disconnect UNKNOWN |
-| Normal logout | N/A | N/A | Product policy | Current connection ends |
-
-The implementation phase must resolve the `UNKNOWN` cells before production-auth readiness claims.
-
-## Ambiguous commit and idempotency
-
-Failure case:
-
-```text
-Gateway -> session adapter INSERT
-DB commits
-network/driver reports ambiguous failure
-Gateway retries
-```
-
-Unbounded second session creation is undesirable.
-
-The selected adapter must provide one of:
-
-1. server-generated unique `login_attempt_id` stored with recoverable session metadata;
-2. deterministic natural/idempotency key supported by an approved Platform-owned mapping table;
-3. proof that duplicate sessions are harmless and bounded, explicitly accepted by security design.
-
-Do not guess that a failed client call means the DB transaction did not commit.
-
-Current `account_sessions` schema may not have an idempotency column; any additional Platform-owned mapping or schema mutation requires a separate data-contract decision.
-
-## Least-privilege persistence
-
-If Candidate A is selected, create a dedicated connection/principal such as:
-
-```text
-canary_game_session
-```
-
-Name is illustrative until implementation.
-
-It must receive only exact required privileges, potentially:
-
-- INSERT on approved `account_sessions` columns;
-- SELECT on approved session recovery/revocation fields;
-- DELETE only where explicit revocation/cleanup requires it.
-
-Forbidden by default:
-
-- reading `accounts.password`;
-- UPDATE/DELETE on accounts;
-- player writes;
-- character inventory/storage writes;
-- coin/premium writes;
-- ban/guild writes;
-- DDL/admin privileges;
-- generic Canary database access.
-
-Effective grants must be tested against real MariaDB before approval.
-
-## Failure behavior
-
-| Failure | Required behavior |
-|---|---|
-| Session store unavailable before commit | No successful Gateway login response |
-| Session commit definitely failed | No session returned |
-| Session commit outcome ambiguous | Use explicit recovery/idempotency policy; never guess |
-| World disabled before session create | No session for that world |
-| Canary unavailable after session create | Client receives connection failure; session expiry/revocation policy handles stale credential |
-| Session expired at Canary | World entry denied |
-| Session revoked/deleted | Future authentication denied where adapter supports it |
-| Wrong account/character | Canary denies at final ownership gate |
-
-## Logging
-
-Never log:
-
-- raw Game Session credential;
-- Game Login Ticket;
-- password/sink credential;
-- OAuth token/code.
-
-May log bounded:
-
-- session creation event ID/correlation ID;
-- account ID only where operational policy permits;
-- world ID;
-- success/failure category;
-- expiry duration, not secret.
-
-## Required Candidate A tests
-
-Before selecting DB `account_sessions` adapter:
-
-- exact schema/hash compatibility fixture;
-- raw generated secret authenticates through exact Canary version;
-- wrong secret fails;
-- expired session fails;
-- session for account A cannot enter account B character;
-- deleted character denied;
-- no password involved in Gateway/Canary flow;
-- shortest accepted configured TTL behaves as expected;
-- concurrent/replayed use behavior measured;
-- explicit deletion/revocation behavior measured;
-- ambiguous commit recovery/idempotency test;
-- effective least-privilege MariaDB grant test;
-- forbidden privilege/read tests;
-- Canary restart behavior;
-- multiple Canary process/world behavior where relevant.
-
-## Required Candidate B tests
-
-If a direct Canary integration is selected:
-
-- shared atomic issue/consume or validate behavior;
-- concurrent replay semantics;
-- account/world/audience binding;
-- expiry;
-- revocation generation/event behavior;
-- multi-process routing;
-- restart behavior;
-- no password fallback;
-- exact OTClient protocol compatibility;
-- rollout compatibility with old/new client/server combinations.
+- one successful world entry;
+- fail-closed replay;
+- exactly one successful server login/world entry;
+- no credential leakage in retained logs/evidence.
 
 ## Rollout ordering
 
-1. Keep legacy authentication unchanged while adapter is developed.
-2. Implement/validate Gateway session adapter in controlled environment.
-3. Implement OTClient candidate flow.
-4. Prove cross-repository E2E.
-5. Only then fence legacy password paths.
+1. Merge/deploy Platform hardening with native-auth activation unchanged.
+2. Merge/deploy Canary credential-rotation support with the issuer still disabled unless already deliberately enabled in a controlled environment.
+3. Provision private/TLS Platform and Canary service routes.
+4. Provision separate Gateway -> Platform and Gateway -> Canary service credentials using overlap-capable configuration.
+5. Deploy the compatible OTClient build.
+6. Re-prove the hardened exact-revision native-auth E2E in the production-like deployment boundary.
+7. Verify deployed revision, TLS, ingress/firewall and secret-manager evidence.
+8. Enable the Canary issuer and Gateway native-auth path in the controlled production rollout.
+9. Observe health/readiness/authentication/replay metrics and retain rollback capability.
+10. Only after successful production validation consider fencing/removing legacy password authentication.
 
-If Candidate B requires Canary changes, deploy compatible Canary support before enabling official-client Gateway flow that depends on it.
+## Production activation gate
 
-## Current unresolved decisions
+Repository merge is deploy-first-safe and does **not** authorize production native-auth activation.
 
-`UNKNOWN` until Phase 6 discovery/implementation:
+Production activation remains blocked while any of these are unproven:
 
-1. Candidate A vs Candidate B final selection.
-2. Exact Game Session TTL.
-3. Exact world-scoping enforcement in current Canary.
-4. Exact reconnect semantics.
-5. Active-session disconnection policy after Identity security events.
-6. Session idempotency/recovery mechanism.
-7. Whether a Canary code change is required.
+- exact private-network/ingress/firewall boundary;
+- exact TLS certificate/hostname validation from deployed Gateway;
+- exact secret-manager injection and credential-rotation state;
+- exact deployed Platform/Gateway/Canary/OTClient revisions;
+- hardened exact-revision native-auth E2E;
+- rollback/legacy-auth availability during controlled cutover.
 
-These are deliberate blockers against premature implementation claims, not missing assumptions to be filled silently.
+Legacy password authentication remains available until a separately evidenced cutover decision.
