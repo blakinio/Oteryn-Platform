@@ -15,9 +15,9 @@ on:
       - resources/**
       - routes/**
       - services/game-gateway/**
-      - deploy/synology/docker/**
-      - deploy/synology/runner/**
+      - deploy/synology/**
       - .github/workflows/build-synology-staging-images.yml
+      - .github/workflows/deploy-synology-staging.yml
   push:
     branches:
       - main
@@ -32,9 +32,9 @@ on:
       - resources/**
       - routes/**
       - services/game-gateway/**
-      - deploy/synology/docker/**
-      - deploy/synology/runner/**
+      - deploy/synology/**
       - .github/workflows/build-synology-staging-images.yml
+      - .github/workflows/deploy-synology-staging.yml
   workflow_dispatch:
 
 permissions:
@@ -46,6 +46,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  validate-deployment:
+    name: Validate Synology deployment package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v7
+
+      - name: Validate shell syntax
+        run: |
+          set -euo pipefail
+          bash -n \
+            deploy/synology/scripts/deploy.sh \
+            deploy/synology/scripts/health-check.sh \
+            deploy/synology/scripts/rollback.sh \
+            deploy/synology/runner/entrypoint.sh
+          sh -n \
+            deploy/synology/tls/init.sh \
+            deploy/synology/mariadb/init/10-platform-database.sh
+
+      - name: Validate Compose manifests
+        run: |
+          set -euo pipefail
+          cp deploy/synology/.env.example /tmp/oteryn-synology.env
+          sed -E -i 's/=(REQUIRED_[A-Z0-9_]+)$/=localplaceholder/' /tmp/oteryn-synology.env
+          docker compose \
+            --env-file /tmp/oteryn-synology.env \
+            -f deploy/synology/compose.yml \
+            config --quiet
+          docker compose \
+            --env-file deploy/synology/runner/.env.example \
+            -f deploy/synology/runner/compose.yml \
+            config --quiet
+          rm -f /tmp/oteryn-synology.env
+
   build:
     name: Build ${{ matrix.name }} image
     runs-on: ubuntu-latest
