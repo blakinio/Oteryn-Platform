@@ -46,6 +46,42 @@ GATEWAY_VERSION=dev
 
 Service credentials are injected runtime secrets. Do not commit them or place them in URLs.
 
+Dependency URL policy is fail-closed:
+
+- non-loopback Platform and Game Session service URLs must use `https://`;
+- plain `http://` is accepted only for `localhost`, `127.0.0.0/8` and `::1` loopback development/test dependencies;
+- standard Go HTTPS certificate and hostname verification remains enabled because the Gateway does not install an insecure TLS transport.
+
+A private network is defense in depth, not a replacement for TLS or service authentication. Production routing should expose the Platform private API and Canary Game Session issuer only to the Gateway through explicit internal ingress/firewall rules.
+
+## Service credential rotation
+
+### Gateway -> Platform
+
+Platform accepts one current and one optional previous Gateway service credential SHA-256 hash:
+
+```text
+GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256
+GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256
+```
+
+The Gateway receives the corresponding plaintext bearer value only through `OTERYN_PLATFORM_SERVICE_TOKEN` at runtime.
+
+Safe rotation order:
+
+1. generate a new high-entropy service credential in the approved secret manager;
+2. configure Platform `PREVIOUS` with the retiring hash and `SERVICE_TOKEN_SHA256` with the new hash;
+3. deploy/reload Platform and verify both credentials are temporarily accepted;
+4. roll Gateway instances to the new plaintext `OTERYN_PLATFORM_SERVICE_TOKEN`;
+5. verify all Gateway instances use the new credential;
+6. clear the Platform `PREVIOUS` hash and redeploy/reload Platform.
+
+Never reuse the same service credential for Gateway -> Platform and Gateway -> Canary.
+
+### Gateway -> Canary Game Session issuer
+
+`GAME_SESSION_SERVICE_TOKEN` is a separate runtime secret. The Canary issuer must be configured with the matching SHA-256 service-credential hash set before the Gateway token is rotated. Use the same overlap sequence: add the new hash while retaining the old hash, roll Gateway, verify, then remove the old hash.
+
 ## Dependency contracts
 
 ### Platform ticket redeem
@@ -94,7 +130,11 @@ Response semantics:
 }
 ```
 
-Phase 4 implements this adapter boundary only. A concrete Canary-compatible Session Issuer is selected and proven in Phase 6. Until then, successful full world-entry E2E is not claimed.
+The concrete Canary-compatible Session Issuer is delivered by Canary PR #722. Its bounded OTClient -> Gateway -> Canary E2E is proven, but production activation still requires exact private/TLS routing, injected credential rotation and production-like re-verification against the deployed revisions.
+
+## Response caching
+
+`POST /v1/login` returns opaque Game Session material and therefore sets `Cache-Control: no-store, no-cache, must-revalidate, private`, `Pragma: no-cache` and `Expires: 0` on success and bounded failure responses.
 
 ## Logging
 
