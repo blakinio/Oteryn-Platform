@@ -24,6 +24,19 @@ def load_harness() -> Any:
 def main() -> int:
     harness = load_harness()
 
+    original_docker = harness.docker
+
+    def docker_with_mariadb_password_alias(*args: str, **kwargs: Any) -> Any:
+        normalized = tuple(
+            "MYSQL_PWD=" + arg[len("MARIADB_PWD=") :]
+            if arg.startswith("MARIADB_PWD=")
+            else arg
+            for arg in args
+        )
+        return original_docker(*normalized, **kwargs)
+
+    harness.docker = docker_with_mariadb_password_alias
+
     def safe_curl_status(
         self: Any,
         network_key: str,
@@ -184,11 +197,11 @@ FLUSH PRIVILEGES;
         self.runtime["database_schema_import"] = "PASS"
 
     # Canary PR #841 owns the production-like orchestration harness. The
-    # Platform-hosted runner adapts harness-only execution details: safe argv
-    # passing for curl probes, normal system trust installation of the
-    # ephemeral CA, and deterministic MariaDB provisioning after the image's
-    # initialization server has handed off to the final server. It never
-    # disables TLS verification and does not alter pinned product revisions.
+    # Platform-hosted runner adapts harness-only execution details: MariaDB's
+    # supported MYSQL_PWD client environment, safe argv passing for curl probes,
+    # normal system trust installation of the ephemeral CA, and deterministic
+    # provisioning after the image initialization server hands off to the final
+    # server. It never disables TLS verification or alters product revisions.
     harness.Rehearsal.curl_status = safe_curl_status
     harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
     harness.Rehearsal.start_data_services = start_data_services_deterministically
