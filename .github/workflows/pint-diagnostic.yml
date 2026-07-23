@@ -29,15 +29,11 @@ jobs:
         run: composer install --no-interaction --prefer-dist --no-progress --quiet
 
       - name: Capture Pint patch
-        id: pint
         shell: bash
         run: |
-          set +e
-          vendor/bin/pint --test > pint-diagnostic.txt 2>&1
-          status=$?
+          vendor/bin/pint
+          git diff -- . > pint-diagnostic.txt
           cat pint-diagnostic.txt
-          echo "status=$status" >> "$GITHUB_OUTPUT"
-          exit 0
 
       - name: Upload Pint diagnostic
         uses: actions/upload-artifact@v4
@@ -46,6 +42,3 @@ jobs:
           path: pint-diagnostic.txt
           if-no-files-found: error
           retention-days: 1
-
-      - name: Preserve formatter result
-        run: exit "${{ steps.pint.outputs.status }}"
