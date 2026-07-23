@@ -1,0 +1,202 @@
+name: Native Auth Deployment-Targeted E2E
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/native-auth-deployment-targeted-e2e.yml
+      - docs/agents/tasks/active/OTERYN-20260723-native-auth-deployment-targeted-e2e.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-auth-deployment-targeted-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-target-preflight:
+    name: Production target preflight
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 10
+    env:
+      PLATFORM_BASE_URL: ${{ vars.OTERYN_PRODUCTION_BASE_URL }}
+      GATEWAY_BASE_URL: ${{ vars.OTERYN_PRODUCTION_GAME_GATEWAY_URL }}
+      DECLARED_PLATFORM_SHA: ${{ vars.OTERYN_DEPLOYED_PLATFORM_SHA }}
+      DECLARED_GATEWAY_SHA: ${{ vars.OTERYN_DEPLOYED_GATEWAY_SHA }}
+      DECLARED_CANARY_SHA: ${{ vars.OTERYN_DEPLOYED_CANARY_SHA }}
+      NATIVE_OAUTH_CLIENT_ID: ${{ vars.OTERYN_NATIVE_OAUTH_CLIENT_ID }}
+      E2E_CHARACTER: ${{ vars.OTERYN_PRODUCTION_E2E_CHARACTER }}
+      E2E_WORLD: ${{ vars.OTERYN_PRODUCTION_E2E_WORLD }}
+      E2E_GAME_HOST: ${{ vars.OTERYN_PRODUCTION_E2E_GAME_HOST }}
+      E2E_GAME_PORT: ${{ vars.OTERYN_PRODUCTION_E2E_GAME_PORT }}
+      MUTATION_SMOKE_AUTHORIZED: ${{ vars.OTERYN_PRODUCTION_MUTATION_SMOKE_AUTHORIZED }}
+      BACKUP_RESTORE_EVIDENCE_ID: ${{ vars.OTERYN_PRODUCTION_BACKUP_RESTORE_EVIDENCE_ID }}
+      E2E_EMAIL: ${{ secrets.OTERYN_PRODUCTION_E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.OTERYN_PRODUCTION_E2E_PASSWORD }}
+      E2E_TOTP_SECRET: ${{ secrets.OTERYN_PRODUCTION_E2E_TOTP_SECRET }}
+    steps:
+      - name: Checkout validation head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Evaluate real production target and fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/native-auth-deployment-targeted
+          python3 - <<'PY'
+          from __future__ import annotations
+
+          import ipaddress
+          import json
+          import os
+          import ssl
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+          from urllib.parse import urljoin, urlparse
+
+          EXPECTED_PLATFORM_SHA = "53158217a6c6017230301cf4daa783b04fcc13d5"
+          EXPECTED_GATEWAY_SHA = "53158217a6c6017230301cf4daa783b04fcc13d5"
+          EXPECTED_CANARY_SHA = "981c82f5ebb6bc22c867312c2b274a71f6aeeb3e"
+          evidence_path = Path("artifacts/native-auth-deployment-targeted/preflight.json")
+
+          required_non_secret = {
+              "OTERYN_PRODUCTION_BASE_URL": os.environ.get("PLATFORM_BASE_URL", "").strip(),
+              "OTERYN_PRODUCTION_GAME_GATEWAY_URL": os.environ.get("GATEWAY_BASE_URL", "").strip(),
+              "OTERYN_DEPLOYED_PLATFORM_SHA": os.environ.get("DECLARED_PLATFORM_SHA", "").strip(),
+              "OTERYN_DEPLOYED_GATEWAY_SHA": os.environ.get("DECLARED_GATEWAY_SHA", "").strip(),
+              "OTERYN_DEPLOYED_CANARY_SHA": os.environ.get("DECLARED_CANARY_SHA", "").strip(),
+              "OTERYN_NATIVE_OAUTH_CLIENT_ID": os.environ.get("NATIVE_OAUTH_CLIENT_ID", "").strip(),
+              "OTERYN_PRODUCTION_E2E_CHARACTER": os.environ.get("E2E_CHARACTER", "").strip(),
+              "OTERYN_PRODUCTION_E2E_WORLD": os.environ.get("E2E_WORLD", "").strip(),
+              "OTERYN_PRODUCTION_E2E_GAME_HOST": os.environ.get("E2E_GAME_HOST", "").strip(),
+              "OTERYN_PRODUCTION_E2E_GAME_PORT": os.environ.get("E2E_GAME_PORT", "").strip(),
+              "OTERYN_PRODUCTION_MUTATION_SMOKE_AUTHORIZED": os.environ.get("MUTATION_SMOKE_AUTHORIZED", "").strip(),
+              "OTERYN_PRODUCTION_BACKUP_RESTORE_EVIDENCE_ID": os.environ.get("BACKUP_RESTORE_EVIDENCE_ID", "").strip(),
+          }
+          required_secrets = {
+              "OTERYN_PRODUCTION_E2E_EMAIL": bool(os.environ.get("E2E_EMAIL", "")),
+              "OTERYN_PRODUCTION_E2E_PASSWORD": bool(os.environ.get("E2E_PASSWORD", "")),
+          }
+
+          missing = sorted(
+              [name for name, value in required_non_secret.items() if not value]
+              + [name for name, present in required_secrets.items() if not present]
+          )
+          evidence = {
+              "schema_version": 1,
+              "classification": "PRODUCTION_TARGET_PREFLIGHT",
+              "status": "failure",
+              "missing_prerequisites": missing,
+              "required_secret_presence": required_secrets,
+              "totp_secret_present": bool(os.environ.get("E2E_TOTP_SECRET", "")),
+              "declared_revision_checks": {},
+              "mutation_smoke_authorized": required_non_secret["OTERYN_PRODUCTION_MUTATION_SMOKE_AUTHORIZED"].lower() == "true",
+              "backup_restore_evidence_declared": bool(required_non_secret["OTERYN_PRODUCTION_BACKUP_RESTORE_EVIDENCE_ID"]),
+              "probes": {},
+          }
+
+          def finish_failure(message: str) -> None:
+              evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+              raise SystemExit(message)
+
+          if missing:
+              finish_failure("missing production Environment prerequisites: " + ", ".join(missing))
+
+          if required_non_secret["OTERYN_PRODUCTION_MUTATION_SMOKE_AUTHORIZED"].lower() != "true":
+              finish_failure("production mutation smoke is not explicitly authorized by OTERYN_PRODUCTION_MUTATION_SMOKE_AUTHORIZED=true")
+
+          declared = {
+              "platform": required_non_secret["OTERYN_DEPLOYED_PLATFORM_SHA"],
+              "gateway": required_non_secret["OTERYN_DEPLOYED_GATEWAY_SHA"],
+              "canary": required_non_secret["OTERYN_DEPLOYED_CANARY_SHA"],
+          }
+          expected = {
+              "platform": EXPECTED_PLATFORM_SHA,
+              "gateway": EXPECTED_GATEWAY_SHA,
+              "canary": EXPECTED_CANARY_SHA,
+          }
+          evidence["declared_revision_checks"] = {
+              name: value == expected[name] for name, value in declared.items()
+          }
+          mismatched = [name for name in declared if declared[name] != expected[name]]
+          if mismatched:
+              finish_failure("declared deployed revision does not match the hardened E2E revision for: " + ", ".join(sorted(mismatched)))
+
+          def validate_https(name: str, raw: str) -> str:
+              parsed = urlparse(raw)
+              if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+                  finish_failure(f"{name} must be a clean https URL without userinfo/query/fragment")
+              host = parsed.hostname.lower()
+              if host == "localhost":
+                  finish_failure(f"{name} must not use localhost")
+              try:
+                  ip = ipaddress.ip_address(host)
+              except ValueError:
+                  ip = None
+              if ip is not None and ip.is_loopback:
+                  finish_failure(f"{name} must not use a loopback address")
+              return raw.rstrip("/") + "/"
+
+          platform_base = validate_https("OTERYN_PRODUCTION_BASE_URL", required_non_secret["OTERYN_PRODUCTION_BASE_URL"])
+          gateway_base = validate_https("OTERYN_PRODUCTION_GAME_GATEWAY_URL", required_non_secret["OTERYN_PRODUCTION_GAME_GATEWAY_URL"])
+          ssl_context = ssl.create_default_context()
+
+          def probe(label: str, base: str, path: str, expected_status: int = 200) -> bytes:
+              request = urllib.request.Request(urljoin(base, path.lstrip("/")), headers={"User-Agent": "oteryn-deployment-targeted-e2e/1"})
+              try:
+                  with urllib.request.urlopen(request, timeout=15, context=ssl_context) as response:
+                      body = response.read(65536)
+                      status = response.status
+              except urllib.error.HTTPError as exc:
+                  body = exc.read(65536)
+                  status = exc.code
+              except Exception as exc:
+                  evidence["probes"][label] = {"ok": False, "error_type": type(exc).__name__}
+                  finish_failure(f"production target probe failed: {label} ({type(exc).__name__})")
+              evidence["probes"][label] = {"ok": status == expected_status, "status": status}
+              if status != expected_status:
+                  finish_failure(f"production target probe returned unexpected status: {label}={status}")
+              return body
+
+          probe("platform_health", platform_base, "/health")
+          probe("gateway_health", gateway_base, "/health")
+          probe("gateway_ready", gateway_base, "/ready")
+          version_body = probe("gateway_version", gateway_base, "/version")
+          try:
+              version_payload = json.loads(version_body)
+          except json.JSONDecodeError:
+              finish_failure("Gateway /version did not return JSON")
+          reported_version = version_payload.get("version") if isinstance(version_payload, dict) else None
+          evidence["gateway_version_matches_declared_revision"] = reported_version == declared["gateway"]
+          if reported_version != declared["gateway"]:
+              finish_failure("Gateway /version does not match OTERYN_DEPLOYED_GATEWAY_SHA")
+
+          try:
+              game_port = int(required_non_secret["OTERYN_PRODUCTION_E2E_GAME_PORT"])
+          except ValueError:
+              finish_failure("OTERYN_PRODUCTION_E2E_GAME_PORT must be an integer")
+          if not 1 <= game_port <= 65535:
+              finish_failure("OTERYN_PRODUCTION_E2E_GAME_PORT must be between 1 and 65535")
+
+          evidence["status"] = "success"
+          evidence["first_failure"] = None
+          evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print("production target preflight passed; full physical native-auth smoke may proceed")
+          PY
+
+      - name: Upload sanitized production-target preflight evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-auth-deployment-target-preflight
+          path: artifacts/native-auth-deployment-targeted/preflight.json
+          if-no-files-found: error
+          retention-days: 14
