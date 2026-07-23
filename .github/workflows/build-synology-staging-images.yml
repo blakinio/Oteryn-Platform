@@ -97,7 +97,7 @@ jobs:
       - name: Validate locally loaded pull-request image
         if: github.event_name == 'pull_request'
         env:
-          IMAGE_REF: ${{ matrix.image }}:sha-${{ github.event.pull_request.head.sha }}
+          IMAGE_REF: ${{ matrix.image }}:${{ steps.meta.outputs.version }}
           IMAGE_NAME: ${{ matrix.name }}
         run: |
           set -euo pipefail
