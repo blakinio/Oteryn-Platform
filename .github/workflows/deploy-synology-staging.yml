@@ -1,0 +1,258 @@
+name: Deploy Synology Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Deploy selected images or roll back to the last runtime image snapshot
+        required: true
+        type: choice
+        options:
+          - deploy
+          - rollback
+        default: deploy
+      release_tag:
+        description: Platform/Gateway GHCR tag (prefer sha-<full-commit-sha>)
+        required: true
+        type: string
+        default: main
+      canary_image:
+        description: Full compatible prebuilt Canary image reference; required for deploy
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: synology-staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: oteryn-staging
+    environment: synology-staging
+    timeout-minutes: 30
+    env:
+      APP_KEY: ${{ secrets.OTERYN_STAGING_APP_KEY }}
+      MARIADB_ROOT_PASSWORD: ${{ secrets.OTERYN_STAGING_MARIADB_ROOT_PASSWORD }}
+      PLATFORM_DB_PASSWORD: ${{ secrets.OTERYN_STAGING_PLATFORM_DB_PASSWORD }}
+      CANARY_DB_PASSWORD: ${{ secrets.OTERYN_STAGING_CANARY_DB_PASSWORD }}
+      CANARY_READONLY_DB_PASSWORD: ${{ secrets.OTERYN_STAGING_CANARY_READONLY_DB_PASSWORD }}
+      CANARY_PROVISIONING_DB_PASSWORD: ${{ secrets.OTERYN_STAGING_CANARY_PROVISIONING_DB_PASSWORD }}
+      CANARY_CHARACTER_CREATE_DB_PASSWORD: ${{ secrets.OTERYN_STAGING_CANARY_CHARACTER_CREATE_DB_PASSWORD }}
+      REDIS_PASSWORD: ${{ secrets.OTERYN_STAGING_REDIS_PASSWORD }}
+      CANARY_RUNTIME_REDIS_PASSWORD: ${{ secrets.OTERYN_STAGING_CANARY_RUNTIME_REDIS_PASSWORD }}
+      OTERYN_PLATFORM_SERVICE_TOKEN: ${{ secrets.OTERYN_STAGING_PLATFORM_SERVICE_TOKEN }}
+      GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256: ${{ secrets.OTERYN_STAGING_PLATFORM_SERVICE_TOKEN_SHA256 }}
+      GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256: ${{ secrets.OTERYN_STAGING_PLATFORM_PREVIOUS_SERVICE_TOKEN_SHA256 }}
+      GAME_SESSION_SERVICE_TOKEN: ${{ secrets.OTERYN_STAGING_GAME_SESSION_SERVICE_TOKEN }}
+      CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256: ${{ secrets.OTERYN_STAGING_GAME_SESSION_SERVICE_TOKEN_SHA256 }}
+      CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256: ${{ secrets.OTERYN_STAGING_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256 }}
+
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Validate runner tools
+        run: |
+          set -euo pipefail
+          docker version >/dev/null
+          docker compose version >/dev/null
+          curl --version >/dev/null
+          sha256sum --version >/dev/null
+          timeout --version >/dev/null
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
+
+      - name: Validate deployment configuration
+        env:
+          DEPLOY_ACTION: ${{ inputs.action }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          CANARY_IMAGE_INPUT: ${{ inputs.canary_image }}
+          OTERYN_BIND_ADDRESS_INPUT: ${{ vars.OTERYN_STAGING_BIND_ADDRESS }}
+          OTERYN_STATE_DIR_INPUT: ${{ vars.OTERYN_STAGING_STATE_DIR }}
+          APP_URL_INPUT: ${{ vars.OTERYN_STAGING_APP_URL }}
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$RELEASE_TAG" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]; then
+            echo "release_tag is not a valid bounded Docker tag." >&2
+            exit 1
+          fi
+          if [[ "$DEPLOY_ACTION" == "deploy" ]] && { [[ -z "$CANARY_IMAGE_INPUT" ]] || [[ ! "$CANARY_IMAGE_INPUT" =~ ^[A-Za-z0-9./:@_-]+$ ]]; }; then
+            echo "canary_image is required for deploy and must be a bounded container image reference." >&2
+            exit 1
+          fi
+          if [[ -n "$CANARY_IMAGE_INPUT" && ! "$CANARY_IMAGE_INPUT" =~ ^[A-Za-z0-9./:@_-]+$ ]]; then
+            echo "canary_image contains unsupported characters." >&2
+            exit 1
+          fi
+
+          bind_address="${OTERYN_BIND_ADDRESS_INPUT:-127.0.0.1}"
+          state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
+          app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
+          if [[ ! "$bind_address" =~ ^[0-9.]+$ ]]; then
+            echo "OTERYN_STAGING_BIND_ADDRESS must currently be an IPv4 address." >&2
+            exit 1
+          fi
+          if [[ ! "$state_dir" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
+            echo "OTERYN_STAGING_STATE_DIR must be an absolute simple path." >&2
+            exit 1
+          fi
+          if [[ ! "$app_url" =~ ^https?://[A-Za-z0-9._:-]+$ ]]; then
+            echo "OTERYN_STAGING_APP_URL must be a simple HTTP(S) origin." >&2
+            exit 1
+          fi
+
+          required_names=(
+            APP_KEY
+            MARIADB_ROOT_PASSWORD
+            PLATFORM_DB_PASSWORD
+            CANARY_DB_PASSWORD
+            CANARY_READONLY_DB_PASSWORD
+            CANARY_PROVISIONING_DB_PASSWORD
+            CANARY_CHARACTER_CREATE_DB_PASSWORD
+            REDIS_PASSWORD
+            CANARY_RUNTIME_REDIS_PASSWORD
+            OTERYN_PLATFORM_SERVICE_TOKEN
+            GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256
+            GAME_SESSION_SERVICE_TOKEN
+            CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256
+          )
+          for name in "${required_names[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Required synology-staging secret is missing: $name" >&2
+              exit 1
+            fi
+          done
+
+          safe_names=(
+            MARIADB_ROOT_PASSWORD
+            PLATFORM_DB_PASSWORD
+            CANARY_DB_PASSWORD
+            CANARY_READONLY_DB_PASSWORD
+            CANARY_PROVISIONING_DB_PASSWORD
+            CANARY_CHARACTER_CREATE_DB_PASSWORD
+            REDIS_PASSWORD
+            CANARY_RUNTIME_REDIS_PASSWORD
+            OTERYN_PLATFORM_SERVICE_TOKEN
+            GAME_SESSION_SERVICE_TOKEN
+          )
+          for name in "${safe_names[@]}"; do
+            if [[ ! "${!name}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+              echo "$name must use generated hex/alphanumeric staging-safe characters." >&2
+              exit 1
+            fi
+          done
+
+          if [[ ! "$APP_KEY" =~ ^base64:[A-Za-z0-9+/=]+$ ]]; then
+            echo "OTERYN_STAGING_APP_KEY must be a Laravel base64 application key." >&2
+            exit 1
+          fi
+          if [[ ! "$GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+            echo "Platform service-token hash must be a SHA-256 hex digest." >&2
+            exit 1
+          fi
+          if [[ ! "$CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+            echo "Canary session service-token hash must be a SHA-256 hex digest." >&2
+            exit 1
+          fi
+          for optional_hash in \
+            "$GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256" \
+            "$CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256"; do
+            if [[ -n "$optional_hash" && ! "$optional_hash" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+              echo "Optional previous service-token hashes must be empty or SHA-256 hex digests." >&2
+              exit 1
+            fi
+          done
+
+      - name: Write ephemeral staging environment
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          CANARY_IMAGE_INPUT: ${{ inputs.canary_image }}
+          OTERYN_BIND_ADDRESS_INPUT: ${{ vars.OTERYN_STAGING_BIND_ADDRESS }}
+          OTERYN_STATE_DIR_INPUT: ${{ vars.OTERYN_STAGING_STATE_DIR }}
+          APP_URL_INPUT: ${{ vars.OTERYN_STAGING_APP_URL }}
+        run: |
+          set -euo pipefail
+          umask 077
+          bind_address="${OTERYN_BIND_ADDRESS_INPUT:-127.0.0.1}"
+          state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
+          app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
+          canary_image="${CANARY_IMAGE_INPUT:-rollback-placeholder}"
+
+          cat > deploy/synology/.env <<EOF
+          COMPOSE_PROJECT_NAME=oteryn-staging
+          OTERYN_BIND_ADDRESS=$bind_address
+          PLATFORM_PORT=8000
+          GATEWAY_PORT=8080
+          CANARY_LOGIN_PORT=7171
+          CANARY_GAME_PORT=7172
+          PLATFORM_IMAGE=ghcr.io/blakinio/oteryn-platform:$RELEASE_TAG
+          GATEWAY_IMAGE=ghcr.io/blakinio/oteryn-game-gateway:$RELEASE_TAG
+          CANARY_IMAGE=$canary_image
+          APP_NAME=Oteryn Platform Staging
+          APP_ENV=staging
+          APP_DEBUG=false
+          APP_KEY=$APP_KEY
+          APP_URL=$app_url
+          LOG_LEVEL=info
+          SESSION_SECURE_COOKIE=false
+          MARIADB_ROOT_PASSWORD=$MARIADB_ROOT_PASSWORD
+          PLATFORM_DB_NAME=oteryn_platform
+          PLATFORM_DB_USER=oteryn_platform
+          PLATFORM_DB_PASSWORD=$PLATFORM_DB_PASSWORD
+          CANARY_DB_NAME=canary
+          CANARY_DB_USER=canary
+          CANARY_DB_PASSWORD=$CANARY_DB_PASSWORD
+          CANARY_READONLY_DB_USER=oteryn_readonly
+          CANARY_READONLY_DB_PASSWORD=$CANARY_READONLY_DB_PASSWORD
+          CANARY_PROVISIONING_DB_USER=oteryn_provisioning
+          CANARY_PROVISIONING_DB_PASSWORD=$CANARY_PROVISIONING_DB_PASSWORD
+          CANARY_CHARACTER_CREATE_DB_USER=oteryn_character_create
+          CANARY_CHARACTER_CREATE_DB_PASSWORD=$CANARY_CHARACTER_CREATE_DB_PASSWORD
+          REDIS_PASSWORD=$REDIS_PASSWORD
+          CANARY_RUNTIME_REDIS_USERNAME=oteryn_runtime
+          CANARY_RUNTIME_REDIS_PASSWORD=$CANARY_RUNTIME_REDIS_PASSWORD
+          OTERYN_PLATFORM_SERVICE_TOKEN=$OTERYN_PLATFORM_SERVICE_TOKEN
+          GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256=$GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256
+          GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256=$GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256
+          GAME_SESSION_SERVICE_TOKEN=$GAME_SESSION_SERVICE_TOKEN
+          CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256=$CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256
+          CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256=$CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256
+          CANARY_SERVER_NAME=Oteryn Staging
+          CANARY_SERVER_IP=127.0.0.1
+          CANARY_TEST_ACCOUNTS=false
+          CANARY_DATA_PACK=data-otservbr-global
+          CANARY_MAP_URL=https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm
+          GATEWAY_VERSION=$RELEASE_TAG
+          OTERYN_STATE_DIR=$state_dir
+          EOF
+          chmod 600 deploy/synology/.env
+
+      - name: Deploy prebuilt images
+        if: inputs.action == 'deploy'
+        run: bash deploy/synology/scripts/deploy.sh
+
+      - name: Roll back runtime images
+        if: inputs.action == 'rollback'
+        run: bash deploy/synology/scripts/rollback.sh
+
+      - name: Remove ephemeral environment file
+        if: always()
+        run: rm -f deploy/synology/.env
+
+      - name: Log out of GHCR
+        if: always()
+        run: docker logout ghcr.io >/dev/null 2>&1 || true

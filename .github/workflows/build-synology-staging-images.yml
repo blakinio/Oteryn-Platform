@@ -1,0 +1,155 @@
+name: Build Synology Staging Images
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - composer.json
+      - composer.lock
+      - app/**
+      - bootstrap/**
+      - config/**
+      - database/**
+      - public/**
+      - resources/**
+      - routes/**
+      - services/game-gateway/**
+      - deploy/synology/**
+      - .github/workflows/build-synology-staging-images.yml
+      - .github/workflows/deploy-synology-staging.yml
+  push:
+    branches:
+      - main
+    paths:
+      - composer.json
+      - composer.lock
+      - app/**
+      - bootstrap/**
+      - config/**
+      - database/**
+      - public/**
+      - resources/**
+      - routes/**
+      - services/game-gateway/**
+      - deploy/synology/**
+      - .github/workflows/build-synology-staging-images.yml
+      - .github/workflows/deploy-synology-staging.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: synology-staging-images-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-deployment:
+    name: Validate Synology deployment package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v7
+
+      - name: Validate shell syntax
+        run: |
+          set -euo pipefail
+          bash -n \
+            deploy/synology/scripts/lib.sh \
+            deploy/synology/scripts/deploy.sh \
+            deploy/synology/scripts/health-check.sh \
+            deploy/synology/scripts/rollback.sh \
+            deploy/synology/runner/entrypoint.sh
+          sh -n \
+            deploy/synology/tls/init.sh \
+            deploy/synology/mariadb/init/10-platform-database.sh
+
+      - name: Validate Compose manifests
+        run: |
+          set -euo pipefail
+          cp deploy/synology/.env.example /tmp/oteryn-synology.env
+          sed -E -i 's/=(REQUIRED_[A-Z0-9_]+)$/=localplaceholder/' /tmp/oteryn-synology.env
+          docker compose \
+            --env-file /tmp/oteryn-synology.env \
+            -f deploy/synology/compose.yml \
+            config --quiet
+          docker compose \
+            --env-file deploy/synology/runner/.env.example \
+            -f deploy/synology/runner/compose.yml \
+            config --quiet
+          rm -f /tmp/oteryn-synology.env
+
+  build:
+    name: Build ${{ matrix.name }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: platform
+            image: ghcr.io/blakinio/oteryn-platform
+            dockerfile: deploy/synology/docker/platform.Dockerfile
+          - name: game-gateway
+            image: ghcr.io/blakinio/oteryn-game-gateway
+            dockerfile: deploy/synology/docker/gateway.Dockerfile
+          - name: deploy-runner
+            image: ghcr.io/blakinio/oteryn-deploy-runner
+            dockerfile: deploy/synology/runner/Dockerfile
+
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.image }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and optionally publish
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=synology-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=synology-${{ matrix.name }}
+
+      - name: Validate locally loaded pull-request image
+        if: github.event_name == 'pull_request'
+        env:
+          IMAGE_REF: ${{ matrix.image }}:${{ steps.meta.outputs.version }}
+          IMAGE_NAME: ${{ matrix.name }}
+        run: |
+          set -euo pipefail
+          docker image inspect "$IMAGE_REF" >/dev/null
+          case "$IMAGE_NAME" in
+            platform)
+              docker run --rm --entrypoint php "$IMAGE_REF" -v
+              ;;
+            game-gateway)
+              docker run --rm --entrypoint /bin/sh "$IMAGE_REF" -ec 'test -x /usr/local/bin/game-gateway'
+              ;;
+            deploy-runner)
+              docker run --rm --entrypoint /bin/bash "$IMAGE_REF" -ec 'docker --version && docker compose version && test -x /usr/local/bin/oteryn-runner-entrypoint'
+              ;;
+          esac

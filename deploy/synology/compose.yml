@@ -1,0 +1,212 @@
+name: ${COMPOSE_PROJECT_NAME:-oteryn-staging}
+
+services:
+  mariadb:
+    image: mariadb:11.8
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${CANARY_DB_NAME}
+      MARIADB_USER: ${CANARY_DB_USER}
+      MARIADB_PASSWORD: ${CANARY_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      PLATFORM_DB_NAME: ${PLATFORM_DB_NAME}
+      PLATFORM_DB_USER: ${PLATFORM_DB_USER}
+      PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./mariadb/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - redis_data:/data
+    networks:
+      - private
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  platform:
+    image: ${PLATFORM_IMAGE}
+    restart: unless-stopped
+    environment:
+      APP_NAME: ${APP_NAME}
+      APP_ENV: ${APP_ENV}
+      APP_KEY: ${APP_KEY}
+      APP_DEBUG: ${APP_DEBUG}
+      APP_URL: ${APP_URL}
+      LOG_CHANNEL: stderr_json
+      LOG_LEVEL: ${LOG_LEVEL}
+      DB_CONNECTION: mysql
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_DATABASE: ${PLATFORM_DB_NAME}
+      DB_USERNAME: ${PLATFORM_DB_USER}
+      DB_PASSWORD: ${PLATFORM_DB_PASSWORD}
+      CANARY_DB_HOST: mariadb
+      CANARY_DB_PORT: 3306
+      CANARY_DB_DATABASE: ${CANARY_DB_NAME}
+      CANARY_DB_USERNAME: ${CANARY_READONLY_DB_USER}
+      CANARY_DB_PASSWORD: ${CANARY_READONLY_DB_PASSWORD}
+      CANARY_PROVISIONING_DB_HOST: mariadb
+      CANARY_PROVISIONING_DB_PORT: 3306
+      CANARY_PROVISIONING_DB_DATABASE: ${CANARY_DB_NAME}
+      CANARY_PROVISIONING_DB_USERNAME: ${CANARY_PROVISIONING_DB_USER}
+      CANARY_PROVISIONING_DB_PASSWORD: ${CANARY_PROVISIONING_DB_PASSWORD}
+      CANARY_CHARACTER_CREATE_DB_HOST: mariadb
+      CANARY_CHARACTER_CREATE_DB_PORT: 3306
+      CANARY_CHARACTER_CREATE_DB_DATABASE: ${CANARY_DB_NAME}
+      CANARY_CHARACTER_CREATE_DB_USERNAME: ${CANARY_CHARACTER_CREATE_DB_USER}
+      CANARY_CHARACTER_CREATE_DB_PASSWORD: ${CANARY_CHARACTER_CREATE_DB_PASSWORD}
+      CANARY_RUNTIME_REDIS_CLIENT: phpredis
+      CANARY_RUNTIME_REDIS_SCHEME: tcp
+      CANARY_RUNTIME_REDIS_HOST: redis
+      CANARY_RUNTIME_REDIS_PORT: 6379
+      CANARY_RUNTIME_REDIS_DB: 0
+      CANARY_RUNTIME_REDIS_USERNAME: ${CANARY_RUNTIME_REDIS_USERNAME}
+      CANARY_RUNTIME_REDIS_PASSWORD: ${CANARY_RUNTIME_REDIS_PASSWORD}
+      SESSION_DRIVER: file
+      SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE}
+      SESSION_HTTP_ONLY: "true"
+      SESSION_SAME_SITE: lax
+      CACHE_STORE: file
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256: ${GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256}
+      GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256: ${GAME_AUTH_GATEWAY_PREVIOUS_SERVICE_TOKEN_SHA256:-}
+    ports:
+      - ${OTERYN_BIND_ADDRESS}:${PLATFORM_PORT}:8000
+    volumes:
+      - platform_storage:/var/www/html/storage
+    networks:
+      - private
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  canary:
+    image: ${CANARY_IMAGE}
+    restart: unless-stopped
+    environment:
+      CANARY_DB_HOST: mariadb
+      CANARY_DB_PORT: 3306
+      CANARY_DB_NAME: ${CANARY_DB_NAME}
+      CANARY_DB_USER: ${CANARY_DB_USER}
+      CANARY_DB_PASSWORD: ${CANARY_DB_PASSWORD}
+      CANARY_SERVER_NAME: ${CANARY_SERVER_NAME}
+      CANARY_SERVER_IP: ${CANARY_SERVER_IP}
+      CANARY_LOGIN_PORT: ${CANARY_LOGIN_PORT}
+      CANARY_GAME_PORT: ${CANARY_GAME_PORT}
+      CANARY_TEST_ACCOUNTS: ${CANARY_TEST_ACCOUNTS}
+      CANARY_DATA_PACK: ${CANARY_DATA_PACK}
+      CANARY_MAP_URL: ${CANARY_MAP_URL}
+      OT_DB_HOST: mariadb
+      OT_DB_PORT: 3306
+      OT_DB_DATABASE: ${CANARY_DB_NAME}
+      OT_DB_USER: ${CANARY_DB_USER}
+      OT_DB_PASSWORD: ${CANARY_DB_PASSWORD}
+      OT_SERVER_IP: ${CANARY_SERVER_IP}
+      OT_SERVER_LOGIN_PORT: ${CANARY_LOGIN_PORT}
+      OT_SERVER_GAME_PORT: ${CANARY_GAME_PORT}
+      OT_SERVER_TEST_ACCOUNTS: ${CANARY_TEST_ACCOUNTS}
+      OT_SERVER_DATA: ${CANARY_DATA_PACK}
+      OT_SERVER_MAP: ${CANARY_MAP_URL}
+      CANARY_GAME_SESSION_ISSUER_ENABLED: "true"
+      CANARY_GAME_SESSION_ISSUER_BIND: 0.0.0.0
+      CANARY_GAME_SESSION_ISSUER_PORT: 7180
+      CANARY_GAME_SESSION_ISSUER_REQUEST_TIMEOUT_MS: 5000
+      CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256: ${CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256}
+      CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256: ${CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256:-}
+    ports:
+      - ${OTERYN_BIND_ADDRESS}:${CANARY_LOGIN_PORT}:${CANARY_LOGIN_PORT}
+      - ${OTERYN_BIND_ADDRESS}:${CANARY_GAME_PORT}:${CANARY_GAME_PORT}
+    volumes:
+      - canary_data:/data
+    networks:
+      - private
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  tls-init:
+    image: alpine:3.22
+    restart: "no"
+    environment:
+      TLS_DIR: /tls
+    command: ["/bin/sh", "-ec", "apk add --no-cache openssl >/dev/null && sh /init.sh"]
+    volumes:
+      - ./tls/init.sh:/init.sh:ro
+      - internal_tls:/tls
+    networks:
+      - private
+
+  internal-proxy:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    volumes:
+      - ./nginx/internal.conf:/etc/nginx/nginx.conf:ro
+      - internal_tls:/etc/nginx/tls:ro
+    networks:
+      private:
+        aliases:
+          - platform-internal
+          - canary-session-internal
+    depends_on:
+      tls-init:
+        condition: service_completed_successfully
+      platform:
+        condition: service_started
+      canary:
+        condition: service_started
+
+  gateway:
+    image: ${GATEWAY_IMAGE}
+    restart: unless-stopped
+    environment:
+      OTERYN_PLATFORM_BASE_URL: https://platform-internal:8443
+      OTERYN_PLATFORM_SERVICE_TOKEN: ${OTERYN_PLATFORM_SERVICE_TOKEN}
+      GAME_SESSION_SERVICE_BASE_URL: https://canary-session-internal:8444
+      GAME_SESSION_SERVICE_TOKEN: ${GAME_SESSION_SERVICE_TOKEN}
+      GATEWAY_LISTEN_ADDR: :8080
+      GATEWAY_REQUEST_TIMEOUT: 5s
+      GATEWAY_VERSION: ${GATEWAY_VERSION:-synology-staging}
+      SSL_CERT_FILE: /etc/oteryn/tls/ca.crt
+    ports:
+      - ${OTERYN_BIND_ADDRESS}:${GATEWAY_PORT}:8080
+    volumes:
+      - internal_tls:/etc/oteryn/tls:ro
+    networks:
+      - private
+    depends_on:
+      internal-proxy:
+        condition: service_started
+
+volumes:
+  mariadb_data:
+  redis_data:
+  platform_storage:
+  canary_data:
+  internal_tls:
+
+networks:
+  private:
+    driver: bridge
+    internal: false

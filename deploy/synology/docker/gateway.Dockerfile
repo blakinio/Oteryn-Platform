@@ -1,0 +1,23 @@
+FROM golang:1.24-alpine AS build
+
+WORKDIR /src/services/game-gateway
+COPY services/game-gateway/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/game-gateway \
+    ./cmd/game-gateway
+
+FROM alpine:3.22
+
+RUN apk add --no-cache ca-certificates \
+    && addgroup -S -g 10001 oteryn \
+    && adduser -S -D -H -u 10001 -G oteryn oteryn
+
+COPY --from=build /out/game-gateway /usr/local/bin/game-gateway
+
+USER oteryn
+
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/game-gateway"]
