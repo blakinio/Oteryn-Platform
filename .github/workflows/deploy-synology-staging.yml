@@ -76,8 +76,8 @@ jobs:
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GHCR_USER" --password-stdin
 
       - name: Validate deployment configuration
-        if: inputs.action == 'deploy'
         env:
+          DEPLOY_ACTION: ${{ inputs.action }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           CANARY_IMAGE_INPUT: ${{ inputs.canary_image }}
           OTERYN_BIND_ADDRESS_INPUT: ${{ vars.OTERYN_STAGING_BIND_ADDRESS }}
@@ -90,8 +90,12 @@ jobs:
             echo "release_tag is not a valid bounded Docker tag." >&2
             exit 1
           fi
-          if [[ -z "$CANARY_IMAGE_INPUT" || ! "$CANARY_IMAGE_INPUT" =~ ^[A-Za-z0-9./:@_-]+$ ]]; then
-            echo "canary_image is required and must be a bounded container image reference." >&2
+          if [[ "$DEPLOY_ACTION" == "deploy" ]] && { [[ -z "$CANARY_IMAGE_INPUT" ]] || [[ ! "$CANARY_IMAGE_INPUT" =~ ^[A-Za-z0-9./:@_-]+$ ]]; }; then
+            echo "canary_image is required for deploy and must be a bounded container image reference." >&2
+            exit 1
+          fi
+          if [[ -n "$CANARY_IMAGE_INPUT" && ! "$CANARY_IMAGE_INPUT" =~ ^[A-Za-z0-9./:@_-]+$ ]]; then
+            echo "canary_image contains unsupported characters." >&2
             exit 1
           fi
 
@@ -174,7 +178,6 @@ jobs:
           done
 
       - name: Write ephemeral staging environment
-        if: inputs.action == 'deploy'
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
           CANARY_IMAGE_INPUT: ${{ inputs.canary_image }}
@@ -187,6 +190,7 @@ jobs:
           bind_address="${OTERYN_BIND_ADDRESS_INPUT:-127.0.0.1}"
           state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
           app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
+          canary_image="${CANARY_IMAGE_INPUT:-rollback-placeholder}"
 
           cat > deploy/synology/.env <<EOF
           COMPOSE_PROJECT_NAME=oteryn-staging
@@ -197,7 +201,7 @@ jobs:
           CANARY_GAME_PORT=7172
           PLATFORM_IMAGE=ghcr.io/blakinio/oteryn-platform:$RELEASE_TAG
           GATEWAY_IMAGE=ghcr.io/blakinio/oteryn-game-gateway:$RELEASE_TAG
-          CANARY_IMAGE=$CANARY_IMAGE_INPUT
+          CANARY_IMAGE=$canary_image
           APP_NAME=Oteryn Platform Staging
           APP_ENV=staging
           APP_DEBUG=false
