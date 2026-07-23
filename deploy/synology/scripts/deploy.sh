@@ -80,11 +80,12 @@ chmod 700 "$state_dir"
 snapshot_current_images() {
     local tmp="$state_dir/last-good.env.tmp"
     local found=0
+    local service container_id image
     : > "$tmp"
     chmod 600 "$tmp"
 
     for service in platform gateway canary; do
-        container_id="$(${compose[@]} ps -q "$service" 2>/dev/null || true)"
+        container_id="$("${compose[@]}" ps -q "$service" 2>/dev/null || true)"
         if [[ -n "$container_id" ]]; then
             image="$(docker inspect --format '{{.Config.Image}}' "$container_id")"
             case "$service" in
@@ -105,8 +106,7 @@ snapshot_current_images() {
 
 apply_sql_template() {
     local template="$1"
-    shift
-    awk_script="$1"
+    local awk_script="$2"
 
     awk "$awk_script" "$template" \
         | "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb \
@@ -119,13 +119,19 @@ snapshot_current_images
 "${compose[@]}" pull
 "${compose[@]}" up -d mariadb redis tls-init
 
+mariadb_ready=0
 for _ in $(seq 1 60); do
     if "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb \
         mariadb -uroot -N -e 'SELECT 1' >/dev/null 2>&1; then
+        mariadb_ready=1
         break
     fi
     sleep 2
 done
+if [[ "$mariadb_ready" -ne 1 ]]; then
+    echo "MariaDB did not become ready; refusing to continue deployment." >&2
+    exit 1
+fi
 
 "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb mariadb -uroot <<SQL
 CREATE DATABASE IF NOT EXISTS \`$PLATFORM_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -201,6 +207,9 @@ apply_sql_template "$REPO_ROOT/database/provisioning/canary-character-create.sql
 
 "${compose[@]}" up -d platform
 "${compose[@]}" exec -T platform php artisan migrate --force --no-interaction
+if ! "${compose[@]}" exec -T platform sh -ec 'test -s storage/oauth-private.key && test -s storage/oauth-public.key'; then
+    "${compose[@]}" exec -T platform php artisan passport:keys --no-interaction
+fi
 "${compose[@]}" exec -T platform php artisan game-auth:oauth-client:ensure
 "${compose[@]}" exec -T platform php artisan canary:verify-db-privileges
 "${compose[@]}" exec -T platform php artisan canary:verify-provisioning-db-privileges
