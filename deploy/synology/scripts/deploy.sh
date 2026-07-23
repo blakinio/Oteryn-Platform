@@ -7,15 +7,9 @@ REPO_ROOT="$(cd -- "$DEPLOY_DIR/../.." && pwd)"
 ENV_FILE="${OTERYN_ENV_FILE:-$DEPLOY_DIR/.env}"
 COMPOSE_FILE="$DEPLOY_DIR/compose.yml"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-    echo "Missing staging environment file: $ENV_FILE" >&2
-    exit 1
-fi
-
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+# shellcheck source=deploy/synology/scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
+load_oteryn_env_file "$ENV_FILE"
 
 required_vars=(
     PLATFORM_IMAGE GATEWAY_IMAGE CANARY_IMAGE
@@ -37,20 +31,35 @@ for name in "${required_vars[@]}"; do
     fi
 done
 
-safe_db_vars=(
+safe_credential_vars=(
     PLATFORM_DB_NAME PLATFORM_DB_USER PLATFORM_DB_PASSWORD
     CANARY_DB_NAME CANARY_DB_USER CANARY_DB_PASSWORD
     CANARY_READONLY_DB_USER CANARY_READONLY_DB_PASSWORD
     CANARY_PROVISIONING_DB_USER CANARY_PROVISIONING_DB_PASSWORD
     CANARY_CHARACTER_CREATE_DB_USER CANARY_CHARACTER_CREATE_DB_PASSWORD
+    REDIS_PASSWORD CANARY_RUNTIME_REDIS_USERNAME CANARY_RUNTIME_REDIS_PASSWORD
+    OTERYN_PLATFORM_SERVICE_TOKEN GAME_SESSION_SERVICE_TOKEN
 )
-for name in "${safe_db_vars[@]}"; do
+for name in "${safe_credential_vars[@]}"; do
     value="${!name}"
     if [[ ! "$value" =~ ^[A-Za-z0-9_.-]+$ ]]; then
         echo "$name contains unsupported characters; use generated hex/alphanumeric staging values." >&2
         exit 1
     fi
 done
+
+if [[ ! "$APP_KEY" =~ ^base64:[A-Za-z0-9+/=]+$ ]]; then
+    echo "APP_KEY must be a Laravel base64 application key." >&2
+    exit 1
+fi
+if [[ ! "$GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+    echo "GAME_AUTH_GATEWAY_SERVICE_TOKEN_SHA256 must be a 64-character SHA-256 hex digest." >&2
+    exit 1
+fi
+if [[ ! "$CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+    echo "CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256 must be a 64-character SHA-256 hex digest." >&2
+    exit 1
+fi
 
 expected_platform_hash="$(printf '%s' "$OTERYN_PLATFORM_SERVICE_TOKEN" | sha256sum | awk '{print $1}')"
 expected_session_hash="$(printf '%s' "$GAME_SESSION_SERVICE_TOKEN" | sha256sum | awk '{print $1}')"
