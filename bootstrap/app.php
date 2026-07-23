@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureConfirmedMfa;
 use App\Http\Middleware\EnsureIdentitySessionIsCurrent;
+use App\Http\Middleware\GameAuth\PreventSensitiveGameAuthResponseCaching;
 use App\Http\Middleware\RequestCorrelation;
 use App\Http\Middleware\RequireAdminPermission;
 use App\Http\Middleware\SecurityHeaders;
@@ -10,6 +11,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -38,4 +40,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 || $request->is('internal/*')
                 || $request->expectsJson(),
         );
+        $exceptions->respond(function (Response $response): Response {
+            $request = request();
+
+            return PreventSensitiveGameAuthResponseCaching::appliesTo($request)
+                ? PreventSensitiveGameAuthResponseCaching::apply($response)
+                : $response;
+        });
     })->create();
