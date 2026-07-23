@@ -119,6 +119,9 @@ final class GameLoginTicketApiTest extends TestCase
         $this->assertSensitiveResponseIsNotCacheable($response);
     }
 
+    /**
+     * @param TestResponse<\Symfony\Component\HttpFoundation\Response> $response
+     */
     private function assertSensitiveResponseIsNotCacheable(TestResponse $response): void
     {
         $cacheControl = (string) $response->headers->get('Cache-Control');
