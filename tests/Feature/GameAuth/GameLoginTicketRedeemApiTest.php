@@ -7,6 +7,7 @@ use App\GameAuth\Tickets\IssueGameLoginTicket;
 use App\Identity\Models\Identity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 final class GameLoginTicketRedeemApiTest extends TestCase
@@ -14,12 +15,14 @@ final class GameLoginTicketRedeemApiTest extends TestCase
     use RefreshDatabase;
 
     private const SERVICE_CREDENTIAL = 'test-gateway-service-credential-with-sufficient-entropy';
+    private const PREVIOUS_SERVICE_CREDENTIAL = 'previous-gateway-service-credential-with-sufficient-entropy';
 
     protected function setUp(): void
     {
         parent::setUp();
         config([
             'game-auth.gateway.service_token_sha256' => hash('sha256', self::SERVICE_CREDENTIAL),
+            'game-auth.gateway.previous_service_token_sha256' => null,
         ]);
     }
 
@@ -40,6 +43,7 @@ final class GameLoginTicketRedeemApiTest extends TestCase
             ->assertJsonPath('authorization.canary_account_id', 1001)
             ->assertJsonPath('authorization.security_generation', 0)
             ->assertJsonStructure(['authorization' => ['redeemed_at']]);
+        $this->assertSensitiveResponseIsNotCacheable($response);
 
         $payload = $response->json();
 
@@ -58,46 +62,108 @@ final class GameLoginTicketRedeemApiTest extends TestCase
         self::assertArrayNotHasKey('ticket', $payload);
         self::assertArrayNotHasKey('identity_id', $authorization);
 
-        $this->withToken(self::SERVICE_CREDENTIAL)
+        $replay = $this->withToken(self::SERVICE_CREDENTIAL)
             ->postJson('/internal/v1/game-auth/tickets/redeem', [
                 'protocol_version' => 1,
                 'ticket' => $issued->ticket,
                 'audience' => 'oteryn-game-gateway',
-            ])
-            ->assertStatus(401)
+            ]);
+        $replay->assertStatus(401)
             ->assertJsonPath('error', 'invalid_ticket');
+        $this->assertSensitiveResponseIsNotCacheable($replay);
+    }
+
+    public function test_overlapping_previous_gateway_service_credential_is_accepted_during_rotation(): void
+    {
+        config([
+            'game-auth.gateway.previous_service_token_sha256' => hash('sha256', self::PREVIOUS_SERVICE_CREDENTIAL),
+        ]);
+
+        $identity = $this->createIdentityWithReadyBinding(1001);
+        $issued = $this->app->make(IssueGameLoginTicket::class)->execute($identity);
+
+        $response = $this->withToken(self::PREVIOUS_SERVICE_CREDENTIAL)
+            ->postJson('/internal/v1/game-auth/tickets/redeem', [
+                'protocol_version' => 1,
+                'ticket' => $issued->ticket,
+                'audience' => 'oteryn-game-gateway',
+            ]);
+
+        $response->assertOk()
+            ->assertJsonPath('authorization.canary_account_id', 1001);
+        $this->assertSensitiveResponseIsNotCacheable($response);
     }
 
     public function test_invalid_or_missing_gateway_service_credential_is_denied(): void
     {
-        $this->withToken('wrong-credential')
+        $wrongCredential = $this->withToken('wrong-credential')
             ->postJson('/internal/v1/game-auth/tickets/redeem', [
                 'protocol_version' => 1,
                 'ticket' => 'not-a-real-ticket',
                 'audience' => 'oteryn-game-gateway',
-            ])
-            ->assertStatus(401)
+            ]);
+        $wrongCredential->assertStatus(401)
             ->assertJsonPath('error', 'unauthorized_service');
+        $this->assertSensitiveResponseIsNotCacheable($wrongCredential);
 
-        $this->postJson('/internal/v1/game-auth/tickets/redeem', [
+        $missingCredential = $this->postJson('/internal/v1/game-auth/tickets/redeem', [
             'protocol_version' => 1,
             'ticket' => 'not-a-real-ticket',
             'audience' => 'oteryn-game-gateway',
-        ])->assertStatus(401);
+        ]);
+        $missingCredential->assertStatus(401);
+        $this->assertSensitiveResponseIsNotCacheable($missingCredential);
     }
 
-    public function test_missing_service_hash_configuration_fails_closed(): void
+    public function test_unauthorized_redeem_attempts_are_source_throttled_before_service_authentication(): void
     {
-        config(['game-auth.gateway.service_token_sha256' => null]);
+        for ($attempt = 1; $attempt <= 60; $attempt++) {
+            $response = $this->withToken('wrong-credential-'.$attempt)
+                ->postJson('/internal/v1/game-auth/tickets/redeem', [
+                    'protocol_version' => 1,
+                    'ticket' => 'not-a-real-ticket',
+                    'audience' => 'oteryn-game-gateway',
+                ]);
 
-        $this->withToken(self::SERVICE_CREDENTIAL)
+            $response->assertStatus(401)
+                ->assertJsonPath('error', 'unauthorized_service');
+        }
+
+        $throttled = $this->withToken('wrong-credential-61')
             ->postJson('/internal/v1/game-auth/tickets/redeem', [
                 'protocol_version' => 1,
                 'ticket' => 'not-a-real-ticket',
                 'audience' => 'oteryn-game-gateway',
-            ])
-            ->assertStatus(503)
-            ->assertJsonPath('error', 'service_unavailable');
+            ]);
+
+        $throttled->assertStatus(429);
+        $this->assertSensitiveResponseIsNotCacheable($throttled);
+    }
+
+    public function test_missing_or_invalid_service_hash_configuration_fails_closed(): void
+    {
+        foreach ([
+            ['game-auth.gateway.service_token_sha256' => null],
+            ['game-auth.gateway.previous_service_token_sha256' => 'not-a-sha256-hash'],
+        ] as $configuration) {
+            config($configuration);
+
+            $response = $this->withToken(self::SERVICE_CREDENTIAL)
+                ->postJson('/internal/v1/game-auth/tickets/redeem', [
+                    'protocol_version' => 1,
+                    'ticket' => 'not-a-real-ticket',
+                    'audience' => 'oteryn-game-gateway',
+                ]);
+
+            $response->assertStatus(503)
+                ->assertJsonPath('error', 'service_unavailable');
+            $this->assertSensitiveResponseIsNotCacheable($response);
+
+            config([
+                'game-auth.gateway.service_token_sha256' => hash('sha256', self::SERVICE_CREDENTIAL),
+                'game-auth.gateway.previous_service_token_sha256' => null,
+            ]);
+        }
     }
 
     public function test_wrong_audience_and_client_supplied_account_identifiers_fail_closed(): void
@@ -105,14 +171,23 @@ final class GameLoginTicketRedeemApiTest extends TestCase
         $identity = $this->createIdentityWithReadyBinding(1001);
         $issued = $this->app->make(IssueGameLoginTicket::class)->execute($identity);
 
-        $this->withToken(self::SERVICE_CREDENTIAL)
+        $response = $this->withToken(self::SERVICE_CREDENTIAL)
             ->postJson('/internal/v1/game-auth/tickets/redeem', [
                 'protocol_version' => 1,
                 'ticket' => $issued->ticket,
                 'audience' => 'wrong-audience',
                 'canary_account_id' => 999,
-            ])
-            ->assertStatus(422);
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertSensitiveResponseIsNotCacheable($response);
+    }
+
+    private function assertSensitiveResponseIsNotCacheable(TestResponse $response): void
+    {
+        $response->assertHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+            ->assertHeader('Pragma', 'no-cache')
+            ->assertHeader('Expires', '0');
     }
 
     private function createIdentityWithReadyBinding(int $canaryAccountId): Identity
