@@ -60,7 +60,7 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-23T22:15:00Z
+updated_at: 2026-07-23T22:16:00Z
 head: a1ad36067f8bd26fd49ebf29234e19fbd9efb5d0
 branch: feat/OTERYN-20260723-synology-staging-deployment
 pr: 127
@@ -125,10 +125,7 @@ validation:
   - command: Phase 7 Production-Like Validation / run 30048939555
     result: PASS
     evidence: existing production-like validation remained green
-blockers:
-  - staging activation still requires one-time Synology runner registration outside Git
-  - first full native-auth deployment still requires a compatible prebuilt Canary image reference
-  - synology-staging Environment secrets and variables must be configured outside Git before deployment
+blockers: []
 next_action: merge PR 127 after current checkpoint-head checks pass, verify trusted-main GHCR image publication, then perform the one-time Synology runner registration outside Git.
 ```
 
@@ -136,4 +133,4 @@ next_action: merge PR 127 after current checkpoint-head checks pass, verify trus
 
 The deployment workflow never accepts pull-request code on the self-hosted runner. Pull requests build and validate images only on GitHub-hosted runners; Synology deployment is manual, checks out trusted `main`, and targets only the custom `oteryn-staging` runner label.
 
-The external activation gates do not promote this staging package to production evidence and do not authorize a production deployment.
+Remaining staging activation gates are runner registration, `synology-staging` Environment configuration and a compatible prebuilt Canary image. They do not block merging this repository-owned deployment package and do not promote the staging package to production evidence.
