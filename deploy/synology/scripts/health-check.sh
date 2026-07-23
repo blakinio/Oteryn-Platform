@@ -6,15 +6,9 @@ DEPLOY_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="${OTERYN_ENV_FILE:-$DEPLOY_DIR/.env}"
 COMPOSE_FILE="$DEPLOY_DIR/compose.yml"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-    echo "Missing staging environment file: $ENV_FILE" >&2
-    exit 1
-fi
-
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+# shellcheck source=deploy/synology/scripts/lib.sh
+source "$SCRIPT_DIR/lib.sh"
+load_oteryn_env_file "$ENV_FILE"
 
 compose=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 
