@@ -45,7 +45,7 @@ func (f *testSessionIssuer) Create(context.Context, gateway.SessionRequest) (gat
 
 func (f *testSessionIssuer) Ready(context.Context) error { return f.readyErr }
 
-func TestLoginSuccessDoesNotLogCredentials(t *testing.T) {
+func TestLoginSuccessDoesNotLogCredentialsAndIsNotCacheable(t *testing.T) {
 	now := time.Now().UTC()
 	platform := &testPlatform{
 		authorization: gateway.Authorization{CanaryAccountID: 1001},
@@ -68,6 +68,8 @@ func TestLoginSuccessDoesNotLogCredentials(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", response.Code, response.Body.String())
 	}
+	assertSensitiveResponseNoCache(t, response)
+
 	var payload gateway.LoginResponse
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -107,11 +109,12 @@ func TestLoginRejectsUnknownFieldsQueryAndOversizedBodyBeforeDependencies(t *tes
 			if response.Code != http.StatusBadRequest {
 				t.Fatalf("expected 400, got %d body=%s", response.Code, response.Body.String())
 			}
+			assertSensitiveResponseNoCache(t, response)
 		})
 	}
 }
 
-func TestLoginMapsInvalidTicketAndDependencyOutageToBoundedErrors(t *testing.T) {
+func TestLoginMapsInvalidTicketAndDependencyOutageToBoundedNonCacheableErrors(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		err    error
@@ -130,6 +133,7 @@ func TestLoginMapsInvalidTicketAndDependencyOutageToBoundedErrors(t *testing.T) 
 			if response.Code != test.status || !strings.Contains(response.Body.String(), test.body) {
 				t.Fatalf("unexpected response: status=%d body=%s", response.Code, response.Body.String())
 			}
+			assertSensitiveResponseNoCache(t, response)
 		})
 	}
 }
@@ -154,5 +158,19 @@ func TestHealthAndReadinessAreSeparate(t *testing.T) {
 	server.Handler().ServeHTTP(version, httptest.NewRequest(http.MethodGet, "/version", nil))
 	if version.Code != http.StatusOK || !strings.Contains(version.Body.String(), "v1.2.3") {
 		t.Fatalf("unexpected version response: %d %s", version.Code, version.Body.String())
+	}
+}
+
+func assertSensitiveResponseNoCache(t *testing.T, response *httptest.ResponseRecorder) {
+	t.Helper()
+
+	if got := response.Header().Get("Cache-Control"); got != "no-store, no-cache, must-revalidate, private" {
+		t.Fatalf("unexpected Cache-Control header: %q", got)
+	}
+	if got := response.Header().Get("Pragma"); got != "no-cache" {
+		t.Fatalf("unexpected Pragma header: %q", got)
+	}
+	if got := response.Header().Get("Expires"); got != "0" {
+		t.Fatalf("unexpected Expires header: %q", got)
 	}
 }
