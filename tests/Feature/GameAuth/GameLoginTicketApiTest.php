@@ -8,6 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Passport\RefreshToken;
 use Laravel\Passport\Token;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Feature\GameAuth\OAuth\Concerns\ConfiguresEphemeralPassportKeys;
 use Tests\Feature\GameAuth\OAuth\Concerns\CreatesNativeOAuthBootstrapToken;
 use Tests\TestCase;
@@ -120,7 +121,7 @@ final class GameLoginTicketApiTest extends TestCase
     }
 
     /**
-     * @param  TestResponse<\Symfony\Component\HttpFoundation\Response>  $response
+     * @param  TestResponse<Response>  $response
      */
     private function assertSensitiveResponseIsNotCacheable(TestResponse $response): void
     {
