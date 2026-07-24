@@ -7,11 +7,16 @@ use App\PublicPortal\PublicContentState;
 
 final readonly class AnnouncementTicker
 {
+    /** @var list<SiteAnnouncement> */
+    public array $items;
+
     /**
      * @param  list<SiteAnnouncement>  $items
      */
     public function __construct(
         public PublicContentState $state,
-        public array $items,
-    ) {}
+        array $items,
+    ) {
+        $this->items = $items;
+    }
 }
