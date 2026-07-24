@@ -23,7 +23,7 @@ dependencies:
   - Game Gateway 53158217a6c6017230301cf4daa783b04fcc13d5
   - Canary b15b7d544f4795e3a2a65b88de35391b9fd0a20d
   - OTClient bb87346f6c516a19d19497d82bb01fb389334ff5
-  - Canary rehearsal harness 9200c562e7e87dd098c1205c1df83c9d9ce95c1b
+  - Canary rehearsal harness 1046687e44aa2f9321cf7d71364dc076aedf08c5
 blocks:
   - PRODUCTION_LIKE_PROVEN native-auth rehearsal evidence
 cross_repository_tasks:
@@ -48,16 +48,15 @@ cross_repository_tasks:
 ## Security boundaries
 
 - Trust boundary: OTClient -> Platform public HTTPS -> Gateway public HTTPS -> Platform private HTTPS -> Canary private issuer HTTPS -> Canary game protocol.
-- Actions access: no PAT or production secret is introduced; the workflow relies only on the repo-scoped Platform token for its own private repository and read-only public repository checkout for Canary/OTClient.
-- Runtime secrets: generated ephemerally inside the job and excluded from retained evidence.
-- Rollback: native issuer/routing activation is rehearsal-only and torn down with the ephemeral environment.
+- No PAT or production secret is introduced; runtime credentials are generated ephemerally and excluded from retained evidence.
+- Native issuer/routing activation and rollback are rehearsal-only.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T11:55:00+02:00
-head: 3ac0524b0a5e535ff7f2530ce8b9bdc1af5d2b77
+updated_at: 2026-07-24T12:15:00+02:00
+head: 41c2353e37de9192f260460bb4e21dc2c857f7b3
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
 pr: 126
 status: validating
@@ -74,31 +73,24 @@ owned_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 proven:
-  - Oteryn Platform is private while Canary and OTClient are public; Platform PR 126 is the correct Actions execution boundary without a cross-repository PAT.
-  - Gateway and OTClient artifacts from source build run 30047343772 are reused only after source-SHA and binary checksum verification.
-  - Exact Canary b15b7d544f4795e3a2a65b88de35391b9fd0a20d with the complete private-issuer cache policy was built successfully in run 30080248772; artifact 8591665710 has digest sha256:6b0e13966047c571de2c7a3f948f0f9b54b1619800c4b591cd70adf5a7a860f1.
-  - Rehearsal run 30083102212 passed exact revision verification, deterministic data services, credential overlap, TLS, OAuth PKCE, real authorization-code expiry, ticket expiry/replay/protocol checks, service credential checks, wrong account/world checks, Platform and Canary outage fail-closed recovery, account override rejection, malformed Canary response rejection, cache headers and normal happy path without 5xx.
-  - The same run proved the source-IP isolation fix: no later OAuth probe was rejected by the production login rate limiter.
-  - Gateway preserved and logged the supplied correlation ID native-auth-rehearsal-gateway-correlation.
-  - Platform returned request ID 11b6c6af-5724-402b-98b3-3f44316112a0 and the identical ID appears in the final retained Platform log.
-  - The correlation checker read docker logs immediately after the response and raced the logging flush, recording platform_id_logged false despite the retained final log proving the ID.
-  - Commit 3ac0524b0a5e535ff7f2530ce8b9bdc1af5d2b77 adds bounded state-based polling for the exact Platform and Gateway IDs; it passed git diff --check and py_compile, and its one-shot workflow removed itself from the resulting tree.
-  - Platform restart readiness deletes stale bootstrap evidence and requires live internal HTTP 200 before returning.
-  - Platform b5dd6a7be5c704d5706241240e06f8bb8c4b5efe passed Composer validation, audit, Pint, PHPStan and the full PHPUnit suite in run 30079059960.
-  - acceptance_extensions.py adds physical invalid-session rejection, unauthorized-character burn, restart invalidation/recovery, malformed Gateway-to-OTClient failure, complete cache-header checks, correlation IDs and JWT-like sensitive scanning.
-derived:
-  - Correlation is present in both products; only observation readiness in the rehearsal required correction.
+  - Platform run 30083664968 passed every matrix gate through cache headers, correlation, physical random-session rejection, unauthorized-character burn and Canary restart invalidation/recovery.
+  - Its first failure was before the malformed Gateway boundary: browser_driver received HTTP 400 from /oauth/authorize and the fake Gateway access log remained empty.
+  - Canary harness commit fdab1a6b7e4fe8275f12c19812194fbc2ee01c2c aligns malformed-helper readiness with the working happy path by waiting for CharacterList before OterynIdentity.start.
+  - Canary branch head 1046687e44aa2f9321cf7d71364dc076aedf08c5 contains that helper fix plus a documentation-only active-task checkpoint; required CI 30084397393 and ownership 30084528867 passed.
+  - Workflow commit 41c2353e37de9192f260460bb4e21dc2c857f7b3 pins exact harness 1046687e44aa2f9321cf7d71364dc076aedf08c5 and updates the retained-revision assertion accordingly.
+  - The same workflow correction reads failure-injection-summary.json, expects the actual client-events.tsv filename and asserts failure_injection_status PASS; these latent final-gate mismatches were previously hidden because runtime failed before the assertion step.
+  - Product revisions and Gateway/Canary/OTClient binary artifacts remain unchanged and checksum-gated.
 unknown:
-  - physical OTClient negative and happy flows, logout database state, Game Session replay, credential rotation, rollback and final smoke results after the corrected correlation checkpoint
+  - physical malformed Gateway request/access result with corrected UI readiness
+  - final happy-path world entry, logout, Game Session replay, rotation, rollback and final smoke results
 conflicts: []
 first_failure:
-  marker: correlation-log-flush-race
-  evidence: run 30083102212 request-correlation.json reported Platform response ID 11b6c6af-5724-402b-98b3-3f44316112a0 but platform_id_logged false; the retained platform.log contains that exact ID
+  marker: malformed-gateway-native-ui-readiness
+  evidence: run 30083664968 artifact 8592956146 retained no POST /v1/login in malformed-gateway-access.log and Platform recorded /oauth/authorize status 400
 rejected_hypotheses:
-  - add a Platform product propagation fix: rejected because the response ID and retained log ID are identical
-  - accept a missing correlation ID: rejected because both Platform and Gateway IDs remain mandatory
-  - add an arbitrary long sleep: rejected in favor of bounded polling for the exact expected ID
-  - change product source or product SHA: rejected because the defect belongs to evidence observation timing
+  - accept timeout-only Lua evidence: rejected because physical boundary access remains mandatory
+  - weaken final artifact assertions: rejected; filenames and exact harness SHA now match the actual evidence contract
+  - change product revisions: rejected because the defect belongs to validation helper readiness
 changed_paths:
   - .github/workflows/native-auth-canary-cache-build.yml
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
@@ -107,19 +99,16 @@ changed_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 validation:
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30083102212
+  - command: Platform Native Auth Ephemeral Cutover Rehearsal run 30083664968
     result: FAIL
-    evidence: every matrix assertion through cache headers and correlation response IDs passed; first failure was the pre-flush Platform log observation
-  - command: Platform Agent Governance run 30083102216
+    evidence: first failure was malformed Gateway helper readiness after all earlier extended gates passed
+  - command: Canary CI run 30084397393
     result: PASS
-    evidence: active task checkpoint validation passed on the source-IP isolation head
-  - command: Platform CI run 30079059960
+    evidence: required Canary CI passed on the helper change
+  - command: Canary Agent Task Ownership run 30084528867
     result: PASS
-    evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed for Platform b5dd6a7
-  - command: exact Canary build run 30080248772
-    result: PASS
-    evidence: artifact 8591665710 built from b15b7d544f4795e3a2a65b88de35391b9fd0a20d and was uploaded with retained digest
+    evidence: active task ownership and checkpoint validation passed
 blockers:
   - none
-next_action: execute the exact-revision rehearsal with bounded correlation log readiness and repair only the first concrete downstream failure.
+next_action: execute the full exact-revision rehearsal on the corrected harness and repair only the first concrete downstream failure.
 ```
