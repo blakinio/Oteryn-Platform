@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import acceptance_extensions
 import platform_runner
 
 
@@ -38,6 +39,7 @@ def install_exact_harness_adapter() -> None:
             return env
 
         harness.Rehearsal.platform_env = platform_env_with_trusted_proxy
+        acceptance_extensions.install(harness)
         return harness
 
     platform_runner.load_harness = load_harness_with_exact_metadata
