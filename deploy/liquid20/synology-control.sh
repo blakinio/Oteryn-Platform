@@ -62,7 +62,7 @@ run_marker_exists() {
     docker run --rm \
         -v "$DATA_ROOT:/data:ro" \
         "$ALPINE_IMAGE" \
-        test -f "/data/runs/$run_id/.github-uploaded"
+        test -f "/data/github-uploaded/$run_id"
 }
 
 show_status() {
@@ -119,7 +119,7 @@ ensure_data_root() {
     docker run --rm \
         -v "$DATA_ROOT:/data:rw" \
         "$ALPINE_IMAGE" \
-        sh -ec 'mkdir -p /data/runs && chmod 0750 /data /data/runs'
+        sh -ec 'mkdir -p /data/runs /data/github-uploaded && chmod 0750 /data /data/runs /data/github-uploaded'
 }
 
 deploy_acceptance() {
@@ -199,11 +199,11 @@ collect_latest() {
     mkdir -p "$ARTIFACT_DIR/run"
 
     helper_id="$(docker create -v "$DATA_ROOT:/source:ro" "$ALPINE_IMAGE")"
-    trap 'docker rm -f "$helper_id" >/dev/null 2>&1 || true' RETURN
-    docker cp "$helper_id:/source/runs/$run_id/." "$ARTIFACT_DIR/run"
+    if ! docker cp "$helper_id:/source/runs/$run_id/." "$ARTIFACT_DIR/run"; then
+        docker rm -f "$helper_id" >/dev/null 2>&1 || true
+        exit 1
+    fi
     docker rm "$helper_id" >/dev/null
-    helper_id=""
-    trap - RETURN
 
     if [[ -f "$ARTIFACT_DIR/run/artifact-sha256.txt" ]]; then
         (
@@ -234,8 +234,8 @@ mark_uploaded() {
     docker run --rm \
         -v "$DATA_ROOT:/data:rw" \
         "$ALPINE_IMAGE" \
-        touch "/data/runs/$run_id/.github-uploaded"
-    echo "Marked run $run_id as uploaded."
+        sh -ec "mkdir -p /data/github-uploaded && touch '/data/github-uploaded/$run_id'"
+    echo "Marked run $run_id as uploaded outside the immutable run directory."
 }
 
 monitor() {
