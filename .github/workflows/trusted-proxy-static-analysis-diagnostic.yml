@@ -54,6 +54,18 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
+      - name: Capture focused trusted-proxy test output
+        if: steps.install.outputs.status == '0' && steps.analyse.outputs.status == '0'
+        id: focused_test
+        shell: bash
+        run: |
+          set +e
+          php artisan test tests/Feature/Security/TrustedProxySchemeTest.php > trusted-proxy-test.log 2>&1
+          status=$?
+          cat trusted-proxy-test.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,6 +74,7 @@ jobs:
           path: |
             composer-install.log
             phpstan.log
+            trusted-proxy-test.log
           if-no-files-found: error
           retention-days: 3
 
@@ -71,4 +84,8 @@ jobs:
 
       - name: Enforce PHPStan result
         if: steps.install.outputs.status == '0' && steps.analyse.outputs.status != '0'
+        run: exit 1
+
+      - name: Enforce focused test result
+        if: steps.install.outputs.status == '0' && steps.analyse.outputs.status == '0' && steps.focused_test.outputs.status != '0'
         run: exit 1
