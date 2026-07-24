@@ -1,0 +1,170 @@
+name: Liquid20 Synology Control
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/liquid20-synology-control.yml
+      - deploy/liquid20/**
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/liquid20-synology-control.yml
+      - deploy/liquid20/**
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Bootstrap/deploy acceptance, inspect status, or collect the latest run
+        required: true
+        type: choice
+        options:
+          - status
+          - bootstrap
+          - collect
+        default: status
+
+permissions:
+  contents: read
+
+concurrency:
+  group: liquid20-synology-control
+  cancel-in-progress: false
+
+env:
+  FREQTRADE_COMMIT: c00a091c5adc67cf75c46db5805e358ffc72fad7
+  LIQUID20_IMAGE: ghcr.io/blakinio/liquid20-collector:c00a091c5adc67cf75c46db5805e358ffc72fad7
+  LIQUID20_CONTAINER_NAME: liquid20-collector
+  LIQUID20_DATA_ROOT: /volume1/docker/freqtrade-liquidations/data
+  LIQUID20_HOST_ID: synology-pl-01
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate control script syntax and workflow contract
+        run: |
+          set -euo pipefail
+          bash -n deploy/liquid20/synology-control.sh
+          grep -Fq 'runs-on: oteryn-staging' .github/workflows/liquid20-synology-control.yml
+          grep -Fq 'LIQUID20_MODE=acceptance' deploy/liquid20/synology-control.sh
+          grep -Fq -- '--restart no' deploy/liquid20/synology-control.sh
+          if grep -Eq 'BYBIT_API_KEY|BINANCE_API_KEY|FREQTRADE__EXCHANGE__KEY' .github/workflows/liquid20-synology-control.yml deploy/liquid20/synology-control.sh; then
+            echo 'Trading credential variables must not be introduced into Liquid20 control.' >&2
+            exit 1
+          fi
+
+  control:
+    if: github.event_name != 'pull_request'
+    runs-on: oteryn-staging
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Resolve requested operation
+        id: operation
+        env:
+          DISPATCH_ACTION: ${{ inputs.action }}
+        run: |
+          set -euo pipefail
+          case "$GITHUB_EVENT_NAME" in
+            push)
+              action=bootstrap
+              ;;
+            schedule)
+              action=monitor
+              ;;
+            workflow_dispatch)
+              action="$DISPATCH_ACTION"
+              ;;
+            *)
+              echo "Unsupported workflow event: $GITHUB_EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+          echo "Resolved Liquid20 operation: $action"
+
+      - name: Validate Synology runner tools
+        run: |
+          set -euo pipefail
+          docker version >/dev/null
+          bash --version >/dev/null
+          git --version >/dev/null
+          sha256sum --version >/dev/null
+
+      - name: Checkout exact Freqtrade collector source
+        if: steps.operation.outputs.action == 'bootstrap'
+        uses: actions/checkout@v7
+        with:
+          repository: blakinio/freqtrade
+          ref: ${{ env.FREQTRADE_COMMIT }}
+          path: _freqtrade-liquid20
+          persist-credentials: false
+
+      - name: Log in to GHCR
+        if: steps.operation.outputs.action == 'bootstrap'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish immutable Liquid20 image
+        if: steps.operation.outputs.action == 'bootstrap'
+        run: |
+          set -euo pipefail
+          docker build \
+            --pull \
+            --build-arg "COLLECTOR_COMMIT=$FREQTRADE_COMMIT" \
+            --file _freqtrade-liquid20/deploy/synology/liquid20/Dockerfile \
+            --tag "$LIQUID20_IMAGE" \
+            _freqtrade-liquid20
+          docker push "$LIQUID20_IMAGE"
+
+      - name: Control or inspect Liquid20 on Synology
+        id: control
+        env:
+          LIQUID20_COLLECTOR_COMMIT: ${{ env.FREQTRADE_COMMIT }}
+          LIQUID20_ARTIFACT_DIR: ${{ runner.temp }}/liquid20-evidence
+        run: |
+          set -euo pipefail
+          bash deploy/liquid20/synology-control.sh "${{ steps.operation.outputs.action }}"
+
+      - name: Upload completed Liquid20 evidence
+        if: steps.control.outputs.artifact_ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: liquid20-${{ steps.control.outputs.run_id }}
+          path: ${{ steps.control.outputs.artifact_path }}
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
+
+      - name: Mark evidence as uploaded
+        if: steps.control.outputs.artifact_ready == 'true' && success()
+        env:
+          LIQUID20_COLLECTOR_COMMIT: ${{ env.FREQTRADE_COMMIT }}
+        run: |
+          set -euo pipefail
+          bash deploy/liquid20/synology-control.sh mark-uploaded "${{ steps.control.outputs.run_id }}"
+
+      - name: Log out of GHCR
+        if: always() && steps.operation.outputs.action == 'bootstrap'
+        run: docker logout ghcr.io >/dev/null 2>&1 || true
