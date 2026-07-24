@@ -6,6 +6,8 @@ use App\Cms\Models\NewsPost;
 use DateTimeInterface;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 final class PublicNewsQuery
 {
@@ -20,6 +22,24 @@ final class PublicNewsQuery
             ->orderByDesc('published_at')
             ->orderByDesc('id')
             ->paginate($perPage);
+    }
+
+    /**
+     * @return Collection<int, NewsPost>
+     */
+    public function latestPublished(int $limit = 3, ?DateTimeInterface $readTime = null): Collection
+    {
+        if ($limit < 1 || $limit > 10) {
+            throw new InvalidArgumentException('Latest published news limit must be between 1 and 10.');
+        }
+
+        $readTime ??= now();
+
+        return $this->visibleAt($readTime)
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->limit($limit)
+            ->get();
     }
 
     public function findPublishedBySlug(string $slug, ?DateTimeInterface $readTime = null): ?NewsPost
