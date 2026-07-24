@@ -44,7 +44,7 @@ enum EditorialPageKey: string
     public function label(): string
     {
         return match ($this) {
-            self::GettingStarted => "Beginner's Guide",
+            self::GettingStarted => 'Beginner\'s Guide',
             self::ServerInformation => 'Server Information',
             self::Support => 'Support',
             self::ReportABug => 'Report a Bug',
