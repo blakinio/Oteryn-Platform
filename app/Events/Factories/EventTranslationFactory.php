@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 final class EventTranslationFactory extends Factory
 {
+    /** @var class-string<EventTranslation> */
     protected $model = EventTranslation::class;
 
     /**
