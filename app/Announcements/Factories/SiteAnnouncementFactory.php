@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 final class SiteAnnouncementFactory extends Factory
 {
+    /** @var class-string<SiteAnnouncement> */
     protected $model = SiteAnnouncement::class;
 
     /**
