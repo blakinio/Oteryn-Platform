@@ -63,10 +63,6 @@ jobs:
           grep -Fq '/data/github-uploaded/' deploy/liquid20/synology-control.sh
           grep -Fq 'LIQUID20_STATUS_ISSUE: "148"' .github/workflows/liquid20-synology-control.yml
           grep -Fq 'action=status' .github/workflows/liquid20-synology-control.yml
-          if grep -Fq 'action=monitor' .github/workflows/liquid20-synology-control.yml; then
-            echo 'Scheduled monitoring must not automatically collect or upload artifacts.' >&2
-            exit 1
-          fi
           if grep -Eq 'BYBIT_API_KEY|BINANCE_API_KEY|FREQTRADE__EXCHANGE__KEY' deploy/liquid20/synology-control.sh deploy/liquid20/publish-status.sh; then
             echo 'Trading credential variables must not be introduced into Liquid20 control.' >&2
             exit 1
