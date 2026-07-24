@@ -19,38 +19,45 @@ final readonly class PublishClientRelease
 
     public function execute(Identity $actor, ClientRelease $release, bool $makeCurrent): ClientRelease
     {
-        return DB::transaction(function () use ($actor, $release, $makeCurrent): ClientRelease {
+        $releaseId = $release->id;
+        $channel = $release->channel;
+
+        return DB::transaction(function () use ($actor, $releaseId, $channel, $makeCurrent): ClientRelease {
             $lockedReleases = ClientRelease::query()
-                ->where('channel', $release->channel)
+                ->where('channel', $channel)
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
-            $release = $lockedReleases->firstWhere('id', $release->id);
+            $storedRelease = $lockedReleases->first(
+                static fn (ClientRelease $candidate): bool => $candidate->id === $releaseId,
+            );
 
-            if (! $release instanceof ClientRelease) {
+            if (! $storedRelease instanceof ClientRelease) {
                 throw ValidationException::withMessages([
                     'release' => 'The release no longer exists in the selected channel.',
                 ]);
             }
 
-            if ($release->published_at !== null && ! $makeCurrent) {
+            if ($storedRelease->published_at !== null && ! $makeCurrent) {
                 throw ValidationException::withMessages([
                     'release' => 'The release is already published.',
                 ]);
             }
 
-            if ($release->published_at !== null && $release->is_current && $makeCurrent) {
+            if ($storedRelease->published_at !== null && $storedRelease->is_current && $makeCurrent) {
                 throw ValidationException::withMessages([
                     'release' => 'The release is already the current build for this channel.',
                 ]);
             }
 
             $artifacts = ClientReleaseArtifact::query()
-                ->where('client_release_id', $release->id)
+                ->where('client_release_id', $storedRelease->id)
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
-            $enabledArtifacts = $artifacts->where('is_enabled', true)->values();
+            $enabledArtifacts = $artifacts
+                ->filter(static fn (ClientReleaseArtifact $artifact): bool => $artifact->is_enabled)
+                ->values();
 
             if ($enabledArtifacts->isEmpty()) {
                 throw ValidationException::withMessages([
@@ -68,37 +75,37 @@ final readonly class PublishClientRelease
                 }
             }
 
-            $firstPublication = $release->published_at === null;
+            $firstPublication = $storedRelease->published_at === null;
 
             if ($makeCurrent) {
                 ClientRelease::query()
-                    ->where('channel', $release->channel)
-                    ->where('id', '!=', $release->id)
+                    ->where('channel', $storedRelease->channel)
+                    ->where('id', '!=', $storedRelease->id)
                     ->where('is_current', true)
                     ->update(['is_current' => false]);
             }
 
-            if ($release->published_at === null) {
-                $release->published_at = now();
+            if ($storedRelease->published_at === null) {
+                $storedRelease->published_at = now();
             }
 
-            $release->is_current = $makeCurrent || $release->is_current;
-            $release->save();
+            $storedRelease->is_current = $makeCurrent || $storedRelease->is_current;
+            $storedRelease->save();
 
             $this->audit->record(
                 $actor->id,
                 $firstPublication ? 'downloads.release_published' : 'downloads.release_current_set',
                 'client_release',
-                (string) $release->id,
+                (string) $storedRelease->id,
                 [
-                    'version' => $release->version,
-                    'channel' => $release->channel,
-                    'current' => $release->is_current,
+                    'version' => $storedRelease->version,
+                    'channel' => $storedRelease->channel,
+                    'current' => $storedRelease->is_current,
                     'enabled_artifact_count' => $enabledArtifacts->count(),
                 ],
             );
 
-            return $release->load('artifacts');
+            return $storedRelease->load('artifacts');
         }, 3);
     }
 }
