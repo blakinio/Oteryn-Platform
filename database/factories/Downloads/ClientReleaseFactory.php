@@ -32,7 +32,7 @@ final class ClientReleaseFactory extends Factory
 
     public function published(bool $current = true): self
     {
-        return $this->state(fn (): array => [
+        return $this->state([
             'published_at' => now()->subMinute(),
             'is_current' => $current,
         ]);
