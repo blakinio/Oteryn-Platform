@@ -18,16 +18,17 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PLATFORM_REF: 9b80d3f4399c2d4a638a4d040f34cf60792acefc
+  PLATFORM_REF: b5dd6a7be5c704d5706241240e06f8bb8c4b5efe
   GATEWAY_REF: 53158217a6c6017230301cf4daa783b04fcc13d5
-  CANARY_REF: 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e
+  CANARY_REF: b15b7d544f4795e3a2a65b88de35391b9fd0a20d
   OTCLIENT_REF: bb87346f6c516a19d19497d82bb01fb389334ff5
-  CANARY_HARNESS_REF: f1e1664f9ad0097ede7a0a9b023251561ff24cf2
+  CANARY_HARNESS_REF: 9200c562e7e87dd098c1205c1df83c9d9ce95c1b
   SOURCE_BUILD_RUN: "30047343772"
+  CANARY_BUILD_RUN: "30080248772"
   GATEWAY_ARTIFACT_ID: "8579664843"
   GATEWAY_ARTIFACT_DIGEST: sha256:56909f84aad1c7d58e8ccd52021aa6899fdcd19049c68e634e62384e76f4d142
-  CANARY_ARTIFACT_ID: "8579844077"
-  CANARY_ARTIFACT_DIGEST: sha256:f3b128499bc8e9f64b27d9361c0b07507e8405fbb9f8b146faca66f95dff154a
+  CANARY_ARTIFACT_ID: "8591665710"
+  CANARY_ARTIFACT_DIGEST: sha256:6b0e13966047c571de2c7a3f948f0f9b54b1619800c4b591cd70adf5a7a860f1
   OTCLIENT_ARTIFACT_ID: "8580725327"
   OTCLIENT_ARTIFACT_DIGEST: sha256:dd0c063bd14973a4804e2a29023b7ec194fe4db4ef5ce91cf46cc4fd4456ef1e
 
@@ -93,11 +94,11 @@ jobs:
       - name: Reuse exact Canary build artifact
         uses: actions/download-artifact@v4
         with:
-          name: native-auth-rehearsal-canary
+          name: native-auth-rehearsal-canary-cache-headers
           path: canary-artifact
           github-token: ${{ github.token }}
           repository: blakinio/Oteryn-Platform
-          run-id: ${{ env.SOURCE_BUILD_RUN }}
+          run-id: ${{ env.CANARY_BUILD_RUN }}
 
       - name: Reuse exact OTClient build artifact
         uses: actions/download-artifact@v4
@@ -119,8 +120,8 @@ jobs:
           test "$(tr -d '\r\n' < canary-artifact/canary-commit.txt)" = "${CANARY_REF}"
           test "$(tr -d '\r\n' < otclient-artifact/otclient-commit.txt)" = "${OTCLIENT_REF}"
           (cd gateway-artifact && sha256sum --check gateway-build-sha256.txt)
-          (cd canary-artifact && sed 's#canary-rehearsal#canary-rehearsal#' canary-build-sha256.txt | sha256sum --check -)
-          (cd otclient-artifact && sed 's#otclient-rehearsal#otclient-rehearsal#' otclient-build-sha256.txt | sha256sum --check -)
+          (cd canary-artifact && sha256sum --check canary-build-sha256.txt)
+          (cd otclient-artifact && sha256sum --check otclient-build-sha256.txt)
 
       - name: Resolve executable artifacts
         run: |
@@ -134,12 +135,15 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile \
+            tests/e2e/native_auth_ephemeral_cutover/acceptance_extensions.py \
             tests/e2e/native_auth_ephemeral_cutover/exact_runner.py \
             tests/e2e/native_auth_ephemeral_cutover/platform_runner.py \
             canary-harness/tests/e2e/native_auth_ephemeral_cutover/run_rehearsal.py \
             canary-harness/tests/e2e/native_auth_ephemeral_cutover/browser_driver.py \
             canary-harness/tests/e2e/native_auth_ephemeral_cutover/oauth_probe.py
           bash -n canary-harness/tests/e2e/native_auth_ephemeral_cutover/capture-xdg-open.sh
+          test -s canary-harness/tests/e2e/native_auth_ephemeral_cutover/otclient_session_negative_e2e.lua
+          test -s canary-harness/tests/e2e/native_auth_ephemeral_cutover/otclient_malformed_gateway_e2e.lua
 
       - name: Run full ephemeral cutover rehearsal
         env:
@@ -154,6 +158,7 @@ jobs:
           REHEARSAL_OTCLIENT_BIN: ${{ env.REHEARSAL_OTCLIENT_BIN }}
           REHEARSAL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/native-auth-ephemeral-cutover
           REHEARSAL_SOURCE_BUILD_RUN: ${{ env.SOURCE_BUILD_RUN }}
+          REHEARSAL_CANARY_BUILD_RUN: ${{ env.CANARY_BUILD_RUN }}
           REHEARSAL_GATEWAY_ARTIFACT_ID: ${{ env.GATEWAY_ARTIFACT_ID }}
           REHEARSAL_GATEWAY_ARTIFACT_DIGEST: ${{ env.GATEWAY_ARTIFACT_DIGEST }}
           REHEARSAL_CANARY_ARTIFACT_ID: ${{ env.CANARY_ARTIFACT_ID }}
@@ -165,14 +170,24 @@ jobs:
           mkdir -p "${REHEARSAL_EVIDENCE_DIR}"
           python3 tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
 
-      - name: Assert retained result classification
+      - name: Assert retained result classification and extended matrix
         if: success()
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
           from pathlib import Path
-          result = json.loads(Path("artifacts/native-auth-ephemeral-cutover/result.json").read_text())
+
+          root = Path("artifacts/native-auth-ephemeral-cutover")
+          result = json.loads((root / "result.json").read_text())
+          runtime = json.loads((root / "native-auth-runtime.json").read_text())
+          failure = json.loads((root / "failure-injection.json").read_text())
+          cache = json.loads((root / "cache-header-validation.json").read_text())
+          correlation = json.loads((root / "request-correlation.json").read_text())
+          scan = json.loads((root / "sensitive-log-scan.json").read_text())
+          revisions = json.loads((root / "runtime-revisions.json").read_text())
+          digests = json.loads((root / "artifact-digests.json").read_text())
+
           assert result["overall_status"] == "PRODUCTION_LIKE_PROVEN", result
           assert result["evidence_classification"] == "PRODUCTION_LIKE_PROVEN", result
           assert result["successful_world_entries"] == 1, result
@@ -182,6 +197,53 @@ jobs:
           assert result["tls_validation_status"] is True, result
           assert result["rollback_status"] is True, result
           assert result["sensitive_log_scan_status"] == "PASS", result
+
+          assert cache["status"] == "PASS", cache
+          assert cache["canary_issuer_success"] is True, cache
+          assert cache["gateway_login_success"] is True, cache
+          assert cache["normal_happy_path_no_5xx"] is True, cache
+          assert correlation["status"] == "PASS", correlation
+          assert scan["status"] == "PASS", scan
+          assert scan["jwt_pattern_scanned"] is True, scan
+
+          assert runtime["physical_random_invalid_game_session"] == "PASS", runtime
+          assert runtime["physical_unauthorized_character_burn"] == "PASS", runtime
+          assert runtime["canary_restart_invalidated_process_local_session"] is True, runtime
+          assert runtime["canary_restart_service_recovered"] is True, runtime
+          assert runtime["request_correlation"] == "PASS", runtime
+          assert runtime["cache_header_validation"] == "PASS", runtime
+          assert runtime["normal_happy_path_no_5xx"] is True, runtime
+
+          required_failure_checks = [
+              "private_gateway_to_canary_path_blocked_fail_closed",
+              "private_gateway_to_canary_path_recovery",
+              "client_controlled_account_override_rejected",
+              "account_override_response_cache_headers",
+              "malformed_canary_session_response_fail_closed",
+              "malformed_canary_request_reached_private_boundary",
+              "physical_otclient_malformed_gateway_fail_closed",
+          ]
+          for key in required_failure_checks:
+              assert failure[key] is True, (key, failure)
+
+          for event_file in [
+              "random-invalid-session-events.tsv",
+              "unauthorized-character-burn-events.tsv",
+              "restart-invalidated-session-events.tsv",
+              "malformed-gateway-client-events.tsv",
+              "otclient-events.tsv",
+          ]:
+              path = root / event_file
+              assert path.is_file() and path.stat().st_size > 0, event_file
+
+          assert revisions["components"]["platform"]["source_sha"] == "b5dd6a7be5c704d5706241240e06f8bb8c4b5efe", revisions
+          assert revisions["components"]["gateway"]["source_sha"] == "53158217a6c6017230301cf4daa783b04fcc13d5", revisions
+          assert revisions["components"]["canary"]["source_sha"] == "b15b7d544f4795e3a2a65b88de35391b9fd0a20d", revisions
+          assert revisions["components"]["otclient"]["source_sha"] == "bb87346f6c516a19d19497d82bb01fb389334ff5", revisions
+          assert revisions["components"]["canary_harness"]["source_sha"] == "9200c562e7e87dd098c1205c1df83c9d9ce95c1b", revisions
+          assert digests["canary_source_build_artifact_id"] == 8591665710, digests
+          assert digests["gateway_source_build_artifact_id"] == 8579664843, digests
+          assert digests["otclient_source_build_artifact_id"] == 8580725327, digests
           PY
 
       - name: Upload sanitized rehearsal evidence
