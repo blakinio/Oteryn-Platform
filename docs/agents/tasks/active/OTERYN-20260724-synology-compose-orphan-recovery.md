@@ -54,11 +54,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T23:45:00+02:00
-head: 77e7a99a2c66d08a7ddd87be9f6740b81d5ad040
+updated_at: 2026-07-24T23:55:00+02:00
+head: 21f4e0c44741777a1a0f6bd79444417687f0d5c8
 branch: fix/OTERYN-20260724-synology-compose-repair-evidence
 pr: 164
-status: implementing
+status: ready
 context_routes:
   - agent-governance
   - testing
@@ -76,6 +76,7 @@ proven:
   - Exact PR 162 implementation head c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7 passed CI 30127654178, Agent Governance 30127654186, Platform DB Outage Validation 30127654225, Phase 7 Production-Like Validation 30127654182 and Game Auth Ticket Concurrency 30127654171.
   - Exact PR 162 final head 604d1c26c253cb5086c240630057ed893c1bd987 passed CI 30127928095, Agent Governance 30127928088, Platform DB Outage Validation 30127928075, Phase 7 Production-Like Validation 30127928076 and Game Auth Ticket Concurrency 30127928081.
   - Private issue 163 exists as a sanitized connector-readable repair evidence channel.
+  - Exact PR 164 implementation head 21f4e0c44741777a1a0f6bd79444417687f0d5c8 passed CI 30128336572, Agent Governance 30128336598, Platform DB Outage Validation 30128336575, Phase 7 Production-Like Validation 30128336573 and Game Auth Ticket Concurrency 30128336577.
 derived:
   - Platform and Canary are stale Compose replacement containers left under temporary short-ID-prefixed names.
   - Renaming verified running containers to their canonical names avoids data loss, restart and unrelated workload interruption.
@@ -101,10 +102,22 @@ validation:
   - command: PR 162 exact-head repository checks
     result: PASS
     evidence: all required CI, governance, outage, Phase 7 and concurrency checks passed before squash merge a9498dacd8a18b51f1bfd940f61796ca76bb393e.
-  - command: PR 164 exact-head repository checks
-    result: NOT_RUN
-    evidence: sanitized issue reporting workflow change is awaiting exact-head CI and governance validation.
+  - command: CI 30128336572 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+    result: PASS
+    evidence: Composer validation/audit, formatting, static analysis and tests passed.
+  - command: Agent Governance 30128336598 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+    result: PASS
+    evidence: checkpoint and workflow governance passed.
+  - command: Platform DB Outage Validation 30128336575 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+    result: PASS
+    evidence: fail-closed database outage validation passed.
+  - command: Phase 7 Production-Like Validation 30128336573 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+    result: PASS
+    evidence: production-like validation passed.
+  - command: Game Auth Ticket Concurrency 30128336577 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+    result: PASS
+    evidence: ticket concurrency validation passed.
 blockers:
   - none
-next_action: Validate and merge PR 164, then read private issue 163 for the sanitized live repair result and public OAuth client id.
+next_action: Squash-merge PR 164, then read private issue 163 for the sanitized live repair result and public OAuth client id.
 ```
