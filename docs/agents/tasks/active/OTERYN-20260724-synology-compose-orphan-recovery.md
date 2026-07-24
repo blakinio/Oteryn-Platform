@@ -54,10 +54,10 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T23:55:00+02:00
-head: 21f4e0c44741777a1a0f6bd79444417687f0d5c8
-branch: fix/OTERYN-20260724-synology-compose-repair-evidence
-pr: 164
+updated_at: 2026-07-25T00:15:00+02:00
+head: aa73838655084f29944c1efaa94b59af21b3ce33
+branch: fix/OTERYN-20260724-synology-oauth-evidence-parse
+pr: 166
 status: ready
 context_routes:
   - agent-governance
@@ -76,13 +76,17 @@ proven:
   - Exact PR 162 implementation head c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7 passed CI 30127654178, Agent Governance 30127654186, Platform DB Outage Validation 30127654225, Phase 7 Production-Like Validation 30127654182 and Game Auth Ticket Concurrency 30127654171.
   - Exact PR 162 final head 604d1c26c253cb5086c240630057ed893c1bd987 passed CI 30127928095, Agent Governance 30127928088, Platform DB Outage Validation 30127928075, Phase 7 Production-Like Validation 30127928076 and Game Auth Ticket Concurrency 30127928081.
   - Private issue 163 exists as a sanitized connector-readable repair evidence channel.
-  - Exact PR 164 implementation head 21f4e0c44741777a1a0f6bd79444417687f0d5c8 passed CI 30128336572, Agent Governance 30128336598, Platform DB Outage Validation 30128336575, Phase 7 Production-Like Validation 30128336573 and Game Auth Ticket Concurrency 30128336577.
+  - PR 164 added sanitized issue reporting and merged as 63c7d7e9b6dc2584919be0fadd64f68f8d7ef0d1 after all exact-head checks passed.
+  - Synology runner execution 30128638979 reached Docker access and failed inside the combined repair/OAuth step; its always-run evidence publisher succeeded and disclosed no secrets.
+  - PR 166 separates container repair verification from OAuth extraction and parses no-ANSI Laravel output with a bounded message search.
+  - Exact PR 166 implementation head aa73838655084f29944c1efaa94b59af21b3ce33 passed CI 30128821535, Agent Governance 30128821583, Platform DB Outage Validation 30128821579, Phase 7 Production-Like Validation 30128821552 and Game Auth Ticket Concurrency 30128821566.
 derived:
-  - Platform and Canary are stale Compose replacement containers left under temporary short-ID-prefixed names.
+  - Platform and Canary originated as stale Compose replacement containers left under temporary short-ID-prefixed names.
   - Renaming verified running containers to their canonical names avoids data loss, restart and unrelated workload interruption.
-  - Publishing only repaired service names, running-state summary and the public OAuth client id does not expose deployment secrets.
+  - The first connector-readable failure is consistent with strict OAuth output parsing because repair verification and extraction shared one step, but the exact completed sub-operation remains unproven until the separated run reports both outcomes.
 unknown:
-  - whether the first main push repair already renamed the live candidates
+  - whether a prior main-push run already renamed the live candidates
+  - whether run 30128638979 completed rename verification before failing OAuth extraction
   - exact public native OAuth client id stored in the Platform database
 conflicts: []
 first_failure:
@@ -99,25 +103,31 @@ validation:
   - command: live Gateway /ready through Synology reverse proxy
     result: PASS
     evidence: user observed {"status":"ready"}
-  - command: PR 162 exact-head repository checks
+  - command: PR 162 exact-head repository checks and squash merge
     result: PASS
-    evidence: all required CI, governance, outage, Phase 7 and concurrency checks passed before squash merge a9498dacd8a18b51f1bfd940f61796ca76bb393e.
-  - command: CI 30128336572 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+    evidence: all required CI, governance, outage, Phase 7 and concurrency checks passed before merge a9498dacd8a18b51f1bfd940f61796ca76bb393e.
+  - command: PR 164 exact-head repository checks and squash merge
+    result: PASS
+    evidence: all required CI, governance, outage, Phase 7 and concurrency checks passed before merge 63c7d7e9b6dc2584919be0fadd64f68f8d7ef0d1.
+  - command: Synology repair execution 30128638979
+    result: FAIL
+    evidence: Docker access and sanitized issue reporting passed, but the combined repair/OAuth step failed without publishing raw Docker or secret data.
+  - command: CI 30128821535 on aa73838655084f29944c1efaa94b59af21b3ce33
     result: PASS
     evidence: Composer validation/audit, formatting, static analysis and tests passed.
-  - command: Agent Governance 30128336598 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+  - command: Agent Governance 30128821583 on aa73838655084f29944c1efaa94b59af21b3ce33
     result: PASS
     evidence: checkpoint and workflow governance passed.
-  - command: Platform DB Outage Validation 30128336575 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+  - command: Platform DB Outage Validation 30128821579 on aa73838655084f29944c1efaa94b59af21b3ce33
     result: PASS
     evidence: fail-closed database outage validation passed.
-  - command: Phase 7 Production-Like Validation 30128336573 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+  - command: Phase 7 Production-Like Validation 30128821552 on aa73838655084f29944c1efaa94b59af21b3ce33
     result: PASS
     evidence: production-like validation passed.
-  - command: Game Auth Ticket Concurrency 30128336577 on 21f4e0c44741777a1a0f6bd79444417687f0d5c8
+  - command: Game Auth Ticket Concurrency 30128821566 on aa73838655084f29944c1efaa94b59af21b3ce33
     result: PASS
     evidence: ticket concurrency validation passed.
 blockers:
   - none
-next_action: Squash-merge PR 164, then read private issue 163 for the sanitized live repair result and public OAuth client id.
+next_action: Squash-merge PR 166, then read issue 163 for separate live repair and OAuth extraction outcomes.
 ```

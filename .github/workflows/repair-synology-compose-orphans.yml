@@ -89,14 +89,6 @@ jobs:
             echo "$name: running"
           done
 
-          oauth_output="$(docker exec oteryn-staging-platform-1 \
-            sh -lc 'cd /var/www/html && php artisan game-auth:oauth-client:ensure')"
-          oauth_client_id="$(printf '%s\n' "$oauth_output" | sed -n 's/^Oteryn native OAuth client id: //p' | tail -n 1)"
-          if [[ ! "$oauth_client_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
-            echo "Unable to read a bounded public native OAuth client id." >&2
-            exit 1
-          fi
-
           if (( ${#repaired_services[@]} == 0 )); then
             repaired_summary=none
           else
@@ -104,6 +96,25 @@ jobs:
           fi
 
           echo "repaired_services=$repaired_summary" >> "$GITHUB_OUTPUT"
+
+      - name: Read public native OAuth client id
+        id: oauth
+        if: steps.repair.outcome == 'success'
+        run: |
+          set -euo pipefail
+
+          oauth_output="$(docker exec oteryn-staging-platform-1 \
+            sh -lc 'cd /var/www/html && php artisan game-auth:oauth-client:ensure --no-ansi' 2>&1)"
+          oauth_client_id="$(printf '%s\n' "$oauth_output" \
+            | tr -d '\r' \
+            | sed -nE 's/.*Oteryn native OAuth client id:[[:space:]]*([A-Za-z0-9._-]+).*/\1/p' \
+            | tail -n 1)"
+
+          if [[ ! "$oauth_client_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "Unable to read a bounded public native OAuth client id from the no-ANSI command output." >&2
+            exit 1
+          fi
+
           echo "oauth_client_id=$oauth_client_id" >> "$GITHUB_OUTPUT"
           echo "Public native OAuth client id: $oauth_client_id"
 
@@ -112,8 +123,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPAIR_OUTCOME: ${{ steps.repair.outcome }}
+          OAUTH_OUTCOME: ${{ steps.oauth.outcome }}
           REPAIRED_SERVICES: ${{ steps.repair.outputs.repaired_services }}
-          OAUTH_CLIENT_ID: ${{ steps.repair.outputs.oauth_client_id }}
+          OAUTH_CLIENT_ID: ${{ steps.oauth.outputs.oauth_client_id }}
         run: |
           set -euo pipefail
 
@@ -121,31 +133,35 @@ jobs:
           import json
           import os
 
-          outcome = os.environ.get('REPAIR_OUTCOME', 'unknown')
+          repair_outcome = os.environ.get('REPAIR_OUTCOME', 'unknown')
+          oauth_outcome = os.environ.get('OAUTH_OUTCOME', 'unknown')
           repaired = os.environ.get('REPAIRED_SERVICES') or 'unavailable'
           oauth_client_id = os.environ.get('OAUTH_CLIENT_ID') or 'unavailable'
           run_url = (
               f"https://github.com/{os.environ['GITHUB_REPOSITORY']}"
               f"/actions/runs/{os.environ['GITHUB_RUN_ID']}"
           )
+          overall = 'success' if repair_outcome == 'success' and oauth_outcome == 'success' else 'failure'
 
-          if outcome == 'success':
-              body = (
-                  f"Synology Compose name repair run `{os.environ['GITHUB_RUN_ID']}`: **success**\n\n"
-                  f"- repaired services: `{repaired}`\n"
-                  "- canonical runtime: `platform`, `canary`, `gateway` running\n"
-                  f"- public native OAuth client id: `{oauth_client_id}`\n"
-                  f"- commit: `{os.environ['GITHUB_SHA']}`\n"
-                  f"- run: {run_url}"
-              )
-          else:
-              body = (
-                  f"Synology Compose name repair run `{os.environ['GITHUB_RUN_ID']}`: **{outcome}**\n\n"
-                  "No secrets or raw inspect data were published. "
-                  f"Inspect the bounded private run: {run_url}"
-              )
+          lines = [
+              f"Synology Compose name repair run `{os.environ['GITHUB_RUN_ID']}`: **{overall}**",
+              "",
+              f"- name repair/verification: `{repair_outcome}`",
+              f"- OAuth client-id read: `{oauth_outcome}`",
+              f"- repaired services: `{repaired}`",
+          ]
+          if oauth_outcome == 'success':
+              lines.append(f"- public native OAuth client id: `{oauth_client_id}`")
+          if repair_outcome == 'success':
+              lines.append("- canonical runtime: `platform`, `canary`, `gateway` running")
+          lines.extend([
+              f"- commit: `{os.environ['GITHUB_SHA']}`",
+              f"- run: {run_url}",
+              "",
+              "No secrets or raw Docker inspect data were published.",
+          ])
 
-          print(json.dumps({'body': body}))
+          print(json.dumps({'body': '\n'.join(lines)}))
           PY
 
           curl --fail --silent --show-error \
