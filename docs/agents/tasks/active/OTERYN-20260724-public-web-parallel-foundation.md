@@ -111,7 +111,7 @@ The following exact permission keys are reserved centrally with no role grants: 
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-07-24T18:08:25Z
-head: a5283593788943e0d27bc4491d09dc52922996da
+head: 6fda2a5b20d9230f94289e7348a65ce668d2f384
 branch: feat/OTERYN-20260724-public-web-parallel-foundation
 pr: 146
 status: ready
@@ -153,6 +153,7 @@ proven:
   - Existing CMS and PublicGameData boundaries provide published-only news, configured channels and TTL-bounded runtime status/counts.
   - The reservation migration creates no role-permission grants.
   - Exact implementation head a5283593788943e0d27bc4491d09dc52922996da passed all seven required GitHub Actions workflows.
+  - Checkpoint head 6fda2a5b20d9230f94289e7348a65ce668d2f384 passed all seven required GitHub Actions workflows.
 derived:
   - Missing or expired runtime records cannot support an aggregate online count and are represented as STALE.
   - Runtime transport or malformed-data failure cannot support offline or zero claims and is represented as UNAVAILABLE.
@@ -201,27 +202,30 @@ validation:
     evidence: bounded implementation uses existing CMS and PublicGameData reads, exact permission keys, route filtering and shared focus and responsive foundations
   - command: CI
     result: PASS
-    evidence: workflow run 30115488887 passed Composer validation and audit, Pint, PHPStan and the full test suite on a5283593788943e0d27bc4491d09dc52922996da
+    evidence: workflow run 30115819968 passed Composer validation and audit, Pint, PHPStan and the full test suite on 6fda2a5b20d9230f94289e7348a65ce668d2f384
   - command: Acceptance E2E and Visual UX
     result: PASS
-    evidence: workflow run 30115488903 passed Chromium smoke, portability, desktop tablet mobile responsive, resilience and keyboard accessibility profiles on a5283593788943e0d27bc4491d09dc52922996da
+    evidence: workflow run 30115820109 passed Chromium smoke, portability, desktop tablet mobile responsive, resilience and keyboard accessibility profiles on 6fda2a5b20d9230f94289e7348a65ce668d2f384
   - command: Phase 7 Production-Like Validation
     result: PASS
-    evidence: workflow run 30115488683 passed production-like deployment, privilege, runtime, configuration, regression, health, restore and upgrade validation on a5283593788943e0d27bc4491d09dc52922996da
+    evidence: workflow run 30115819940 passed production-like deployment, privilege, runtime, configuration, regression, health, restore and upgrade validation on 6fda2a5b20d9230f94289e7348a65ce668d2f384
   - command: Platform DB Outage Validation
     result: PASS
-    evidence: workflow run 30115488708 passed on a5283593788943e0d27bc4491d09dc52922996da
+    evidence: workflow run 30115820136 passed on 6fda2a5b20d9230f94289e7348a65ce668d2f384
   - command: Agent Governance
     result: PASS
-    evidence: workflow run 30115488884 passed on a5283593788943e0d27bc4491d09dc52922996da
+    evidence: workflow run 30115819977 passed on 6fda2a5b20d9230f94289e7348a65ce668d2f384
   - command: Game Auth Ticket Concurrency
     result: PASS
-    evidence: workflow run 30115488842 passed on a5283593788943e0d27bc4491d09dc52922996da
+    evidence: workflow run 30115819926 passed on 6fda2a5b20d9230f94289e7348a65ce668d2f384
   - command: Build Synology Staging Images
     result: PASS
-    evidence: workflow run 30115488815 passed on a5283593788943e0d27bc4491d09dc52922996da
+    evidence: workflow run 30115819919 passed on 6fda2a5b20d9230f94289e7348a65ce668d2f384
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTERYN-20260724-public-web-parallel-foundation.md --require-checkpoint
+    result: PASS
+    evidence: validated one task checkpoint against governance contract v1 before compact resume generation
 blockers: []
-next_action: Review and merge PR #146 after confirming its live head adds only this checkpoint after validated implementation head a5283593788943e0d27bc4491d09dc52922996da and all required checks remain green.
+next_action: Review and merge PR #146 after confirming its live head contains only this final checkpoint update after 6fda2a5b20d9230f94289e7348a65ce668d2f384 and required checks remain green.
 ```
 
 ## Notes
