@@ -26,7 +26,8 @@ final class ActiveAnnouncementQuery
         return SiteAnnouncement::query()
             ->where('publication_state', SiteAnnouncement::STATE_PUBLISHED)
             ->where('starts_at', '<=', $readTime)
-            ->where(function (Builder $query) use ($readTime): void {
+            ->where(function ($query) use ($readTime): void {
+                /** @var Builder<SiteAnnouncement> $query */
                 $query
                     ->whereNull('ends_at')
                     ->orWhere('ends_at', '>', $readTime);
