@@ -19,43 +19,47 @@ final class ArtifactUrlPolicy
             return 'must be a valid absolute URL.';
         }
 
-        $parts = parse_url($url);
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        $host = parse_url($url, PHP_URL_HOST);
+        $path = parse_url($url, PHP_URL_PATH);
+        $port = parse_url($url, PHP_URL_PORT);
+        $user = parse_url($url, PHP_URL_USER);
+        $password = parse_url($url, PHP_URL_PASS);
+        $fragment = parse_url($url, PHP_URL_FRAGMENT);
 
-        if (! is_array($parts)) {
+        if (! is_string($scheme)) {
             return 'must be a valid absolute URL.';
         }
 
-        $scheme = isset($parts['scheme']) && is_string($parts['scheme'])
-            ? strtolower($parts['scheme'])
-            : '';
-        $host = isset($parts['host']) && is_string($parts['host'])
-            ? strtolower(rtrim($parts['host'], '.'))
-            : '';
-        $path = isset($parts['path']) && is_string($parts['path'])
-            ? $parts['path']
-            : '';
+        $normalizedScheme = strtolower($scheme);
 
-        if (! in_array($scheme, $this->allowedSchemes(), true)) {
+        if (! in_array($normalizedScheme, $this->allowedSchemes(), true)) {
             return 'uses a scheme that is not approved.';
         }
 
-        if ($host === '' || ! in_array($host, $this->allowedHosts(), true)) {
+        if (! is_string($host) || $host === '') {
+            return 'must be a valid absolute URL.';
+        }
+
+        $normalizedHost = strtolower(rtrim($host, '.'));
+
+        if (! in_array($normalizedHost, $this->allowedHosts(), true)) {
             return 'uses a host that is not approved.';
         }
 
-        if (isset($parts['user']) || isset($parts['pass'])) {
+        if (is_string($user) || is_string($password)) {
             return 'must not contain URL user information.';
         }
 
-        if (isset($parts['fragment'])) {
+        if (is_string($fragment)) {
             return 'must not contain a fragment.';
         }
 
-        if (isset($parts['port']) && $parts['port'] !== 443) {
+        if ($port !== null && (! is_int($port) || $port !== 443)) {
             return 'must use the standard HTTPS port.';
         }
 
-        if ($path === '' || $path === '/') {
+        if (! is_string($path) || $path === '' || $path === '/') {
             return 'must reference a concrete immutable artifact path.';
         }
 
@@ -93,8 +97,8 @@ final class ArtifactUrlPolicy
             return [];
         }
 
-        /** @var array<string, true> $unique */
-        $unique = [];
+        /** @var list<string> $normalizedValues */
+        $normalizedValues = [];
 
         foreach ($configured as $value) {
             if (! is_string($value)) {
@@ -107,11 +111,11 @@ final class ArtifactUrlPolicy
                 $normalized = rtrim($normalized, '.');
             }
 
-            if ($normalized !== '') {
-                $unique[$normalized] = true;
+            if ($normalized !== '' && ! in_array($normalized, $normalizedValues, true)) {
+                $normalizedValues[] = $normalized;
             }
         }
 
-        return array_keys($unique);
+        return $normalizedValues;
     }
 }
