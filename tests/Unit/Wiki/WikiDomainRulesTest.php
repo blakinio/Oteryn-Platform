@@ -34,6 +34,30 @@ final class WikiDomainRulesTest extends TestCase
         WikiContentRules::assertSupportedLocale('de');
     }
 
+    public function test_schema_bound_keys_and_change_notes_use_exact_limits(): void
+    {
+        WikiContentRules::assertContentType(str_repeat('a', 64));
+        WikiContentRules::assertCategoryKey(str_repeat('a', 96));
+        WikiContentRules::assertChangeNote(str_repeat('a', 500));
+
+        $rejectedValues = 0;
+
+        foreach ([
+            static fn () => WikiContentRules::assertContentType(str_repeat('a', 65)),
+            static fn () => WikiContentRules::assertCategoryKey(str_repeat('a', 97)),
+            static fn () => WikiContentRules::assertChangeNote(str_repeat('a', 501)),
+        ] as $assertion) {
+            try {
+                $assertion();
+                self::fail('Expected the Wiki schema boundary validation to fail.');
+            } catch (InvalidArgumentException) {
+                $rejectedValues++;
+            }
+        }
+
+        self::assertSame(3, $rejectedValues);
+    }
+
     public function test_restricted_markdown_rejects_raw_html_and_dangerous_protocols(): void
     {
         $rejectedSources = 0;
