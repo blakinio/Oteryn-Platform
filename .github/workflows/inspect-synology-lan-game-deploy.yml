@@ -1,0 +1,213 @@
+name: Inspect Synology LAN Game Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/inspect-synology-lan-game-deploy.yml
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: inspect-synology-lan-game-deploy
+  cancel-in-progress: false
+
+env:
+  DEPLOYED_MAIN_SHA: 050b8b1e0d10265f25d77f62b6c5775871771dc1
+
+jobs:
+  resolve-actions-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    outputs:
+      one_shot_run_id: ${{ steps.resolve.outputs.one_shot_run_id }}
+      deploy_run_id: ${{ steps.resolve.outputs.deploy_run_id }}
+      deploy_job_id: ${{ steps.resolve.outputs.deploy_job_id }}
+    steps:
+      - name: Resolve and verify exact deployment runs
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          find_run() {
+            local workflow="$1"
+            local event="$2"
+            gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?event=${event}&branch=main&per_page=30" \
+              --jq ".workflow_runs | map(select(.head_sha == \"${DEPLOYED_MAIN_SHA}\")) | sort_by(.created_at) | last | .id // empty"
+          }
+
+          wait_for_run() {
+            local workflow="$1"
+            local event="$2"
+            local run_id=""
+            for attempt in $(seq 1 120); do
+              run_id="$(find_run "$workflow" "$event")"
+              if [[ -n "$run_id" ]]; then
+                printf '%s' "$run_id"
+                return 0
+              fi
+              echo "Waiting for ${workflow} run registration (attempt ${attempt}/120)" >&2
+              sleep 10
+            done
+            return 1
+          }
+
+          wait_for_success() {
+            local run_id="$1"
+            for attempt in $(seq 1 180); do
+              status="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq .status)"
+              conclusion="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" --jq '.conclusion // ""')"
+              echo "run=${run_id} status=${status} conclusion=${conclusion:-pending}"
+              if [[ "$status" == "completed" ]]; then
+                if [[ "$conclusion" != "success" ]]; then
+                  echo "Run ${run_id} completed with ${conclusion}." >&2
+                  return 1
+                fi
+                return 0
+              fi
+              sleep 10
+            done
+            echo "Timed out waiting for run ${run_id}." >&2
+            return 1
+          }
+
+          one_shot_run_id="$(wait_for_run one-shot-synology-lan-game-deploy.yml push)"
+          wait_for_success "$one_shot_run_id"
+
+          deploy_run_id="$(wait_for_run deploy-synology-staging.yml workflow_dispatch)"
+          wait_for_success "$deploy_run_id"
+
+          deploy_job_id="$(
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${deploy_run_id}/jobs?filter=latest&per_page=20" \
+              --jq '.jobs | map(select(.name == "deploy" and .conclusion == "success")) | last | .id // empty'
+          )"
+          if [[ -z "$deploy_job_id" ]]; then
+            echo "Successful deploy job was not found for run ${deploy_run_id}." >&2
+            exit 1
+          fi
+
+          echo "one_shot_run_id=${one_shot_run_id}" >> "$GITHUB_OUTPUT"
+          echo "deploy_run_id=${deploy_run_id}" >> "$GITHUB_OUTPUT"
+          echo "deploy_job_id=${deploy_job_id}" >> "$GITHUB_OUTPUT"
+          echo "one_shot_run=${one_shot_run_id}"
+          echo "deploy_run=${deploy_run_id}"
+          echo "deploy_job=${deploy_job_id}"
+
+  inspect-runtime:
+    needs: resolve-actions-evidence
+    runs-on: oteryn-staging
+    environment: synology-staging
+    timeout-minutes: 15
+    steps:
+      - name: Verify live services, images and bindings
+        env:
+          ONE_SHOT_RUN_ID: ${{ needs.resolve-actions-evidence.outputs.one_shot_run_id }}
+          DEPLOY_RUN_ID: ${{ needs.resolve-actions-evidence.outputs.deploy_run_id }}
+          DEPLOY_JOB_ID: ${{ needs.resolve-actions-evidence.outputs.deploy_job_id }}
+          EXPECTED_PLATFORM_IMAGE: ghcr.io/blakinio/oteryn-platform:sha-050b8b1e0d10265f25d77f62b6c5775871771dc1
+          EXPECTED_GATEWAY_IMAGE: ghcr.io/blakinio/oteryn-game-gateway:sha-050b8b1e0d10265f25d77f62b6c5775871771dc1
+          EXPECTED_CANARY_IMAGE: ghcr.io/blakinio/canary@sha256:784e5dbdcc64e311c48c51cd94aa206e2efa1e5eefb2f4ef40170d5aac55031f
+        run: |
+          set -euo pipefail
+
+          declare -A containers=()
+          service_container() {
+            local service="$1"
+            mapfile -t ids < <(docker ps -q \
+              --filter label=com.docker.compose.project=oteryn-staging \
+              --filter "label=com.docker.compose.service=${service}")
+            if [[ "${#ids[@]}" -ne 1 ]]; then
+              echo "Expected exactly one running ${service} container; found ${#ids[@]}." >&2
+              exit 1
+            fi
+            containers["$service"]="${ids[0]}"
+          }
+
+          for service in mariadb redis canary platform internal-proxy gateway; do
+            service_container "$service"
+          done
+
+          assert_image() {
+            local service="$1"
+            local expected="$2"
+            local actual
+            actual="$(docker inspect --format '{{.Config.Image}}' "${containers[$service]}")"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Unexpected image for ${service}: ${actual}" >&2
+              exit 1
+            fi
+            echo "service=${service} image=${actual}"
+          }
+
+          assert_binding() {
+            local service="$1"
+            local container_port="$2"
+            local expected="$3"
+            local actual
+            actual="$(docker port "${containers[$service]}" "${container_port}/tcp" | sort)"
+            if [[ "$actual" != "$expected" ]]; then
+              echo "Unexpected binding for ${service} ${container_port}/tcp: ${actual:-none}" >&2
+              exit 1
+            fi
+            echo "binding=${service}:${container_port}/tcp->${actual}"
+          }
+
+          assert_image platform "$EXPECTED_PLATFORM_IMAGE"
+          assert_image gateway "$EXPECTED_GATEWAY_IMAGE"
+          assert_image canary "$EXPECTED_CANARY_IMAGE"
+
+          for service in mariadb redis canary platform internal-proxy gateway; do
+            restart_count="$(docker inspect --format '{{.RestartCount}}' "${containers[$service]}")"
+            if [[ "$restart_count" != "0" ]]; then
+              echo "Unexpected restart count for ${service}: ${restart_count}" >&2
+              exit 1
+            fi
+            echo "service=${service} running=true restart_count=${restart_count}"
+          done
+
+          assert_binding platform 8000 '127.0.0.1:8000'
+          assert_binding gateway 8080 '127.0.0.1:8080'
+          assert_binding canary 7171 '127.0.0.1:7171'
+          assert_binding canary 7172 '192.168.1.2:7172'
+
+          docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${containers[canary]}" \
+            | grep -qx 'CANARY_SERVER_IP=192.168.1.2'
+          docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "${containers[canary]}" \
+            | grep -qx 'CANARY_GAME_SESSION_ISSUER_WORLD_ID=1'
+
+          timeout 5 bash -c 'exec 3<>/dev/tcp/192.168.1.2/7172'
+          echo 'lan_game_endpoint=192.168.1.2:7172 reachable=true'
+
+          docker exec "${containers[platform]}" php -r '
+          require "/var/www/html/vendor/autoload.php";
+          $app = require "/var/www/html/bootstrap/app.php";
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $world = App\GameAuth\Worlds\GameWorld::query()->find(1);
+          if ($world === null
+              || $world->slug !== "oteryn-staging"
+              || $world->status->value !== "online"
+              || $world->login_enabled !== true
+              || $world->game_host !== "192.168.1.2"
+              || $world->game_port !== 7172) {
+              fwrite(STDERR, "World Registry route does not match the expected LAN game endpoint.\n");
+              exit(1);
+          }
+          echo "world_route=id=1 slug=oteryn-staging status=online login_enabled=true host=192.168.1.2 port=7172\n";
+          '
+
+          if find /runner/_work /home/runner/_work -path '*/deploy/synology/.env' -type f -print -quit 2>/dev/null | grep -q .; then
+            echo 'Ephemeral deployment environment file is still present.' >&2
+            exit 1
+          fi
+
+          echo 'ephemeral_env_absent=true'
+          echo "one_shot_run=${ONE_SHOT_RUN_ID}"
+          echo "deploy_run=${DEPLOY_RUN_ID}"
+          echo "deploy_job=${DEPLOY_JOB_ID}"
+          echo 'runtime_binding_policy=platform-loopback,gateway-loopback,legacy-login-loopback,game-lan-only'
