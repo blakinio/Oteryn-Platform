@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-None.
+- `OTERYN-20260724-wiki-architecture-plan` — documentation-only architecture and phased implementation plan for a first-party Oteryn Wiki, including a standalone implementation-agent prompt. Branch: `docs/OTERYN-20260724-wiki-architecture-plan`.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -43,7 +43,7 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-No repository/staging E2E implementation task is currently active.
+The Wiki architecture planning task is documentation-only. It does not change the current delivered application surface or production readiness classification.
 
 The merged stability and soak workflows should accumulate scheduled/manual evidence. Their first multi-iteration and soak baselines are intentionally pending and remain non-blocking until measured variance justifies any stronger gate.
 
