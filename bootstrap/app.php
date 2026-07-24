@@ -6,9 +6,11 @@ use App\Http\Middleware\GameAuth\PreventSensitiveGameAuthResponseCaching;
 use App\Http\Middleware\RequestCorrelation;
 use App\Http\Middleware\RequireAdminPermission;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TrustConfiguredProxies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,7 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->replace(TrustProxies::class, TrustConfiguredProxies::class);
         $middleware->append(RequestCorrelation::class);
+        $middleware->append(PreventSensitiveGameAuthResponseCaching::class);
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/');
         $middleware->appendToGroup('web', EnsureIdentitySessionIsCurrent::class);

@@ -13,12 +13,17 @@ final class PreventSensitiveGameAuthResponseCaching
      */
     public function handle(Request $request, Closure $next): Response
     {
-        return self::apply($next($request));
+        $response = $next($request);
+
+        return self::appliesTo($request)
+            ? self::apply($response)
+            : $response;
     }
 
     public static function appliesTo(Request $request): bool
     {
-        return $request->is('api/v1/game-auth/tickets')
+        return $request->is('oauth/token')
+            || $request->is('api/v1/game-auth/tickets')
             || $request->is('internal/v1/game-auth/tickets/redeem');
     }
 
