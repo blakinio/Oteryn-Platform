@@ -84,6 +84,39 @@ def main() -> int:
         match = re.search(r"([0-9]{3})$", output)
         return (int(match.group(1)) if match else 0, output)
 
+    def run_oauth_probe_with_diagnostics(self: Any, args: list[str], *, secret_mount: Path | None = None) -> int:
+        command = [
+            "run", "--rm", "--network", self.networks["public"],
+            "-v", f"{self.harness_root}:/harness:ro",
+            "-v", f"{self.tls['ca']}:/certs/ca.crt:ro",
+            "-v", f"{self.evidence}:/evidence",
+            "-e", "REHEARSAL_PLATFORM_PUBLIC_URL=https://platform.oteryn.test",
+            "-e", f"REHEARSAL_OAUTH_CLIENT_ID={self.oauth_client_id}",
+            "-e", f"REHEARSAL_IDENTITY_EMAIL={self.identity_email}",
+            "-e", f"REHEARSAL_IDENTITY_PASSWORD={self.identity_password}",
+            "-e", "REHEARSAL_CA_FILE=/certs/ca.crt",
+        ]
+        if secret_mount is not None:
+            command += ["-v", f"{secret_mount}:/secret"]
+        command += ["python:3.12-slim", "python3", "/harness/oauth_probe.py", *args]
+        completed = harness.docker(*command, check=False)
+        if completed.returncode != 0:
+            stdout = (completed.stdout or b"").decode("utf-8", errors="replace")
+            stderr = (completed.stderr or b"").decode("utf-8", errors="replace")
+            diagnostic = (
+                f"operation={args[0] if args else 'unknown'}\n"
+                f"returncode={completed.returncode}\n"
+                f"stdout:\n{stdout[-8000:]}\n"
+                f"stderr:\n{stderr[-8000:]}\n"
+            )
+            path = self.evidence / "oauth-probe-diagnostics.log"
+            existing = path.read_text(encoding="utf-8", errors="replace") if path.exists() else ""
+            path.write_text(
+                existing + harness.redact(diagnostic, self.secret_values + self.raw_tickets),
+                encoding="utf-8",
+            )
+        return completed.returncode
+
     def validate_tls_with_expected_polarity(self: Any) -> None:
         good_platform = self.curl_status("public", "https://platform.oteryn.test/health")[0]
         good_gateway = self.curl_status("public", "https://gateway.oteryn.test/health")[0]
@@ -238,6 +271,7 @@ FLUSH PRIVILEGES;
         self.runtime["database_schema_import"] = "PASS"
 
     harness.Rehearsal.curl_status = safe_curl_status
+    harness.Rehearsal.run_oauth_probe = run_oauth_probe_with_diagnostics
     harness.Rehearsal.validate_tls = validate_tls_with_expected_polarity
     harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
     harness.Rehearsal.start_data_services = start_data_services_deterministically
