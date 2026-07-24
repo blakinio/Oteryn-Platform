@@ -54,8 +54,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-25T00:45:00+02:00
-head: 6e103e6ff4dd4dbf8a3a22c05ae2e57ae2987123
+updated_at: 2026-07-25T00:55:00+02:00
+head: dd03949d5e4f3555087d43b52cac0fa4859e6bfd
 branch: chore/OTERYN-20260724-synology-compose-recovery-closeout
 pr: 169
 status: ready
@@ -77,6 +77,7 @@ proven:
   - Synology execution 30129638273 reported repair verification success, OAuth read success, repaired services none, canonical platform, canary and gateway running, and public OAuth client id 019f93b3-5e7e-721c-bc23-7e22e4bee7cc.
   - No recovery run removed volumes, restarted unrelated containers or published secrets/raw Docker inspect data.
   - The Windows LAN-ready client package was generated with the exact public OAuth client id and requires no SSH or first-run identifier input.
+  - PR 169 exact head dd03949d5e4f3555087d43b52cac0fa4859e6bfd passed CI 30129831642, Agent Governance 30129831738, Platform DB Outage Validation 30129831711, Phase 7 Production-Like Validation 30129831716 and Game Auth Ticket Concurrency 30129831768.
 derived:
   - A bounded earlier run restored canonical names; later idempotent runs found no remaining prefixed candidates.
   - Synology Container Manager can now address the canonical Platform and Canary containers instead of resolving an undefined replacement reference.
@@ -103,10 +104,10 @@ validation:
   - command: Synology corrected evidence execution 30129638273
     result: PASS
     evidence: canonical platform, canary and gateway were running and exact OAuth client id was published without terminal punctuation.
-  - command: PR 169 exact-head repository checks
-    result: NOT_RUN
-    evidence: manual-only workflow closeout and task archival are awaiting final validation.
+  - command: PR 169 exact-head repository checks on dd03949d5e4f3555087d43b52cac0fa4859e6bfd
+    result: PASS
+    evidence: CI, governance, outage, Phase 7 and concurrency checks all passed.
 blockers:
   - none
-next_action: Validate and squash-merge PR 169, then close private evidence issue 163 as completed.
+next_action: Squash-merge PR 169 and close private evidence issue 163 as completed.
 ```
