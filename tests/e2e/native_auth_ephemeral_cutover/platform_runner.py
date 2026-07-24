@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import importlib.util
 import os
 import re
+import secrets
 import sys
 import time
 from pathlib import Path
@@ -24,6 +26,16 @@ def load_harness() -> Any:
 def main() -> int:
     harness = load_harness()
 
+    original_rehearsal_init = harness.Rehearsal.__init__
+
+    def rehearsal_init_with_valid_app_key(self: Any) -> None:
+        original_rehearsal_init(self)
+        invalid_key = self.app_key
+        self.app_key = "base64:" + base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+        self.secret_values = [self.app_key if value == invalid_key else value for value in self.secret_values]
+
+    harness.Rehearsal.__init__ = rehearsal_init_with_valid_app_key
+
     original_docker = harness.docker
 
     def docker_with_runtime_compatibility(*args: str, **kwargs: Any) -> Any:
@@ -33,11 +45,6 @@ def main() -> int:
             else arg
             for arg in args
         ]
-
-        # The exact Canary issuer requires an explicit Platform world mapping.
-        # The upstream harness already pins world_id=1 in Platform bootstrap and
-        # all issuer probes, so inject that same mapping only into enabled Canary
-        # containers. This does not alter the pinned Canary binary or protocol.
         if (
             len(normalized) >= 2
             and normalized[0] == "create"
@@ -46,7 +53,6 @@ def main() -> int:
         ):
             image_index = normalized.index("-e") if "-e" in normalized else 2
             normalized[image_index:image_index] = ["-e", "CANARY_GAME_SESSION_ISSUER_WORLD_ID=1"]
-
         return original_docker(*tuple(normalized), **kwargs)
 
     harness.docker = docker_with_runtime_compatibility
@@ -63,23 +69,10 @@ def main() -> int:
     ) -> tuple[int, str]:
         ca = ca or self.tls["ca"]
         command = [
-            "run",
-            "--rm",
-            "--network",
-            self.networks[network_key],
-            "-v",
-            f"{ca}:/certs/ca.crt:ro",
-            "curlimages/curl:8.12.1",
-            "curl",
-            "-sS",
-            "--cacert",
-            "/certs/ca.crt",
-            "-o",
-            "/tmp/body",
-            "-w",
-            "%{http_code}",
-            "-X",
-            method,
+            "run", "--rm", "--network", self.networks[network_key],
+            "-v", f"{ca}:/certs/ca.crt:ro",
+            "curlimages/curl:8.12.1", "curl", "-sS", "--cacert", "/certs/ca.crt",
+            "-o", "/tmp/body", "-w", "%{http_code}", "-X", method,
         ]
         if token is not None:
             command += ["-H", f"Authorization: Bearer {token}"]
@@ -142,13 +135,8 @@ def main() -> int:
             encoding="utf-8",
         )
         harness.docker(
-            "build",
-            "-f",
-            str(trust_dockerfile),
-            "-t",
-            f"{self.prefix}-otclient:latest",
-            str(self.temp),
-            capture=False,
+            "build", "-f", str(trust_dockerfile), "-t", f"{self.prefix}-otclient:latest",
+            str(self.temp), capture=False,
         )
 
     def start_data_services_deterministically(self: Any) -> None:
@@ -158,8 +146,7 @@ def main() -> int:
         )
         redis_conf = self.temp / "redis.conf"
         redis_conf.write_text(
-            "bind 0.0.0.0\nprotected-mode yes\nport 6379\n"
-            f"requirepass {self.redis_admin_password}\n",
+            "bind 0.0.0.0\nprotected-mode yes\nport 6379\n" f"requirepass {self.redis_admin_password}\n",
             encoding="utf-8",
         )
         harness.docker(
@@ -250,13 +237,6 @@ FLUSH PRIVILEGES;
         self.runtime["redis_readonly_acl_write_rejected"] = denied.returncode != 0 or "NOPERM" in denied_text or "DENIED" in denied_text.upper()
         self.runtime["database_schema_import"] = "PASS"
 
-    # Canary PR #841 owns the production-like orchestration harness. The
-    # Platform-hosted runner adapts harness-only execution details: MariaDB's
-    # supported MYSQL_PWD client environment, explicit Platform world mapping,
-    # TLS negative-invariant polarity, safe argv passing for curl probes, normal
-    # system trust installation of the ephemeral CA, deterministic data
-    # provisioning, and robust Redis ACL rejection detection. It never disables
-    # TLS verification or alters product revisions.
     harness.Rehearsal.curl_status = safe_curl_status
     harness.Rehearsal.validate_tls = validate_tls_with_expected_polarity
     harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
