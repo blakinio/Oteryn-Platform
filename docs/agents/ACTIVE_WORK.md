@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260724-wiki-architecture-plan` — documentation-only architecture and phased implementation plan for a first-party Oteryn Wiki, including a standalone implementation-agent prompt. Branch: `docs/OTERYN-20260724-wiki-architecture-plan`.
+None.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -22,6 +22,8 @@ Convenience index only. Individual active task records, live PRs and Git state a
 - PR #104 / `18bd5b2c3b4496677cc58df41fd50c6387e9e6f8` — archived the completed observability-correlation task and closed its governance lifecycle.
 - PR #106 / `8030f98d7280c16705f34f2d29c8ebd7fc85f285` — issue #105 closed; required acceptance now includes zero-retry Chromium public dependency resilience proving Canary DB and Redis failure, deterministic restoration and successful browser recovery.
 - PR #111 / `740d9879b341d98e4cf0ef0e7f076b43cd86cdaf` — issue #110 closed; required acceptance now includes bounded zero-retry Chromium keyboard/focus accessibility, while scheduled/manual three-iteration zero-retry critical stability and read-only public soak profiles provide future non-blocking evidence.
+- PR #142 / `f4570b99c9ef6f222ae3aa9ee1d9a41919768df3` — first-party Wiki architecture, phased implementation plan and standalone implementation-agent prompt merged.
+- PR #143 / `434ef4c950b52c1cb77422fda1a17c1d20bba59f` — complete non-commercial public website expansion architecture, delivery programme and first-slice implementation prompt merged.
 
 ## Current project phase
 
@@ -43,7 +45,7 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-The Wiki architecture planning task is documentation-only. It does not change the current delivered application surface or production readiness classification.
+The public website and Wiki planning records are complete and archived. The next implementation slice is the production homepage/public-shell foundation defined by `docs/architecture/PUBLIC_WEBSITE_EXPANSION_PLAN.md`; it must start as a new dedicated task, branch and draft PR after overlap checks.
 
 The merged stability and soak workflows should accumulate scheduled/manual evidence. Their first multi-iteration and soak baselines are intentionally pending and remain non-blocking until measured variance justifies any stronger gate.
 
