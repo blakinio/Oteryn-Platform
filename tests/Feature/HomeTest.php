@@ -78,7 +78,7 @@ final class HomeTest extends TestCase
         $response->assertOk()
             ->assertSee('Answer the call of Oteryn')
             ->assertSee('Find your character')
-            ->assertSee('42 players online')
+            ->assertSeeText('42 players online')
             ->assertSee('The realm awakens')
             ->assertDontSee('Future hidden news')
             ->assertSee('data-content-state="AVAILABLE"', false)
@@ -143,6 +143,7 @@ final class HomeTest extends TestCase
             'email' => 'home-account@example.test',
             'password' => Hash::make('Correct-Horse-9!Battery'),
         ]);
+        $identity->refresh();
 
         $this->actingAs($identity)
             ->withSession([WebSessionState::GENERATION_KEY => $identity->web_session_generation])
