@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 final class EventFactory extends Factory
 {
+    /** @var class-string<Event> */
     protected $model = Event::class;
 
     /**
