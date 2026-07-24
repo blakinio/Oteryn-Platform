@@ -1,0 +1,102 @@
+name: Repair Synology Compose Container Names
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/repair-synology-compose-orphans.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: synology-staging-deployment
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.ref == 'refs/heads/main'
+    runs-on: oteryn-staging
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - name: Validate Docker access
+        run: |
+          set -euo pipefail
+          docker version >/dev/null
+
+      - name: Repair verified Compose replacement names
+        run: |
+          set -euo pipefail
+
+          project=oteryn-staging
+          services=(mariadb redis platform canary tls-init internal-proxy gateway)
+          repaired=0
+
+          for service in "${services[@]}"; do
+            canonical="${project}-${service}-1"
+            candidate_id=""
+            candidate_name=""
+
+            while IFS='|' read -r container_id container_name; do
+              if [[ "$container_name" =~ ^[0-9a-f]{12}_${canonical}$ ]]; then
+                if [[ -n "$candidate_id" ]]; then
+                  echo "More than one stale replacement candidate exists for service $service; refusing repair." >&2
+                  exit 1
+                fi
+                candidate_id="$container_id"
+                candidate_name="$container_name"
+              fi
+            done < <(docker ps -a --format '{{.ID}}|{{.Names}}')
+
+            if [[ -z "$candidate_id" ]]; then
+              continue
+            fi
+
+            actual_project="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$candidate_id")"
+            actual_service="$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$candidate_id")"
+
+            if [[ "$actual_project" != "$project" || "$actual_service" != "$service" ]]; then
+              echo "Candidate $candidate_name failed exact Compose label verification; refusing repair." >&2
+              exit 1
+            fi
+
+            if docker inspect "$canonical" >/dev/null 2>&1; then
+              echo "Canonical container $canonical already exists; refusing to overwrite it." >&2
+              exit 1
+            fi
+
+            echo "Renaming verified stale Compose replacement for service $service to $canonical."
+            docker rename "$candidate_id" "$canonical"
+            repaired=1
+          done
+
+          if [[ "$repaired" -eq 0 ]]; then
+            echo "No stale short-ID-prefixed Oteryn staging containers were found."
+          fi
+
+      - name: Verify canonical runtime containers
+        run: |
+          set -euo pipefail
+
+          for service in platform canary gateway; do
+            name="oteryn-staging-${service}-1"
+            running="$(docker inspect --format '{{.State.Running}}' "$name")"
+            if [[ "$running" != "true" ]]; then
+              echo "$name is not running after name repair." >&2
+              exit 1
+            fi
+            echo "$name: running"
+          done
+
+      - name: Read public native OAuth client id
+        run: |
+          set -euo pipefail
+          docker exec oteryn-staging-platform-1 \
+            sh -lc 'cd /var/www/html && php artisan game-auth:oauth-client:ensure'
