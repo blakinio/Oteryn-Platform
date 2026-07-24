@@ -31,7 +31,7 @@ final class WikiCategoryTranslation extends Model
 
     protected static function booted(): void
     {
-        static::saving(function (self $translation): void {
+        self::saving(function (self $translation): void {
             WikiContentRules::assertCategoryTranslation(
                 $translation->locale,
                 $translation->name,

@@ -32,7 +32,7 @@ final class WikiCategory extends Model
 
     protected static function booted(): void
     {
-        static::saving(function (self $category): void {
+        self::saving(function (self $category): void {
             WikiContentRules::assertCategoryKey($category->key);
 
             if ($category->exists && $category->parent_id === $category->id) {

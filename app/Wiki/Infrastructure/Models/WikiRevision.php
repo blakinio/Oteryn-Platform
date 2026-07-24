@@ -46,7 +46,7 @@ final class WikiRevision extends Model
 
     protected static function booted(): void
     {
-        static::creating(function (self $revision): void {
+        self::creating(function (self $revision): void {
             WikiContentRules::assertArticleTranslation(
                 $revision->locale,
                 $revision->title,
@@ -58,11 +58,11 @@ final class WikiRevision extends Model
             $revision->created_at ??= now();
         });
 
-        static::updating(static function (self $revision): void {
+        self::updating(static function (self $revision): void {
             throw new LogicException('Wiki revisions are append-only and cannot be updated.');
         });
 
-        static::deleting(static function (self $revision): void {
+        self::deleting(static function (self $revision): void {
             throw new LogicException('Wiki revisions are append-only and cannot be deleted.');
         });
     }

@@ -59,31 +59,6 @@ jobs:
       - name: Audit Composer dependencies
         run: composer audit --no-interaction
 
-      - name: Apply Wiki formatting diagnostic
-        run: >-
-          vendor/bin/pint
-          app/Wiki
-          database/migrations/2026_07_24_231000_create_wiki_foundation_tables.php
-          tests/Unit/Wiki
-          tests/Feature/Wiki
-
-      - name: Capture Wiki formatting patch
-        run: >-
-          git diff --binary --
-          app/Wiki
-          database/migrations/2026_07_24_231000_create_wiki_foundation_tables.php
-          tests/Unit/Wiki
-          tests/Feature/Wiki
-          > wiki-pint.patch
-
-      - name: Upload Wiki formatting patch
-        uses: actions/upload-artifact@v4
-        with:
-          name: wiki-pint-patch
-          path: wiki-pint.patch
-          if-no-files-found: error
-          retention-days: 1
-
       - name: Check formatting
         run: vendor/bin/pint --test
 

@@ -40,7 +40,7 @@ final class WikiArticle extends Model
 
     protected static function booted(): void
     {
-        static::saving(function (self $article): void {
+        self::saving(function (self $article): void {
             WikiContentRules::assertContentType($article->content_type);
         });
     }
