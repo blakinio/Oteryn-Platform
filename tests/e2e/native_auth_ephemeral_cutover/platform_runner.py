@@ -26,16 +26,30 @@ def main() -> int:
 
     original_docker = harness.docker
 
-    def docker_with_mariadb_password_alias(*args: str, **kwargs: Any) -> Any:
-        normalized = tuple(
+    def docker_with_runtime_compatibility(*args: str, **kwargs: Any) -> Any:
+        normalized = [
             "MYSQL_PWD=" + arg[len("MARIADB_PWD=") :]
             if arg.startswith("MARIADB_PWD=")
             else arg
             for arg in args
-        )
-        return original_docker(*normalized, **kwargs)
+        ]
 
-    harness.docker = docker_with_mariadb_password_alias
+        # The exact Canary issuer requires an explicit Platform world mapping.
+        # The upstream harness already pins world_id=1 in Platform bootstrap and
+        # all issuer probes, so inject that same mapping only into enabled Canary
+        # containers. This does not alter the pinned Canary binary or protocol.
+        if (
+            len(normalized) >= 2
+            and normalized[0] == "create"
+            and any(value == "CANARY_GAME_SESSION_ISSUER_ENABLED=true" for value in normalized)
+            and not any(value.startswith("CANARY_GAME_SESSION_ISSUER_WORLD_ID=") for value in normalized)
+        ):
+            image_index = normalized.index("-e") if "-e" in normalized else 2
+            normalized[image_index:image_index] = ["-e", "CANARY_GAME_SESSION_ISSUER_WORLD_ID=1"]
+
+        return original_docker(*tuple(normalized), **kwargs)
+
+    harness.docker = docker_with_runtime_compatibility
 
     def safe_curl_status(
         self: Any,
@@ -193,15 +207,17 @@ FLUSH PRIVILEGES;
             "redis-cli", "-h", "redis", "--user", "oteryn_runtime", "-a", self.redis_readonly_password,
             "SET", "forbidden", "1", check=False,
         )
-        self.runtime["redis_readonly_acl_write_rejected"] = denied.returncode != 0
+        denied_text = ((denied.stdout or b"") + (denied.stderr or b"")).decode("utf-8", errors="replace")
+        self.runtime["redis_readonly_acl_write_rejected"] = denied.returncode != 0 or "NOPERM" in denied_text or "DENIED" in denied_text.upper()
         self.runtime["database_schema_import"] = "PASS"
 
     # Canary PR #841 owns the production-like orchestration harness. The
     # Platform-hosted runner adapts harness-only execution details: MariaDB's
-    # supported MYSQL_PWD client environment, safe argv passing for curl probes,
-    # normal system trust installation of the ephemeral CA, and deterministic
-    # provisioning after the image initialization server hands off to the final
-    # server. It never disables TLS verification or alters product revisions.
+    # supported MYSQL_PWD client environment, explicit Platform world mapping
+    # required by the exact Canary issuer, safe argv passing for curl probes,
+    # normal system trust installation of the ephemeral CA, deterministic data
+    # provisioning, and robust Redis ACL rejection detection. It never disables
+    # TLS verification or alters product revisions.
     harness.Rehearsal.curl_status = safe_curl_status
     harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
     harness.Rehearsal.start_data_services = start_data_services_deterministically
