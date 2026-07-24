@@ -83,6 +83,11 @@ fi
 
 compose=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 state_dir="${OTERYN_STATE_DIR:-/var/lib/oteryn-staging-state}"
+mariadb_ready_timeout_seconds="${OTERYN_MARIADB_READY_TIMEOUT_SECONDS:-420}"
+if [[ ! "$mariadb_ready_timeout_seconds" =~ ^[1-9][0-9]*$ ]]; then
+    echo "OTERYN_MARIADB_READY_TIMEOUT_SECONDS must be a positive integer." >&2
+    exit 1
+fi
 mkdir -p "$state_dir"
 chmod 700 "$state_dir"
 
@@ -143,19 +148,17 @@ snapshot_current_images
 stage_bootstrap_files
 "${compose[@]}" up -d mariadb redis tls-init
 
-mariadb_ready=0
-for _ in $(seq 1 60); do
-    if "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb \
-        mariadb -uroot -N -e 'SELECT 1' >/dev/null 2>&1; then
-        mariadb_ready=1
-        break
+mariadb_deadline=$((SECONDS + mariadb_ready_timeout_seconds))
+while ! "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb \
+    mariadb -uroot -N -e 'SELECT 1' >/dev/null 2>&1; do
+    if (( SECONDS >= mariadb_deadline )); then
+        echo "MariaDB did not become ready within ${mariadb_ready_timeout_seconds} seconds; refusing to continue deployment." >&2
+        "${compose[@]}" ps mariadb >&2 || true
+        "${compose[@]}" logs --no-color --tail 100 mariadb >&2 || true
+        exit 1
     fi
     sleep 2
 done
-if [[ "$mariadb_ready" -ne 1 ]]; then
-    echo "MariaDB did not become ready; refusing to continue deployment." >&2
-    exit 1
-fi
 
 "${compose[@]}" exec -T -e MYSQL_PWD="$MARIADB_ROOT_PASSWORD" mariadb mariadb -uroot <<SQL
 CREATE DATABASE IF NOT EXISTS \`$PLATFORM_DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
