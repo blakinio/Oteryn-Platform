@@ -5,6 +5,7 @@ namespace App\Http\Requests\Downloads;
 use App\Downloads\DownloadCatalog;
 use App\Downloads\Models\ClientRelease;
 use App\Downloads\Rules\ApprovedArtifactUrl;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -32,7 +33,7 @@ final class SaveClientReleaseRequest extends FormRequest
                 'max:64',
                 'regex:/^[0-9A-Za-z][0-9A-Za-z._+\-]{0,63}$/',
                 Rule::unique('client_releases', 'version')
-                    ->where(static fn ($query) => $query->where('channel', $channel))
+                    ->where(static fn (Builder $query): Builder => $query->where('channel', $channel))
                     ->ignore($releaseId),
             ],
             'channel' => ['required', 'string', Rule::in(DownloadCatalog::channels())],
@@ -66,6 +67,7 @@ final class SaveClientReleaseRequest extends FormRequest
                 return;
             }
 
+            /** @var array<string, true> $variants */
             $variants = [];
 
             foreach ($artifacts as $index => $artifact) {
@@ -100,26 +102,30 @@ final class SaveClientReleaseRequest extends FormRequest
     public function artifactInput(): array
     {
         $validated = $this->validated();
+
+        /**
+         * @var list<array{
+         *     platform: string,
+         *     architecture: string,
+         *     artifact_url: string,
+         *     filename: string,
+         *     size_bytes: int|string,
+         *     sha256: string,
+         *     is_enabled: bool|int|string
+         * }> $artifacts
+         */
         $artifacts = $validated['artifacts'] ?? [];
         $result = [];
 
-        if (! is_array($artifacts)) {
-            return [];
-        }
-
         foreach ($artifacts as $artifact) {
-            if (! is_array($artifact)) {
-                continue;
-            }
-
             $result[] = [
-                'platform' => (string) $artifact['platform'],
-                'architecture' => (string) $artifact['architecture'],
-                'artifact_url' => (string) $artifact['artifact_url'],
-                'filename' => (string) $artifact['filename'],
+                'platform' => $artifact['platform'],
+                'architecture' => $artifact['architecture'],
+                'artifact_url' => $artifact['artifact_url'],
+                'filename' => $artifact['filename'],
                 'size_bytes' => (int) $artifact['size_bytes'],
-                'sha256' => (string) $artifact['sha256'],
-                'is_enabled' => (bool) $artifact['is_enabled'],
+                'sha256' => $artifact['sha256'],
+                'is_enabled' => filter_var($artifact['is_enabled'], FILTER_VALIDATE_BOOL),
             ];
         }
 
@@ -143,13 +149,18 @@ final class SaveClientReleaseRequest extends FormRequest
                 continue;
             }
 
+            $platform = $artifact['platform'] ?? null;
+            $architecture = $artifact['architecture'] ?? null;
+            $artifactUrl = $artifact['artifact_url'] ?? null;
+            $filename = $artifact['filename'] ?? null;
+            $sha256 = $artifact['sha256'] ?? null;
             $normalized = [
-                'platform' => is_string($artifact['platform'] ?? null) ? trim($artifact['platform']) : ($artifact['platform'] ?? null),
-                'architecture' => is_string($artifact['architecture'] ?? null) ? trim($artifact['architecture']) : ($artifact['architecture'] ?? null),
-                'artifact_url' => is_string($artifact['artifact_url'] ?? null) ? trim($artifact['artifact_url']) : ($artifact['artifact_url'] ?? null),
-                'filename' => is_string($artifact['filename'] ?? null) ? trim($artifact['filename']) : ($artifact['filename'] ?? null),
+                'platform' => is_string($platform) ? trim($platform) : $platform,
+                'architecture' => is_string($architecture) ? trim($architecture) : $architecture,
+                'artifact_url' => is_string($artifactUrl) ? trim($artifactUrl) : $artifactUrl,
+                'filename' => is_string($filename) ? trim($filename) : $filename,
                 'size_bytes' => $artifact['size_bytes'] ?? null,
-                'sha256' => is_string($artifact['sha256'] ?? null) ? strtolower(trim($artifact['sha256'])) : ($artifact['sha256'] ?? null),
+                'sha256' => is_string($sha256) ? strtolower(trim($sha256)) : $sha256,
                 'is_enabled' => $artifact['is_enabled'] ?? false,
             ];
 
@@ -163,10 +174,14 @@ final class SaveClientReleaseRequest extends FormRequest
             }
         }
 
+        $version = $this->input('version');
+        $channel = $this->input('channel');
+        $releaseNotes = $this->input('release_notes');
+
         $this->merge([
-            'version' => is_string($this->input('version')) ? trim((string) $this->input('version')) : $this->input('version'),
-            'channel' => is_string($this->input('channel')) ? trim((string) $this->input('channel')) : $this->input('channel'),
-            'release_notes' => is_string($this->input('release_notes')) ? trim((string) $this->input('release_notes')) : $this->input('release_notes'),
+            'version' => is_string($version) ? trim($version) : $version,
+            'channel' => is_string($channel) ? trim($channel) : $channel,
+            'release_notes' => is_string($releaseNotes) ? trim($releaseNotes) : $releaseNotes,
             'artifacts' => $artifacts,
         ]);
     }
