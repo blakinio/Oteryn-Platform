@@ -12,11 +12,13 @@ Maximum evidence classification is `PRODUCTION_LIKE_PROVEN`. This task performs 
 owned_paths:
   - docs/agents/tasks/active/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal.md
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
+  - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 modules:
   - native-auth production-like validation runner
 dependencies:
-  - Oteryn Platform 53158217a6c6017230301cf4daa783b04fcc13d5
+  - Oteryn Platform 9b80d3f4399c2d4a638a4d040f34cf60792acefc
+  - Game Gateway 53158217a6c6017230301cf4daa783b04fcc13d5
   - Canary 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e
   - OTClient bb87346f6c516a19d19497d82bb01fb389334ff5
   - Canary rehearsal harness f1e1664f9ad0097ede7a0a9b023251561ff24cf2
@@ -24,6 +26,8 @@ blocks:
   - PRODUCTION_LIKE_PROVEN native-auth rehearsal evidence
 cross_repository_tasks:
   - CAN-20260723-native-auth-ephemeral-cutover-rehearsal
+  - OTERYN-20260724-trusted-reverse-proxy-scheme
+  - CAN-20260724-game-session-cache-headers
   - OTERYN-20260723-native-auth-production-cutover
   - CAN-20260723-oteryn-native-auth-production-cutover
 ```
@@ -48,11 +52,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T07:25:00+02:00
-head: cbf70d6d7487c4043582d443274578f3adb0bf54
+updated_at: 2026-07-24T10:12:00+02:00
+head: dee6b19554d1e58355cc6395fa4849505cbdff9d
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
 pr: 126
-status: blocked_external
+status: validating
 context_routes:
   - auth-identity
   - canary-integration
@@ -61,50 +65,43 @@ context_routes:
 owned_paths:
   - docs/agents/tasks/active/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal.md
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
+  - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 proven:
   - Oteryn Platform is private while Canary and OTClient are public; Platform PR 126 is the correct Actions execution boundary without a cross-repository PAT.
-  - Workflow pins Platform/Gateway 53158217a6c6017230301cf4daa783b04fcc13d5, Canary 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e, OTClient bb87346f6c516a19d19497d82bb01fb389334ff5 and Canary harness f1e1664f9ad0097ede7a0a9b023251561ff24cf2.
   - Exact Gateway, Canary and OTClient build artifacts from run 30047343772 are reused only after source-SHA and binary checksum verification.
   - MariaDB final-server readiness, MYSQL_PWD client compatibility and in-container --skip-ssl schema import are deterministic; database_schema_import is PASS.
   - Redis read-only ACL rejects writes; output-aware validation records redis_readonly_acl_write_rejected true.
   - Canary world_id 1 is explicitly mapped to the private issuer; credential overlap accepts current and previous Platform and Canary credentials and stage4_native_issuer_activated is true.
   - TLS validation is PASS for valid CA/hostnames, wrong CA, hostname mismatch, non-loopback HTTP dependency rejection, private issuer network isolation, no verification bypass and no retained private keys.
-  - Laravel APP_KEY is now generated from exactly 32 random bytes and encoded as standard base64.
-  - Sensitive-log scans for every retained failed-run artifact through run 30068710857 are PASS.
-  - Head cbf70d6d7487c4043582d443274578f3adb0bf54 retains redacted OAuth subprocess stdout/stderr in oauth-probe-diagnostics.log on failure.
+  - Rehearsal run 30069293159 attempt 4 retained OAuth diagnostics and proved Platform generated an internal HTTP login form action behind the valid HTTPS proxy boundary.
+  - Platform PR 131 exact head 9b80d3f4399c2d4a638a4d040f34cf60792acefc fixes explicit trusted proxy handling and passed standard CI run 30077363907 before its final documentation-only checkpoint.
+  - exact_runner.py preserves the checked-out Canary harness unchanged while setting exact component metadata, applying rehearsal-only TRUSTED_PROXIES=10.201.3.0/24 to Platform and recording current build artifact IDs/digests.
 derived:
-  - Product components have passed exact builds and the rehearsal has advanced through provisioning, credential overlap and TLS; the next unresolved runtime boundary is OAuth/PKCE probe execution.
-  - Runs 30069031309 and its two retries are not validation evidence because every job failed before the first step and produced no logs or artifact.
+  - The next run exercises the real OAuth PKCE boundary with the exact Platform reverse-proxy fix instead of rewriting browser/probe URLs.
 unknown:
-  - exact OAuth probe exception on diagnostic head cbf70d6d7487c4043582d443274578f3adb0bf54
   - final OAuth, Game Login Ticket, Gateway, Game Session, physical OTClient world-entry, logout, replay, rotation-retirement, failure-injection and rollback results
 conflicts: []
 first_failure:
-  marker: github-actions-job-start-gate
-  evidence: run 30069031309 and two retries created jobs with conclusion failure, steps null, no logs and no evidence artifact; five unrelated workflows on the same commit failed identically before execution
+  marker: platform-forwarded-https-boundary
+  evidence: artifact 8589703457 oauth-probe-diagnostics.log showed the login form POST attempted the internal HTTP origin and returned connection refused
 rejected_hypotheses:
-  - native-auth source or runner Python caused run 30069031309: rejected because no workflow step, checkout or interpreter started
-  - retrying the same run immediately resolves the gate: rejected by two successful rerun API requests followed by identical zero-step failures
-  - classify prior partial runs as PRODUCTION_LIKE_PROVEN: rejected because successful_world_entries remains zero and downstream matrices are incomplete
+  - disable TLS verification: rejected because TLS validation already passes with hostname and CA verification
+  - rewrite the form action inside the OAuth probe: rejected because the defect belonged to Platform production URL generation
+  - mutate the exact Canary harness checkout: rejected because exact_runner can adapt metadata and ephemeral deployment configuration without changing harness bytes
 changed_paths:
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
   - docs/agents/tasks/active/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal.md
+  - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 validation:
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30068164918
+  - command: Native Auth Ephemeral Cutover Rehearsal run 30069293159 attempt 4
     result: FAIL
-    evidence: provisioning, Redis ACL, credential overlap and private issuer activation passed; harness TLS polarity bug was the first failure
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30068422345
-    result: FAIL
-    evidence: TLS matrix passed; invalid Laravel APP_KEY prevented OAuth matrix
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30068710857
-    result: FAIL
-    evidence: valid APP_KEY removed Platform encryption failure; OAuth probe still returned nonzero without retained subprocess diagnostics
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30069031309 plus two failed-job retries
-    result: BLOCKED
-    evidence: jobs failed before step allocation with steps null, no downloadable logs and no artifact
+    evidence: provisioning, credential overlap and TLS passed; exact first product failure was forwarded HTTPS handling in Platform
+  - command: Platform trusted proxy CI run 30077363907
+    result: PASS
+    evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed
 blockers:
-  - GitHub Actions currently rejects all Platform workflow jobs before allocating a runner or executing step 1; the diagnostic head cannot be exercised until hosted-runner execution resumes or the repository/account Actions gate is cleared.
-next_action: rerun Native Auth Ephemeral Cutover Rehearsal on head cbf70d6d7487c4043582d443274578f3adb0bf54 after GitHub-hosted jobs can start, then inspect the retained redacted oauth-probe-diagnostics.log and repair only the concrete OAuth failure.
+  - none
+next_action: execute the Platform-fix-pinned rehearsal and repair only the first concrete downstream native-auth failure.
 ```
