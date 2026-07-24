@@ -51,8 +51,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T10:15:00Z
-head: 22b07eecc073d59d9107eca39f919d0282dfe0a8
+updated_at: 2026-07-24T10:17:00Z
+head: 1e83f9db36e4bcf35dbc2e484c1e760ab308f879
 branch: fix/OTERYN-20260724-synology-deploy-runtime-evidence
 pr: 135
 status: in_progress
@@ -79,6 +79,7 @@ proven:
   - sanitized runner diagnostic job 89456309129 found the same MariaDB container running, healthy, exit code 0, restart count 0 and not OOM-killed after the deployment timeout
   - MariaDB logs showed normal first initialization and eventual ready-for-connections state after the deployment polling window had already expired
   - inspected logs masked injected secret values and sanitized evidence extraction did not reproduce secret values
+  - the temporary runtime inspection workflow was removed from PR 135 after evidence collection
 derived:
   - the APP_KEY configuration blocker is resolved
   - image publication, runner connectivity, runner Docker tooling and MariaDB image viability are not the current blocker
@@ -100,7 +101,6 @@ rejected_hypotheses:
   - MariaDB was OOM-killed: diagnostic state reported oom_killed=false
   - MariaDB data volume must be deleted: the existing container completed initialization and became healthy without destructive intervention
 changed_paths:
-  - .github/workflows/inspect-synology-runtime-failure.yml
   - deploy/synology/scripts/deploy.sh
   - docs/agents/tasks/active/OTERYN-20260724-synology-first-staging-deploy.md
 validation:
@@ -118,7 +118,7 @@ validation:
     evidence: readiness timeout fix changes the bounded wait from 120 to 420 seconds and adds timeout diagnostics
 blockers:
   - merge the validated readiness timeout fix from PR 135, then rerun deploy job 89454820564 against trusted main
-next_action: Complete exact-head validation for PR 135, remove the temporary diagnostic workflow, merge the bounded MariaDB readiness fix, and rerun the failed deployment job.
+next_action: Complete exact-head validation for PR 135, merge the bounded MariaDB readiness fix, and rerun the failed deployment job.
 ```
 
 ## Notes
