@@ -50,11 +50,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T07:20:00Z
-head: 60b12fb2d1748fb016484eca521a6c61af505d37
+updated_at: 2026-07-24T07:30:00Z
+head: f73dc45e34f825a2bcb51baaad2cb9a9fb0732ad
 branch: chore/OTERYN-20260724-synology-first-staging-deploy
-pr: none
-status: implementing
+pr: 130
+status: validating
 context_routes:
   - agent-governance
   - testing
@@ -70,6 +70,8 @@ proven:
   - the repository-scoped Synology runner previously reported Listening for Jobs
   - synology-staging environment variables and required secrets were added by the user
   - the existing deployment workflow is restricted to refs/heads/main, runner label oteryn-staging and environment synology-staging
+  - PR 130 contains a temporary dispatcher that requires the explicit synology-first-deploy merge marker
+  - PR 130 makes the image workflow publish Platform and Gateway tags for the exact marked merge SHA before dispatch
 derived:
   - a trusted push workflow can use actions write permission to invoke the existing workflow_dispatch endpoint without exposing deployment secrets
 unknown:
@@ -78,19 +80,21 @@ unknown:
 conflicts: []
 first_failure:
   marker: none
-  evidence: execution has not started
+  evidence: pull-request validation is pending
 rejected_hypotheses:
   - duplicate the complete deployment workflow in a temporary file: rejected because dispatching the existing guarded workflow avoids configuration drift
   - build Platform or Canary directly on the Synology NAS: rejected because the NAS is staging runtime only
 changed_paths:
+  - .github/workflows/build-synology-staging-images.yml
+  - .github/workflows/one-shot-synology-staging-deploy.yml
   - docs/agents/tasks/active/OTERYN-20260724-synology-first-staging-deploy.md
 validation:
-  - command: not-run
+  - command: PR 130 required GitHub checks
     result: NOT_RUN
-    evidence: one-shot workflow implementation is starting
+    evidence: checks are expected on the checkpointed implementation head
 blockers:
   - none
-next_action: add the one-shot dispatcher and make the Synology image build workflow publish the exact merge-SHA images before dispatch.
+next_action: inspect PR 130 exact-head checks, repair only concrete failures, and merge with the required synology-first-deploy marker after all gates pass.
 ```
 
 ## Notes
