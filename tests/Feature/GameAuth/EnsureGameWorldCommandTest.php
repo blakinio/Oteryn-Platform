@@ -5,6 +5,8 @@ namespace Tests\Feature\GameAuth;
 use App\GameAuth\Worlds\GameWorld;
 use App\GameAuth\Worlds\GameWorldStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Console\Command\Command;
 use Tests\TestCase;
 
 final class EnsureGameWorldCommandTest extends TestCase
@@ -13,7 +15,7 @@ final class EnsureGameWorldCommandTest extends TestCase
 
     public function test_command_creates_and_idempotently_updates_an_explicit_world_route(): void
     {
-        $this->artisan('game-auth:world:ensure', [
+        self::assertSame(Command::SUCCESS, Artisan::call('game-auth:world:ensure', [
             '--id' => '1',
             '--slug' => 'oteryn-staging',
             '--name' => 'Oteryn Staging',
@@ -22,7 +24,7 @@ final class EnsureGameWorldCommandTest extends TestCase
             '--port' => '7172',
             '--status' => 'online',
             '--login-enabled' => '1',
-        ])->assertSuccessful();
+        ]));
 
         $world = GameWorld::query()->findOrFail(1);
         self::assertSame('oteryn-staging', $world->slug);
@@ -31,7 +33,7 @@ final class EnsureGameWorldCommandTest extends TestCase
         self::assertSame('192.168.1.2', $world->game_host);
         self::assertSame(7172, $world->game_port);
 
-        $this->artisan('game-auth:world:ensure', [
+        self::assertSame(Command::SUCCESS, Artisan::call('game-auth:world:ensure', [
             '--id' => '1',
             '--slug' => 'oteryn-staging',
             '--name' => 'Oteryn LAN',
@@ -40,7 +42,7 @@ final class EnsureGameWorldCommandTest extends TestCase
             '--port' => '7172',
             '--status' => 'maintenance',
             '--login-enabled' => '0',
-        ])->assertSuccessful();
+        ]));
 
         self::assertSame(1, GameWorld::query()->count());
         $world->refresh();
@@ -72,7 +74,10 @@ final class EnsureGameWorldCommandTest extends TestCase
             ['--status' => 'starting'],
             ['--login-enabled' => 'maybe'],
         ] as $override) {
-            $this->artisan('game-auth:world:ensure', array_replace($base, $override))->assertFailed();
+            self::assertSame(
+                Command::FAILURE,
+                Artisan::call('game-auth:world:ensure', array_replace($base, $override)),
+            );
         }
 
         self::assertSame(0, GameWorld::query()->count());
@@ -90,7 +95,7 @@ final class EnsureGameWorldCommandTest extends TestCase
             'game_port' => 7172,
         ]);
 
-        $this->artisan('game-auth:world:ensure', [
+        self::assertSame(Command::FAILURE, Artisan::call('game-auth:world:ensure', [
             '--id' => '2',
             '--slug' => 'oteryn-staging',
             '--name' => 'Conflicting',
@@ -99,7 +104,7 @@ final class EnsureGameWorldCommandTest extends TestCase
             '--port' => '7172',
             '--status' => 'online',
             '--login-enabled' => '1',
-        ])->assertFailed();
+        ]));
 
         self::assertSame(1, GameWorld::query()->count());
         self::assertNull(GameWorld::query()->find(2));
