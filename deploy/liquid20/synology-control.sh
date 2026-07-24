@@ -157,7 +157,6 @@ deploy_acceptance() {
         --env LIQUID20_MODE=acceptance \
         --env TZ=UTC \
         --volume "$DATA_ROOT:/data:rw" \
-        --read-only \
         --tmpfs /tmp:size=64m,mode=1777 \
         --cap-drop ALL \
         --security-opt no-new-privileges:true \
