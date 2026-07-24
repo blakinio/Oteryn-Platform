@@ -16,11 +16,12 @@ jobs:
     name: Inventory Synology workflow runs and jobs
     runs-on: ubuntu-latest
     steps:
-      - name: List targeted workflow runs and jobs
+      - name: List exact deployment workflow runs and jobs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          target_sha='e08548866e6edc70f69eaba40249303b69236625'
           since='2026-07-24T07:33:44Z'
           workflows=(
             build-synology-staging-images.yml
@@ -31,23 +32,26 @@ jobs:
           for workflow in "${workflows[@]}"; do
             echo "=== WORKFLOW $workflow ==="
             runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?per_page=100")"
-            jq -c --arg since "$since" '
-              .workflow_runs[]
-              | select(.created_at >= $since)
-              | {
-                  id,
-                  name,
-                  event,
-                  status,
-                  conclusion,
-                  head_branch,
-                  head_sha,
-                  run_attempt,
-                  created_at,
-                  updated_at,
-                  html_url
-                }
-            ' <<<"$runs_json"
+
+            if [[ "$workflow" == deploy-synology-staging.yml ]]; then
+              filter='select(.event == "workflow_dispatch" and .head_sha == $target_sha and .created_at >= $since)'
+            else
+              filter='select(.event == "push" and .head_sha == $target_sha)'
+            fi
+
+            jq -c --arg target_sha "$target_sha" --arg since "$since" ".workflow_runs[] | $filter | {
+              id,
+              name,
+              event,
+              status,
+              conclusion,
+              head_branch,
+              head_sha,
+              run_attempt,
+              created_at,
+              updated_at,
+              html_url
+            }" <<<"$runs_json"
 
             while IFS= read -r run_id; do
               [[ -n "$run_id" ]] || continue
@@ -63,13 +67,9 @@ jobs:
                   runner_name,
                   runner_group_name,
                   labels,
-                  steps: [.steps[] | {number, name, status, conclusion}]
+                  steps: [.steps[]? | {number, name, status, conclusion}]
                 }'
             done < <(
-              jq -r --arg since "$since" '
-                .workflow_runs[]
-                | select(.created_at >= $since)
-                | .id
-              ' <<<"$runs_json"
+              jq -r --arg target_sha "$target_sha" --arg since "$since" ".workflow_runs[] | $filter | .id" <<<"$runs_json"
             )
           done
