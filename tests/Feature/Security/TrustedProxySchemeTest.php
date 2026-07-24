@@ -43,12 +43,7 @@ final class TrustedProxySchemeTest extends TestCase
 
     public function test_untrusted_client_cannot_spoof_forwarded_scheme_or_host(): void
     {
-        $configuredScheme = parse_url((string) config('app.url'), PHP_URL_SCHEME);
-
-        if (! is_string($configuredScheme) || $configuredScheme === '') {
-            $configuredScheme = 'http';
-        }
-
+        $configuredScheme = str_starts_with((string) config('app.url'), 'https://') ? 'https' : 'http';
         $spoofedScheme = $configuredScheme === 'https' ? 'http' : 'https';
 
         $response = $this->requestLoginPage(
