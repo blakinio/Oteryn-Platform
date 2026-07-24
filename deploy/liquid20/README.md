@@ -15,7 +15,7 @@ The control workflow:
 - does not mount the Docker socket into the collector;
 - uses `restart=no`, so an interrupted 24-hour attempt remains failed evidence rather than silently continuing.
 
-The Oteryn runner has Docker access because it is the deployment control plane. The Liquid20 collector does not. Only the bootstrap job receives `packages: write`; scheduled status and evidence collection remain read-only toward repository and package APIs.
+The Oteryn runner has Docker access because it is the deployment control plane. The Liquid20 collector does not. Only the bootstrap job receives `packages: write`. Bootstrap and observation receive `issues: write` solely to update the fixed non-secret status issue; they cannot use that permission to expose raw liquidation data or secrets.
 
 ## Workflow operations
 
@@ -24,9 +24,22 @@ The Oteryn runner has Docker access because it is the deployment control plane. 
 - `bootstrap` — build and publish the immutable image, then deploy acceptance mode unless a collector is already running;
 - `status` — inspect the container, show a bounded log tail and list the newest run directory;
 - `collect` — copy the newest run directory and container diagnostics into a GitHub Actions artifact;
-- scheduled `monitor` — run hourly, report status, and upload a completed run once.
+- scheduled `monitor` — run hourly, report status, update issue `#148`, and upload a completed run once.
 
 A push to `main` that changes the workflow or this directory performs the initial `bootstrap`. An already running collector is preserved and is never replaced by bootstrap.
+
+## Status board
+
+Issue `#148` is the durable non-secret status board. Every bootstrap and hourly observation replaces its body with only:
+
+- container state and exit code;
+- immutable runtime image reference;
+- latest run ID;
+- container start and finish timestamps;
+- operation outcome;
+- timestamp and link to the controlling Actions run.
+
+The issue never receives container logs, exchange credentials, Oteryn secrets or raw liquidation event data. This provides connector-readable visibility without direct DSM or SSH access.
 
 ## Evidence retention
 
@@ -52,6 +65,7 @@ The workflow fails closed when:
 - the immutable collector image cannot be built or published;
 - a new container exits immediately after deployment;
 - no run directory exists when collection is requested;
-- artifact SHA-256 verification fails.
+- artifact SHA-256 verification fails;
+- the trusted runner cannot update the fixed non-secret status issue.
 
 It does not restart or replace a running collector, weaken the Freqtrade acceptance policy, or classify a failed report as successful.
