@@ -4,10 +4,14 @@ namespace App\PublicPortal\Navigation;
 
 use Illuminate\Support\Facades\Route;
 
+/**
+ * @phpstan-type NavigationItem array{label: string, url: string, active: string, priority: int}
+ * @phpstan-type FooterGroup array{label: string, priority: int, items: list<NavigationItem>}
+ */
 final class PublicNavigationRegistry
 {
     /**
-     * @return list<array{label: string, url: string, active: string, priority: int}>
+     * @return list<NavigationItem>
      */
     public function header(): array
     {
@@ -29,17 +33,17 @@ final class PublicNavigationRegistry
             }
         }
 
-        usort($items, static fn (array $left, array $right): int => $left['priority'] <=> $right['priority']);
+        usort($items, self::compareItems(...));
 
         return $items;
     }
 
     /**
-     * @return list<array{label: string, priority: int, items: list<array{label: string, url: string, active: string, priority: int}>}>
+     * @return list<FooterGroup>
      */
     public function footer(): array
     {
-        /** @var array<string, array{label: string, priority: int, items: list<array{label: string, url: string, active: string, priority: int}>}> $groups */
+        /** @var array<string, FooterGroup> $groups */
         $groups = [];
 
         foreach ($this->definitions() as $definition) {
@@ -79,18 +83,19 @@ final class PublicNavigationRegistry
             }
         }
 
-        foreach ($groups as &$group) {
-            usort($group['items'], static fn (array $left, array $right): int => $left['priority'] <=> $right['priority']);
+        $sortedGroups = [];
+
+        foreach ($groups as $group) {
+            usort($group['items'], self::compareItems(...));
+
+            if ($group['items'] !== []) {
+                $sortedGroups[] = $group;
+            }
         }
-        unset($group);
 
-        $groups = array_values(array_filter(
-            $groups,
-            static fn (array $group): bool => $group['items'] !== [],
-        ));
-        usort($groups, static fn (array $left, array $right): int => $left['priority'] <=> $right['priority']);
+        usort($sortedGroups, self::compareGroups(...));
 
-        return $groups;
+        return $sortedGroups;
     }
 
     /**
@@ -110,16 +115,19 @@ final class PublicNavigationRegistry
         foreach ($files as $file) {
             $definition = require $file;
 
-            if (is_array($definition)) {
-                $definitions[] = $definition;
+            if (! is_array($definition)) {
+                continue;
             }
+
+            /** @var array<string, mixed> $definition */
+            $definitions[] = $definition;
         }
 
         return $definitions;
     }
 
     /**
-     * @return array{label: string, url: string, active: string, priority: int}|null
+     * @return NavigationItem|null
      */
     private function normalizeItem(mixed $item): ?array
     {
@@ -153,5 +161,23 @@ final class PublicNavigationRegistry
             'active' => $active,
             'priority' => $priority,
         ];
+    }
+
+    /**
+     * @param  NavigationItem  $left
+     * @param  NavigationItem  $right
+     */
+    private static function compareItems(array $left, array $right): int
+    {
+        return $left['priority'] <=> $right['priority'];
+    }
+
+    /**
+     * @param  FooterGroup  $left
+     * @param  FooterGroup  $right
+     */
+    private static function compareGroups(array $left, array $right): int
+    {
+        return $left['priority'] <=> $right['priority'];
     }
 }
