@@ -59,7 +59,7 @@ jobs:
           grep -Fq 'LIQUID20_MODE=acceptance' deploy/liquid20/synology-control.sh
           grep -Fq -- '--restart no' deploy/liquid20/synology-control.sh
           grep -Fq '/data/github-uploaded/' deploy/liquid20/synology-control.sh
-          if grep -Eq 'BYBIT_API_KEY|BINANCE_API_KEY|FREQTRADE__EXCHANGE__KEY' .github/workflows/liquid20-synology-control.yml deploy/liquid20/synology-control.sh; then
+          if grep -Eq 'BYBIT_API_KEY|BINANCE_API_KEY|FREQTRADE__EXCHANGE__KEY' deploy/liquid20/synology-control.sh; then
             echo 'Trading credential variables must not be introduced into Liquid20 control.' >&2
             exit 1
           fi
