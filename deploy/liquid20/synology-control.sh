@@ -119,7 +119,12 @@ ensure_data_root() {
     docker run --rm \
         -v "$DATA_ROOT:/data:rw" \
         "$ALPINE_IMAGE" \
-        sh -ec 'mkdir -p /data/runs /data/github-uploaded && chmod 0750 /data /data/runs /data/github-uploaded'
+        sh -ec '
+            mkdir -p /data/runs /data/github-uploaded
+            chown 0:0 /data /data/runs /data/github-uploaded
+            chmod 0750 /data /data/runs /data/github-uploaded
+            stat -c "path=%n owner=%u:%g mode=%a" /data /data/runs /data/github-uploaded
+        '
 }
 
 deploy_acceptance() {
