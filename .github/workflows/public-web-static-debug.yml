@@ -1,0 +1,47 @@
+name: Public Web Static Debug
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-web-static-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Capture PHPStan result
+        shell: bash
+        run: |
+          set +e
+          vendor/bin/phpstan analyse --memory-limit=1G --error-format=json > phpstan-result.json 2>&1
+          echo "$?" > phpstan-exit-code.txt
+          exit 0
+
+      - name: Upload PHPStan result
+        uses: actions/upload-artifact@v6
+        with:
+          name: public-web-phpstan-${{ github.run_id }}
+          path: |
+            phpstan-result.json
+            phpstan-exit-code.txt
+          retention-days: 1
