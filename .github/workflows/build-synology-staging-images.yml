@@ -18,6 +18,7 @@ on:
       - deploy/synology/**
       - .github/workflows/build-synology-staging-images.yml
       - .github/workflows/deploy-synology-staging.yml
+      - .github/workflows/one-shot-synology-staging-deploy.yml
   push:
     branches:
       - main
@@ -35,6 +36,7 @@ on:
       - deploy/synology/**
       - .github/workflows/build-synology-staging-images.yml
       - .github/workflows/deploy-synology-staging.yml
+      - .github/workflows/one-shot-synology-staging-deploy.yml
   workflow_dispatch:
 
 permissions:
