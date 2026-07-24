@@ -32,6 +32,7 @@ final readonly class PublicDownloadCenterQuery
             return new DownloadCenterViewModel(DownloadCenterState::EMPTY, [], $platform);
         }
 
+        /** @var list<ClientRelease> $publicReleases */
         $publicReleases = [];
         $rejectedArtifactSeen = false;
 
@@ -50,11 +51,12 @@ final readonly class PublicDownloadCenterQuery
 
                     return false;
                 })
-                ->sortBy([
-                    ['platform', 'asc'],
-                    ['architecture', 'asc'],
-                    ['id', 'asc'],
-                ])
+                ->sortBy(static fn (ClientReleaseArtifact $artifact): string => sprintf(
+                    '%s|%s|%020d',
+                    $artifact->platform,
+                    $artifact->architecture,
+                    $artifact->id,
+                ))
                 ->values();
 
             if ($platform !== null) {
@@ -77,7 +79,6 @@ final readonly class PublicDownloadCenterQuery
             );
         }
 
-        /** @var list<ClientRelease> $publicReleases */
         return new DownloadCenterViewModel(DownloadCenterState::AVAILABLE, $publicReleases, $platform);
     }
 }
