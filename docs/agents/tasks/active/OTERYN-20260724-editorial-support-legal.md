@@ -79,11 +79,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T22:26:00Z
-head: cd8a879e40d345a1a60f5c3e20154b39e4e0feb4
+updated_at: 2026-07-24T22:30:00Z
+head: 6031cb65fa780c4a5bb24d78f294066a4b73cd13
 branch: feat/OTERYN-20260724-editorial-support-legal
 pr: 159
-status: ready_for_review
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -202,9 +202,6 @@ validation:
   - command: Build Synology Staging Images run 30130763757
     result: PASS
     evidence: staging image build passed
-  - command: diagnostic pull requests #168 and #170
-    result: CLOSED_NOT_MERGED
-    evidence: temporary quiet workflows exposed exact PHPStan and PHPUnit failures; both diagnostic PRs were closed without merging
 blockers:
   - none
 next_action: Verify required checks on the final record-only head, then mark PR #159 ready for review.
