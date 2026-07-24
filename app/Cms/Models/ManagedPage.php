@@ -10,6 +10,8 @@ use Illuminate\Support\Carbon;
  * @property string $slug
  * @property string $title
  * @property string $body
+ * @property string|null $legal_version
+ * @property Carbon|null $legal_effective_date
  * @property Carbon|null $published_at
  */
 final class ManagedPage extends Model
@@ -21,6 +23,8 @@ final class ManagedPage extends Model
         'slug',
         'title',
         'body',
+        'legal_version',
+        'legal_effective_date',
         'published_at',
     ];
 
@@ -30,6 +34,7 @@ final class ManagedPage extends Model
     protected function casts(): array
     {
         return [
+            'legal_effective_date' => 'date',
             'published_at' => 'datetime',
         ];
     }
