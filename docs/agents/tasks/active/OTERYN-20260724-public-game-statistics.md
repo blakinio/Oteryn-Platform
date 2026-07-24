@@ -31,7 +31,7 @@ Deliver the smallest complete read-only public-game-statistics capability suppor
 - [x] Ordering and pagination are deterministic and bounded.
 - [x] Empty and dependency-unavailable behavior are distinct.
 - [x] The implementation uses the database-enforced read-only Canary boundary without N+1 or unbounded queries.
-- [ ] Focused feature/integration tests and exact-head CI pass.
+- [x] Focused feature/integration tests and exact-head CI pass.
 
 ## Ownership
 
@@ -59,11 +59,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T23:45:00+02:00
-head: 6b5e812eb8b6e0e3663983d4456b615abe48a708
+updated_at: 2026-07-24T23:59:00+02:00
+head: 20aad2c97d591c5f9dc9168333019c2a9dc48567
 branch: feat/OTERYN-20260724-public-game-statistics
 pr: 160
-status: validating
+status: ready
 context_routes:
   - public-game-data
   - canary-integration
@@ -87,17 +87,20 @@ proven:
   - PR 160 implements GET /guilds with a dedicated query, controller, module route, view and focused tests.
   - The projection allowlist is guild name plus a derived count of membership rows joined to active players only.
   - Pagination is fixed at 50 and ordering is guild name ascending with guild ID as a deterministic tie-breaker.
+  - The aggregate is produced by one grouped active-members subquery joined into the bounded page query; the paginator performs at most one count query plus one page query.
   - Empty data returns HTTP 200 while Canary query failure returns HTTP 503.
+  - All seven pull-request workflow families succeeded on executable head 20aad2c97d591c5f9dc9168333019c2a9dc48567.
 derived:
   - The guild index adds no Canary table grant because every source table is already inside the database-enforced read allowlist.
 unknown:
   - Product meaning of guild points, level, residence and creationdata remains unverified for this capability and those fields are not exposed.
 conflicts: []
 first_failure:
-  marker: LOCAL_CHECKOUT_UNAVAILABLE
-  evidence: execution sandbox could not resolve github.com; validation uses GitHub CI on the exact branch head
+  marker: PHPSTAN_LEVEL_10
+  evidence: early CI revisions stopped at static analysis before tests; type-safe response assertions and a grouped aggregate query produced a passing exact-head CI run 30127714879
 rejected_hypotheses:
   - Bundle all three statistics surfaces: rejected because latest-death and kill-statistic semantics were not proven and are not required for a complete guild index.
+  - Inspect paginator internals in the feature test: rejected because response-level ordering, count output, pagination boundary and query-log assertions cover the public contract without introducing generic-type ambiguity.
 changed_paths:
   - app/Http/Controllers/PublicGameData/GuildIndexController.php
   - app/PublicGameData/GuildIndexQuery.php
@@ -115,13 +118,31 @@ validation:
     evidence: existing verifier and provisioning template require direct SELECT only on guilds, guild_membership and players among the approved tables
   - command: local checkout and tests
     result: BLOCKED
-    evidence: sandbox DNS resolution for github.com failed
-  - command: exact-head GitHub Actions
-    result: NOT_RUN
-    evidence: final checkpoint commit pending workflow execution
+    evidence: sandbox DNS resolution for github.com failed; no local result is claimed
+  - command: CI run 30127714879 on 20aad2c97d591c5f9dc9168333019c2a9dc48567
+    result: PASS
+    evidence: composer validation/install/audit, Pint, PHPStan level 10 and full test suite succeeded
+  - command: Agent Governance run 30127714795
+    result: PASS
+    evidence: exact executable head workflow succeeded
+  - command: Phase 7 Production-Like Validation run 30127714852
+    result: PASS
+    evidence: exact executable head workflow succeeded
+  - command: Platform DB Outage Validation run 30127714889
+    result: PASS
+    evidence: exact executable head workflow succeeded
+  - command: Game Auth Ticket Concurrency run 30127714828
+    result: PASS
+    evidence: exact executable head workflow succeeded
+  - command: Acceptance E2E and Visual UX run 30127714786
+    result: PASS
+    evidence: exact executable head workflow succeeded
+  - command: Build Synology Staging Images run 30127714843
+    result: PASS
+    evidence: exact executable head workflow succeeded
 blockers:
   - none
-next_action: Inspect all required GitHub Actions checks on the exact PR head and fix the first failing invariant or mark PR 160 ready when they pass.
+next_action: Verify the docs-only checkpoint head remains green, then mark PR 160 ready for review and merge only while all required checks remain successful.
 ```
 
 ## Notes
