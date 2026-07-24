@@ -13,6 +13,9 @@ load_oteryn_env_file "$ENV_FILE"
 
 required_vars=(
     PLATFORM_IMAGE GATEWAY_IMAGE CANARY_IMAGE
+    PLATFORM_BIND_ADDRESS GATEWAY_BIND_ADDRESS CANARY_LOGIN_BIND_ADDRESS CANARY_GAME_BIND_ADDRESS
+    PLATFORM_PORT GATEWAY_PORT CANARY_LOGIN_PORT CANARY_GAME_PORT CANARY_SERVER_IP
+    GAME_WORLD_ID GAME_WORLD_SLUG GAME_WORLD_NAME GAME_WORLD_REGION GAME_WORLD_HOST GAME_WORLD_PORT
     APP_KEY MARIADB_ROOT_PASSWORD PLATFORM_DB_NAME PLATFORM_DB_USER PLATFORM_DB_PASSWORD
     CANARY_DB_NAME CANARY_DB_USER CANARY_DB_PASSWORD
     CANARY_READONLY_DB_USER CANARY_READONLY_DB_PASSWORD
@@ -78,6 +81,90 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 if ! docker compose version >/dev/null 2>&1; then
     echo "Docker Compose v2 plugin is required on the deployment runner." >&2
+    exit 1
+fi
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 is required on the deployment runner." >&2
+    exit 1
+fi
+
+validate_ipv4_policy() {
+    local address="$1"
+    local policy="$2"
+    python3 - "$address" "$policy" <<'PY'
+import ipaddress
+import sys
+
+try:
+    address = ipaddress.ip_address(sys.argv[1])
+except ValueError as exc:
+    raise SystemExit(str(exc)) from exc
+
+policy = sys.argv[2]
+if address.version != 4 or address.is_unspecified or address.is_multicast or address.is_link_local:
+    raise SystemExit('address must be a usable IPv4 address')
+if policy == 'loopback' and str(address) != '127.0.0.1':
+    raise SystemExit('service must remain bound to exact loopback 127.0.0.1')
+if policy == 'private-or-loopback' and not (address.is_private or address.is_loopback):
+    raise SystemExit('game bind must be loopback or an RFC1918 private IPv4 address')
+PY
+}
+
+validate_port() {
+    local name="$1"
+    local value="${!name}"
+    if [[ ! "$value" =~ ^[1-9][0-9]*$ ]] || (( value > 65535 )); then
+        echo "$name must be an integer in 1..65535." >&2
+        exit 1
+    fi
+}
+
+if ! validate_ipv4_policy "$PLATFORM_BIND_ADDRESS" loopback; then
+    echo "PLATFORM_BIND_ADDRESS is invalid; Platform must remain loopback-only." >&2
+    exit 1
+fi
+if ! validate_ipv4_policy "$GATEWAY_BIND_ADDRESS" loopback; then
+    echo "GATEWAY_BIND_ADDRESS is invalid; Gateway must remain loopback-only." >&2
+    exit 1
+fi
+if ! validate_ipv4_policy "$CANARY_LOGIN_BIND_ADDRESS" loopback; then
+    echo "CANARY_LOGIN_BIND_ADDRESS is invalid; legacy login must remain loopback-only." >&2
+    exit 1
+fi
+if ! validate_ipv4_policy "$CANARY_GAME_BIND_ADDRESS" private-or-loopback; then
+    echo "CANARY_GAME_BIND_ADDRESS must be loopback or an exact private LAN IPv4 address." >&2
+    exit 1
+fi
+if [[ "$CANARY_SERVER_IP" != "$CANARY_GAME_BIND_ADDRESS" ]]; then
+    echo "CANARY_SERVER_IP must exactly match CANARY_GAME_BIND_ADDRESS." >&2
+    exit 1
+fi
+if [[ "$GAME_WORLD_HOST" != "$CANARY_GAME_BIND_ADDRESS" ]]; then
+    echo "GAME_WORLD_HOST must exactly match CANARY_GAME_BIND_ADDRESS." >&2
+    exit 1
+fi
+
+for port_name in PLATFORM_PORT GATEWAY_PORT CANARY_LOGIN_PORT CANARY_GAME_PORT GAME_WORLD_PORT; do
+    validate_port "$port_name"
+done
+if [[ "$GAME_WORLD_PORT" != "$CANARY_GAME_PORT" ]]; then
+    echo "GAME_WORLD_PORT must exactly match CANARY_GAME_PORT." >&2
+    exit 1
+fi
+if [[ ! "$GAME_WORLD_ID" =~ ^[1-9][0-9]*$ ]]; then
+    echo "GAME_WORLD_ID must be a positive integer." >&2
+    exit 1
+fi
+if [[ ! "$GAME_WORLD_SLUG" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]]; then
+    echo "GAME_WORLD_SLUG must be a bounded lower-case slug." >&2
+    exit 1
+fi
+if [[ ! "$GAME_WORLD_REGION" =~ ^[A-Za-z0-9_-]{1,32}$ ]]; then
+    echo "GAME_WORLD_REGION must be a simple bounded label." >&2
+    exit 1
+fi
+if (( ${#GAME_WORLD_NAME} < 1 || ${#GAME_WORLD_NAME} > 100 )); then
+    echo "GAME_WORLD_NAME must contain 1..100 characters." >&2
     exit 1
 fi
 
@@ -245,5 +332,15 @@ fi
 "${compose[@]}" up -d internal-proxy gateway
 
 OTERYN_ENV_FILE="$ENV_FILE" bash "$SCRIPT_DIR/health-check.sh"
+
+"${compose[@]}" exec -T platform php artisan game-auth:world:ensure \
+    --id="$GAME_WORLD_ID" \
+    --slug="$GAME_WORLD_SLUG" \
+    --name="$GAME_WORLD_NAME" \
+    --region="$GAME_WORLD_REGION" \
+    --host="$GAME_WORLD_HOST" \
+    --port="$GAME_WORLD_PORT" \
+    --status=online \
+    --login-enabled=1
 
 echo "Oteryn Synology staging deployment is healthy."
