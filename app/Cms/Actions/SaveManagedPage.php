@@ -70,6 +70,7 @@ final class SaveManagedPage
                 $this->preserveLegalVersion($page);
             }
 
+            /** @var array<string, bool|int|string|null> $metadata */
             $metadata = [
                 'slug' => $page->slug,
                 'published' => $page->published_at !== null,
