@@ -73,12 +73,15 @@ final readonly class PublishClientRelease
             if ($makeCurrent) {
                 ClientRelease::query()
                     ->where('channel', $release->channel)
-                    ->whereKeyNot($release->id)
+                    ->where('id', '!=', $release->id)
                     ->where('is_current', true)
                     ->update(['is_current' => false]);
             }
 
-            $release->published_at ??= now();
+            if ($release->published_at === null) {
+                $release->published_at = now();
+            }
+
             $release->is_current = $makeCurrent || $release->is_current;
             $release->save();
 
