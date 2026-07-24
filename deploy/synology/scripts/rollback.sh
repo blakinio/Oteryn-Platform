@@ -19,9 +19,11 @@ fi
 
 load_oteryn_env_file "$state_file"
 
-for name in PLATFORM_IMAGE GATEWAY_IMAGE CANARY_IMAGE; do
+for name in \
+    PLATFORM_IMAGE GATEWAY_IMAGE CANARY_IMAGE \
+    GAME_WORLD_ID GAME_WORLD_SLUG GAME_WORLD_NAME GAME_WORLD_REGION GAME_WORLD_HOST GAME_WORLD_PORT; do
     if [[ -z "${!name:-}" ]]; then
-        echo "Rollback snapshot is incomplete: $name" >&2
+        echo "Rollback configuration is incomplete: $name" >&2
         exit 1
     fi
 done
@@ -33,5 +35,15 @@ compose=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 "${compose[@]}" up -d canary platform internal-proxy gateway
 
 OTERYN_ENV_FILE="$ENV_FILE" bash "$SCRIPT_DIR/health-check.sh"
+
+"${compose[@]}" exec -T platform php artisan game-auth:world:ensure \
+    --id="$GAME_WORLD_ID" \
+    --slug="$GAME_WORLD_SLUG" \
+    --name="$GAME_WORLD_NAME" \
+    --region="$GAME_WORLD_REGION" \
+    --host="$GAME_WORLD_HOST" \
+    --port="$GAME_WORLD_PORT" \
+    --status=online \
+    --login-enabled=1
 
 echo "Runtime image rollback completed. Database migrations were not reversed automatically."

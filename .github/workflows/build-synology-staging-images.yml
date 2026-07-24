@@ -18,6 +18,7 @@ on:
       - deploy/synology/**
       - .github/workflows/build-synology-staging-images.yml
       - .github/workflows/deploy-synology-staging.yml
+      - .github/workflows/one-shot-synology-lan-game-deploy.yml
   push:
     branches:
       - main
@@ -35,6 +36,7 @@ on:
       - deploy/synology/**
       - .github/workflows/build-synology-staging-images.yml
       - .github/workflows/deploy-synology-staging.yml
+      - .github/workflows/one-shot-synology-lan-game-deploy.yml
   workflow_dispatch:
 
 permissions:
@@ -66,10 +68,12 @@ jobs:
             deploy/synology/tls/init.sh \
             deploy/synology/mariadb/init/10-platform-database.sh
 
-      - name: Validate Compose manifests and containerized runner boundary
+      - name: Validate Compose manifests and LAN isolation
         run: |
           set -euo pipefail
           env_file=/tmp/oteryn-synology.env
+          default_json=/tmp/oteryn-runtime-default.json
+          lan_json=/tmp/oteryn-runtime-lan.json
           project="oteryn-boundary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           cp deploy/synology/.env.example "$env_file"
           sed -E -i 's/=(REQUIRED_[A-Z0-9_]+)$/=localplaceholder/' "$env_file"
@@ -82,17 +86,46 @@ jobs:
           )
           cleanup() {
             "${runtime_compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
-            rm -f "$env_file" /tmp/oteryn-runtime-compose.json
+            rm -f "$env_file" "$default_json" "$lan_json"
           }
           trap cleanup EXIT
 
-          "${runtime_compose[@]}" config --quiet
-          "${runtime_compose[@]}" config --format json > /tmp/oteryn-runtime-compose.json
-          python3 - <<'PY'
+          render_compose() {
+            local output="$1"
+            "${runtime_compose[@]}" config --quiet
+            "${runtime_compose[@]}" config --format json > "$output"
+          }
+
+          render_compose "$default_json"
+          python3 - "$default_json" <<'PY'
           import json
+          import sys
           from pathlib import Path
 
-          data = json.loads(Path('/tmp/oteryn-runtime-compose.json').read_text())
+          data = json.loads(Path(sys.argv[1]).read_text())
+
+          def bindings(service):
+              result = {}
+              for port in data['services'][service].get('ports', []) or []:
+                  result[str(port['target'])] = (
+                      str(port.get('host_ip', '')),
+                      str(port['published']),
+                  )
+              return result
+
+          expected = {
+              'platform': {'8000': ('127.0.0.1', '8000')},
+              'gateway': {'8080': ('127.0.0.1', '8080')},
+              'canary': {
+                  '7171': ('127.0.0.1', '7171'),
+                  '7172': ('127.0.0.1', '7172'),
+              },
+          }
+          for service, service_expected in expected.items():
+              actual = bindings(service)
+              if actual != service_expected:
+                  raise SystemExit(f'default bindings for {service} are {actual}, expected {service_expected}')
+
           bind_mounts = []
           for service_name, service in data.get('services', {}).items():
               for mount in service.get('volumes', []) or []:
@@ -100,6 +133,46 @@ jobs:
                       bind_mounts.append((service_name, mount.get('source'), mount.get('target')))
           if bind_mounts:
               raise SystemExit(f'runtime Compose must not depend on runner checkout bind mounts: {bind_mounts}')
+          PY
+
+          sed -i 's/^CANARY_GAME_BIND_ADDRESS=.*/CANARY_GAME_BIND_ADDRESS=192.168.50.10/' "$env_file"
+          sed -i 's/^CANARY_SERVER_IP=.*/CANARY_SERVER_IP=192.168.50.10/' "$env_file"
+          sed -i 's/^GAME_WORLD_HOST=.*/GAME_WORLD_HOST=192.168.50.10/' "$env_file"
+          render_compose "$lan_json"
+          python3 - "$lan_json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          data = json.loads(Path(sys.argv[1]).read_text())
+
+          def bindings(service):
+              result = {}
+              for port in data['services'][service].get('ports', []) or []:
+                  result[str(port['target'])] = (
+                      str(port.get('host_ip', '')),
+                      str(port['published']),
+                  )
+              return result
+
+          expected = {
+              'platform': {'8000': ('127.0.0.1', '8000')},
+              'gateway': {'8080': ('127.0.0.1', '8080')},
+              'canary': {
+                  '7171': ('127.0.0.1', '7171'),
+                  '7172': ('192.168.50.10', '7172'),
+              },
+          }
+          for service, service_expected in expected.items():
+              actual = bindings(service)
+              if actual != service_expected:
+                  raise SystemExit(f'LAN bindings for {service} are {actual}, expected {service_expected}')
+
+          canary_environment = data['services']['canary']['environment']
+          if str(canary_environment['CANARY_SERVER_IP']) != '192.168.50.10':
+              raise SystemExit('Canary advertised server IP does not match the LAN game bind')
+          if str(canary_environment['CANARY_GAME_SESSION_ISSUER_WORLD_ID']) != '1':
+              raise SystemExit('Canary issuer world ID does not match the staging World Registry ID')
           PY
 
           "${runtime_compose[@]}" pull tls-init
@@ -115,11 +188,10 @@ jobs:
             alpine:3.22 \
             /bin/sh -ec 'test -s /bootstrap/tls-init.sh && test -s /bootstrap/internal-nginx.conf'
 
-          if grep -q 'http://${OTERYN_BIND_ADDRESS}' deploy/synology/scripts/health-check.sh; then
-            echo 'Health checks must not probe the containerized runner loopback.' >&2
-            exit 1
-          fi
           grep -q -- '--network "container:' deploy/synology/scripts/health-check.sh
+          grep -q 'assert_binding platform' deploy/synology/scripts/health-check.sh
+          grep -q 'assert_binding gateway' deploy/synology/scripts/health-check.sh
+          grep -q 'assert_binding canary' deploy/synology/scripts/health-check.sh
 
           docker compose \
             --env-file deploy/synology/runner/.env.example \

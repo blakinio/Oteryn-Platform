@@ -27,6 +27,28 @@ for service in mariadb redis canary platform internal-proxy gateway; do
     container_ids["$service"]="$container_id"
 done
 
+assert_binding() {
+    local service="$1"
+    local container_port="$2"
+    local expected_host="$3"
+    local expected_port="$4"
+    local container_id="${container_ids[$service]}"
+    local actual
+
+    actual="$(docker inspect --format "{{with index .NetworkSettings.Ports \"${container_port}/tcp\"}}{{if eq (len .) 1}}{{(index . 0).HostIp}}:{{(index . 0).HostPort}}{{end}}{{end}}" "$container_id")"
+    if [[ "$actual" != "${expected_host}:${expected_port}" ]]; then
+        echo "Unexpected published binding for ${service} ${container_port}/tcp: ${actual:-none}" >&2
+        exit 1
+    fi
+
+    echo "Verified binding: ${service} ${container_port}/tcp -> ${actual}"
+}
+
+assert_binding platform 8000 "$PLATFORM_BIND_ADDRESS" "$PLATFORM_PORT"
+assert_binding gateway 8080 "$GATEWAY_BIND_ADDRESS" "$GATEWAY_PORT"
+assert_binding canary "$CANARY_LOGIN_PORT" "$CANARY_LOGIN_BIND_ADDRESS" "$CANARY_LOGIN_PORT"
+assert_binding canary "$CANARY_GAME_PORT" "$CANARY_GAME_BIND_ADDRESS" "$CANARY_GAME_PORT"
+
 probe_url() {
     local service="$1"
     local port="$2"
@@ -61,6 +83,14 @@ if ! docker run --rm \
     "nc -z -w 3 127.0.0.1 '${CANARY_GAME_PORT}'"; then
     echo "Canary game TCP port is not reachable inside the Canary network namespace." >&2
     exit 1
+fi
+
+if [[ "$CANARY_GAME_BIND_ADDRESS" != "127.0.0.1" ]]; then
+    if ! timeout 5 bash -c "exec 3<>/dev/tcp/${CANARY_GAME_BIND_ADDRESS}/${CANARY_GAME_PORT}"; then
+        echo "Canary game TCP port is not reachable through the configured Synology LAN address." >&2
+        exit 1
+    fi
+    echo "Verified LAN game endpoint: ${CANARY_GAME_BIND_ADDRESS}:${CANARY_GAME_PORT}"
 fi
 
 echo "Platform, Gateway and Canary staging probes passed."

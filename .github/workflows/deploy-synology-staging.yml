@@ -20,6 +20,31 @@ on:
         description: Full compatible prebuilt Canary image reference; required for deploy
         required: false
         type: string
+      canary_game_bind_address:
+        description: Exact private Synology IPv4 address for game TCP, or 127.0.0.1 for loopback-only
+        required: true
+        type: string
+        default: 127.0.0.1
+      game_world_id:
+        description: Positive Platform world ID matching the Canary issuer world ID
+        required: true
+        type: string
+        default: "1"
+      game_world_slug:
+        description: Stable lower-case World Registry slug
+        required: true
+        type: string
+        default: oteryn-staging
+      game_world_name:
+        description: Player-facing World Registry name
+        required: true
+        type: string
+        default: Oteryn Staging
+      game_world_region:
+        description: Bounded World Registry region label
+        required: true
+        type: string
+        default: LAN
 
 permissions:
   contents: read
@@ -64,6 +89,7 @@ jobs:
           docker version >/dev/null
           docker compose version >/dev/null
           curl --version >/dev/null
+          python3 --version >/dev/null
           sha256sum --version >/dev/null
           timeout --version >/dev/null
 
@@ -80,7 +106,11 @@ jobs:
           DEPLOY_ACTION: ${{ inputs.action }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           CANARY_IMAGE_INPUT: ${{ inputs.canary_image }}
-          OTERYN_BIND_ADDRESS_INPUT: ${{ vars.OTERYN_STAGING_BIND_ADDRESS }}
+          CANARY_GAME_BIND_ADDRESS_INPUT: ${{ inputs.canary_game_bind_address }}
+          GAME_WORLD_ID_INPUT: ${{ inputs.game_world_id }}
+          GAME_WORLD_SLUG_INPUT: ${{ inputs.game_world_slug }}
+          GAME_WORLD_NAME_INPUT: ${{ inputs.game_world_name }}
+          GAME_WORLD_REGION_INPUT: ${{ inputs.game_world_region }}
           OTERYN_STATE_DIR_INPUT: ${{ vars.OTERYN_STAGING_STATE_DIR }}
           APP_URL_INPUT: ${{ vars.OTERYN_STAGING_APP_URL }}
         run: |
@@ -99,13 +129,40 @@ jobs:
             exit 1
           fi
 
-          bind_address="${OTERYN_BIND_ADDRESS_INPUT:-127.0.0.1}"
-          state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
-          app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
-          if [[ ! "$bind_address" =~ ^[0-9.]+$ ]]; then
-            echo "OTERYN_STAGING_BIND_ADDRESS must currently be an IPv4 address." >&2
+          python3 - "$CANARY_GAME_BIND_ADDRESS_INPUT" <<'PY'
+          import ipaddress
+          import sys
+
+          try:
+              address = ipaddress.ip_address(sys.argv[1])
+          except ValueError as exc:
+              raise SystemExit(f'canary_game_bind_address is invalid: {exc}') from exc
+
+          if address.version != 4 or address.is_unspecified or address.is_multicast or address.is_link_local:
+              raise SystemExit('canary_game_bind_address must be a usable IPv4 address')
+          if not (address.is_private or address.is_loopback):
+              raise SystemExit('canary_game_bind_address must be loopback or RFC1918 private IPv4')
+          PY
+
+          if [[ ! "$GAME_WORLD_ID_INPUT" =~ ^[1-9][0-9]*$ ]]; then
+            echo "game_world_id must be a positive integer." >&2
             exit 1
           fi
+          if [[ ! "$GAME_WORLD_SLUG_INPUT" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]]; then
+            echo "game_world_slug must be a bounded lower-case slug." >&2
+            exit 1
+          fi
+          if [[ ! "$GAME_WORLD_REGION_INPUT" =~ ^[A-Za-z0-9_-]{1,32}$ ]]; then
+            echo "game_world_region must be a simple bounded label." >&2
+            exit 1
+          fi
+          if (( ${#GAME_WORLD_NAME_INPUT} < 1 || ${#GAME_WORLD_NAME_INPUT} > 100 )); then
+            echo "game_world_name must contain 1..100 characters." >&2
+            exit 1
+          fi
+
+          state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
+          app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
           if [[ ! "$state_dir" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
             echo "OTERYN_STAGING_STATE_DIR must be an absolute simple path." >&2
             exit 1
@@ -181,24 +238,36 @@ jobs:
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
           CANARY_IMAGE_INPUT: ${{ inputs.canary_image }}
-          OTERYN_BIND_ADDRESS_INPUT: ${{ vars.OTERYN_STAGING_BIND_ADDRESS }}
+          CANARY_GAME_BIND_ADDRESS_INPUT: ${{ inputs.canary_game_bind_address }}
+          GAME_WORLD_ID_INPUT: ${{ inputs.game_world_id }}
+          GAME_WORLD_SLUG_INPUT: ${{ inputs.game_world_slug }}
+          GAME_WORLD_NAME_INPUT: ${{ inputs.game_world_name }}
+          GAME_WORLD_REGION_INPUT: ${{ inputs.game_world_region }}
           OTERYN_STATE_DIR_INPUT: ${{ vars.OTERYN_STAGING_STATE_DIR }}
           APP_URL_INPUT: ${{ vars.OTERYN_STAGING_APP_URL }}
         run: |
           set -euo pipefail
           umask 077
-          bind_address="${OTERYN_BIND_ADDRESS_INPUT:-127.0.0.1}"
           state_dir="${OTERYN_STATE_DIR_INPUT:-/var/lib/oteryn-staging-state}"
           app_url="${APP_URL_INPUT:-http://127.0.0.1:8000}"
           canary_image="${CANARY_IMAGE_INPUT:-rollback-placeholder}"
 
           cat > deploy/synology/.env <<EOF
           COMPOSE_PROJECT_NAME=oteryn-staging
-          OTERYN_BIND_ADDRESS=$bind_address
+          PLATFORM_BIND_ADDRESS=127.0.0.1
+          GATEWAY_BIND_ADDRESS=127.0.0.1
+          CANARY_LOGIN_BIND_ADDRESS=127.0.0.1
+          CANARY_GAME_BIND_ADDRESS=$CANARY_GAME_BIND_ADDRESS_INPUT
           PLATFORM_PORT=8000
           GATEWAY_PORT=8080
           CANARY_LOGIN_PORT=7171
           CANARY_GAME_PORT=7172
+          GAME_WORLD_ID=$GAME_WORLD_ID_INPUT
+          GAME_WORLD_SLUG=$GAME_WORLD_SLUG_INPUT
+          GAME_WORLD_NAME=$GAME_WORLD_NAME_INPUT
+          GAME_WORLD_REGION=$GAME_WORLD_REGION_INPUT
+          GAME_WORLD_HOST=$CANARY_GAME_BIND_ADDRESS_INPUT
+          GAME_WORLD_PORT=7172
           PLATFORM_IMAGE=ghcr.io/blakinio/oteryn-platform:$RELEASE_TAG
           GATEWAY_IMAGE=ghcr.io/blakinio/oteryn-game-gateway:$RELEASE_TAG
           CANARY_IMAGE=$canary_image
@@ -232,7 +301,7 @@ jobs:
           CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256=$CANARY_GAME_SESSION_SERVICE_TOKEN_SHA256
           CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256=$CANARY_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256
           CANARY_SERVER_NAME=Oteryn Staging
-          CANARY_SERVER_IP=127.0.0.1
+          CANARY_SERVER_IP=$CANARY_GAME_BIND_ADDRESS_INPUT
           CANARY_TEST_ACCOUNTS=false
           CANARY_DATA_PACK=data-otservbr-global
           CANARY_MAP_URL=https://github.com/opentibiabr/canary/releases/download/v3.6.1/otservbr.otbm
