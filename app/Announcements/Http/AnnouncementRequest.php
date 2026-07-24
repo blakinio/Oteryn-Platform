@@ -34,6 +34,7 @@ final class AnnouncementRequest extends FormRequest
                 'string',
                 'max:2048',
                 'required_with:action_label',
+                /** @param Closure(string): void $fail */
                 function (string $attribute, mixed $value, Closure $fail): void {
                     try {
                         AnnouncementActionLink::normalize(is_string($value) ? $value : null);
