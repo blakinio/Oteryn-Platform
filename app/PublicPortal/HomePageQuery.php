@@ -34,9 +34,7 @@ final readonly class HomePageQuery
     {
         try {
             $posts = $this->news->latestPublished();
-        } catch (Throwable $exception) {
-            report($exception);
-
+        } catch (Throwable) {
             return new HomeNewsSummary(PublicContentState::UNAVAILABLE, []);
         }
 
@@ -98,9 +96,7 @@ final readonly class HomePageQuery
             }
 
             return new HomeWorldSummary($state, $worldChannels, $playersOnline);
-        } catch (Throwable $exception) {
-            report($exception);
-
+        } catch (Throwable) {
             return new HomeWorldSummary(PublicContentState::UNAVAILABLE, [], null);
         }
     }
