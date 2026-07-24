@@ -54,11 +54,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-25T00:25:00+02:00
-head: 55f1f25e6beb3c55942a2ca96a508167ef6b8124
+updated_at: 2026-07-25T00:35:00+02:00
+head: d0916f969db980295b10c6eaa62bd93cb3ddacdd
 branch: fix/OTERYN-20260724-synology-oauth-id-punctuation
 pr: 167
-status: implementing
+status: ready
 context_routes:
   - agent-governance
   - testing
@@ -78,6 +78,7 @@ proven:
   - Execution 30129145948 proved no prefixed candidates remained when the separated workflow ran, so an earlier bounded run had already restored the canonical names.
   - Execution 30129145948 read the public OAuth client value but included the Laravel sentence-ending period because the bounded character class allowed a trailing dot.
   - PR 167 changes only the parser so dots must separate non-empty identifier segments; a local exact-message check returned 019f93b3-5e7e-721c-bc23-7e22e4bee7cc without punctuation.
+  - Exact PR 167 implementation head d0916f969db980295b10c6eaa62bd93cb3ddacdd passed CI 30129307622, Agent Governance 30129307586, Platform DB Outage Validation 30129307581, Phase 7 Production-Like Validation 30129307588 and Game Auth Ticket Concurrency 30129307552.
 derived:
   - Docker rename repaired the Container Manager-visible names without restarting runtime containers or touching named volumes.
   - The stored OAuth client id is expected to be 019f93b3-5e7e-721c-bc23-7e22e4bee7cc, pending one final runner publication with the corrected parser.
@@ -107,10 +108,22 @@ validation:
   - command: local bounded parser check against observed formatted Laravel message
     result: PASS
     evidence: corrected expression returned 019f93b3-5e7e-721c-bc23-7e22e4bee7cc without the sentence-ending period.
-  - command: PR 167 exact-head repository checks
-    result: NOT_RUN
-    evidence: punctuation parser fix is awaiting exact-head validation.
+  - command: CI 30129307622 on d0916f969db980295b10c6eaa62bd93cb3ddacdd
+    result: PASS
+    evidence: Composer validation/audit, formatting, static analysis and tests passed.
+  - command: Agent Governance 30129307586 on d0916f969db980295b10c6eaa62bd93cb3ddacdd
+    result: PASS
+    evidence: checkpoint and workflow governance passed.
+  - command: Platform DB Outage Validation 30129307581 on d0916f969db980295b10c6eaa62bd93cb3ddacdd
+    result: PASS
+    evidence: fail-closed database outage validation passed.
+  - command: Phase 7 Production-Like Validation 30129307588 on d0916f969db980295b10c6eaa62bd93cb3ddacdd
+    result: PASS
+    evidence: production-like validation passed.
+  - command: Game Auth Ticket Concurrency 30129307552 on d0916f969db980295b10c6eaa62bd93cb3ddacdd
+    result: PASS
+    evidence: ticket concurrency validation passed.
 blockers:
   - none
-next_action: Validate and merge PR 167, then verify the corrected OAuth client id published to issue 163.
+next_action: Squash-merge PR 167, then verify the corrected OAuth client id published to issue 163.
 ```
