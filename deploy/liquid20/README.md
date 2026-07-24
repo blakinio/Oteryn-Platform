@@ -15,7 +15,7 @@ The control workflow:
 - does not mount the Docker socket into the collector;
 - uses `restart=no`, so an interrupted 24-hour attempt remains failed evidence rather than silently continuing.
 
-The Oteryn runner has Docker access because it is the deployment control plane. The Liquid20 collector does not.
+The Oteryn runner has Docker access because it is the deployment control plane. The Liquid20 collector does not. Only the bootstrap job receives `packages: write`; scheduled status and evidence collection remain read-only toward repository and package APIs.
 
 ## Workflow operations
 
@@ -30,7 +30,13 @@ A push to `main` that changes the workflow or this directory performs the initia
 
 ## Evidence retention
 
-Completed evidence is uploaded with seven-day GitHub Actions retention to limit storage consumption. After a successful upload, the run receives a `.github-uploaded` marker in its Synology run directory so scheduled monitoring does not upload the same package repeatedly.
+Completed evidence is uploaded with seven-day GitHub Actions retention to limit storage consumption. After a successful upload, a marker is written to the separate control directory:
+
+```text
+/volume1/docker/freqtrade-liquidations/data/github-uploaded/<run-id>
+```
+
+The marker is not written into the immutable run directory. Scheduled monitoring therefore avoids duplicate uploads without modifying accepted source evidence.
 
 The durable source data remains under:
 
