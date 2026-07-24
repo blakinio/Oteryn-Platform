@@ -23,7 +23,7 @@ Apply the complete sensitive-response cache contract to OAuth token success and 
 - [x] Existing Game Login Ticket issue/redeem responses preserve the same headers in focused coverage.
 - [x] Unrelated endpoints do not inherit sensitive-response cache headers in focused coverage.
 - [x] Focused tests and required Platform CI pass.
-- [ ] The native-auth rehearsal verifies the headers over the real HTTPS boundary.
+- [x] The native-auth rehearsal verifies the headers over the real HTTPS boundary.
 
 ## Ownership
 
@@ -49,12 +49,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T10:40:00+02:00
-head: b5dd6a7be5c704d5706241240e06f8bb8c4b5efe
+updated_at: 2026-07-24T17:42:00+02:00
+head: 6170bb21b00ca55211272be24649a5930c14150b
 branch: fix/OTERYN-20260724-oauth-token-cache-headers
-base_branch: main
 pr: 133
-status: review
+status: ready
 context_routes:
   - auth-identity
   - security
@@ -71,19 +70,20 @@ proven:
   - PreventSensitiveGameAuthResponseCaching centralizes the required header values for game ticket issue/redeem paths.
   - PR 133 makes that middleware conditional and global, adds /oauth/token, and preserves the exception response hook for 4xx responses.
   - Focused unit coverage checks OAuth token, ticket issue, ticket redeem and an unrelated health response.
-  - Standard CI run 30079059960 passed Composer validation, dependency audit, Pint, PHPStan and the complete PHPUnit suite on head b5dd6a7be5c704d5706241240e06f8bb8c4b5efe.
+  - Standard CI run 30079059960 passed Composer validation, dependency audit, Pint, PHPStan and the complete PHPUnit suite on implementation head b5dd6a7be5c704d5706241240e06f8bb8c4b5efe.
+  - Production-like rehearsal run 30095854266 passed the OAuth token success and error cache-header assertions over the real HTTPS boundary using the exact combined Platform implementation.
+  - Retained rehearsal artifact 8597730728 has digest sha256:e7e908e9129658654054a96adf641757edc2c904fc2b01a5b9fc97e393d18009 and classification PRODUCTION_LIKE_PROVEN.
 derived:
   - OAuth token responses reuse the existing middleware contract rather than introducing a second header implementation.
-unknown:
-  - production-like runtime result over the real HTTPS OAuth boundary
+unknown: []
 conflicts: []
 first_failure:
-  marker: none-in-product-ci
-  evidence: all required Platform CI stages passed after applying the retained Pint diff
+  marker: none
+  evidence: Product CI and the full production-like HTTPS rehearsal passed the cache-header contract.
 rejected_hypotheses:
-  - OAuth PKCE exchange is broken: rejected because authorization_code_exchange is true and code reuse is rejected
-  - ticket issuance failed: rejected because Platform log records POST /api/v1/game-auth/tickets status 200 and token-family reuse is rejected
-  - apply no-cache to every response: rejected because the middleware checks an explicit sensitive path allowlist
+  - OAuth PKCE exchange is broken: rejected because authorization_code_exchange is true and code reuse is rejected.
+  - ticket issuance failed: rejected because Platform records POST /api/v1/game-auth/tickets status 200 and token-family reuse is rejected.
+  - apply no-cache to every response: rejected because the middleware checks an explicit sensitive path allowlist.
 changed_paths:
   - app/Http/Middleware/GameAuth/PreventSensitiveGameAuthResponseCaching.php
   - bootstrap/app.php
@@ -92,11 +92,13 @@ changed_paths:
 validation:
   - command: Native Auth Ephemeral Cutover Rehearsal run 30077854561
     result: FAIL
-    evidence: OAuth behavior passed; cache-header assertions and obsolete ticket status expectation failed
+    evidence: OAuth behavior passed; cache-header assertions and obsolete ticket status expectation failed.
   - command: CI run 30079059960 on b5dd6a7be5c704d5706241240e06f8bb8c4b5efe
     result: PASS
-    evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed
-blockers:
-  - none
-next_action: pin the validated PR 133 revision into the full native-auth rehearsal and verify OAuth token headers over HTTPS.
+    evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed.
+  - command: Native Auth Ephemeral Cutover Rehearsal run 30095854266
+    result: PASS
+    evidence: OAuth token success and error responses carried the complete sensitive no-cache policy over HTTPS.
+blockers: []
+next_action: Inspect checks on this checkpoint commit, mark PR 133 ready, and squash-merge when all required checks pass.
 ```
