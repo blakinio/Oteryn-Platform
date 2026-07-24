@@ -8,18 +8,22 @@
         $artifactRows = old('artifacts');
 
         if (! is_array($artifactRows)) {
-            $artifactRows = $release?->artifacts
-                ->map(static fn ($artifact): array => [
-                    'platform' => $artifact->platform,
-                    'architecture' => $artifact->architecture,
-                    'artifact_url' => $artifact->artifact_url,
-                    'filename' => $artifact->filename,
-                    'size_bytes' => $artifact->size_bytes,
-                    'sha256' => $artifact->sha256,
-                    'is_enabled' => $artifact->is_enabled,
-                ])
-                ->values()
-                ->all() ?? [];
+            $artifactRows = [];
+
+            if ($release !== null) {
+                $artifactRows = $release->artifacts
+                    ->map(static fn ($artifact): array => [
+                        'platform' => $artifact->platform,
+                        'architecture' => $artifact->architecture,
+                        'artifact_url' => $artifact->artifact_url,
+                        'filename' => $artifact->filename,
+                        'size_bytes' => $artifact->size_bytes,
+                        'sha256' => $artifact->sha256,
+                        'is_enabled' => $artifact->is_enabled,
+                    ])
+                    ->values()
+                    ->all();
+            }
         }
 
         while (count($artifactRows) < 6 && ! $published) {
