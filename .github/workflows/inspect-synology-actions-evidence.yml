@@ -13,14 +13,20 @@ jobs:
   inventory:
     runs-on: ubuntu-latest
     steps:
-      - name: List one-shot and deployment runs
+      - name: Extract sanitized deployment evidence
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          sha=e08548866e6edc70f69eaba40249303b69236625
-          for wf in one-shot-synology-staging-deploy.yml deploy-synology-staging.yml; do
-            echo "=== $wf ==="
-            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$wf/runs?per_page=100" \
-              --jq ".workflow_runs[] | select(.head_sha == \"$sha\") | {id,name,event,status,conclusion,head_sha,created_at,updated_at}"
-          done
+
+          echo '=== ONE-SHOT JOB METADATA ==='
+          gh api repos/${GITHUB_REPOSITORY}/actions/jobs/89426365047 \
+            --jq '{id,name,status,conclusion,runner_name,runner_group_name,labels,steps:[.steps[]|{number,name,status,conclusion}]}'
+          gh api repos/${GITHUB_REPOSITORY}/actions/jobs/89426365047/logs > /tmp/one-shot.log
+          grep -E 'Resolved image: ghcr\.io/blakinio/(oteryn-platform|oteryn-game-gateway):|Digest: sha256:|Monitoring Deploy Synology Staging run|Process completed with exit code' /tmp/one-shot.log || true
+
+          echo '=== DEPLOY JOB METADATA ==='
+          gh api repos/${GITHUB_REPOSITORY}/actions/jobs/89426521777 \
+            --jq '{id,name,status,conclusion,runner_name,runner_group_name,labels,steps:[.steps[]|{number,name,status,conclusion}]}'
+          gh api repos/${GITHUB_REPOSITORY}/actions/jobs/89426521777/logs > /tmp/deploy.log
+          grep -E 'Required synology-staging secret is missing:|must use generated hex/alphanumeric staging-safe characters|must be a Laravel base64 application key|must be a SHA-256 hex digest|Optional previous service-token hashes|release_tag is not|canary_image is required|contains unsupported characters|OTERYN_STAGING_.*must|Process completed with exit code' /tmp/deploy.log || true
