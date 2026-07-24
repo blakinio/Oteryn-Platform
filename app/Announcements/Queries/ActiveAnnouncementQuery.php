@@ -26,12 +26,14 @@ final class ActiveAnnouncementQuery
         return SiteAnnouncement::query()
             ->where('publication_state', SiteAnnouncement::STATE_PUBLISHED)
             ->where('starts_at', '<=', $readTime)
-            ->where(function ($query) use ($readTime): void {
-                /** @var Builder<SiteAnnouncement> $query */
-                $query
-                    ->whereNull('ends_at')
-                    ->orWhere('ends_at', '>', $readTime);
-            })
+            ->where(
+                /** @param Builder<SiteAnnouncement> $query */
+                function (Builder $query) use ($readTime): void {
+                    $query
+                        ->whereNull('ends_at')
+                        ->orWhere('ends_at', '>', $readTime);
+                },
+            )
             ->orderByDesc('severity')
             ->orderByDesc('starts_at')
             ->orderByDesc('id')
