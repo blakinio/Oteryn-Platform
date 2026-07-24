@@ -17,14 +17,17 @@ The control workflow:
 
 The Oteryn runner has Docker access because it is the deployment control plane. The Liquid20 collector does not. Only the bootstrap job receives `packages: write`. Bootstrap and observation receive `issues: write` solely to update the fixed non-secret status issue; they cannot use that permission to expose raw liquidation data or secrets.
 
+Synology's Docker engine did not permit writes to the explicit `:rw` data bind while the container root was configured `--read-only`. The collector therefore runs without Docker's root-filesystem read-only flag on this host, but retains `cap-drop ALL`, `no-new-privileges`, an isolated `/tmp` tmpfs, no ports, no Docker socket and no credentials.
+
 ## Workflow operations
 
 `Liquid20 Synology Control` supports:
 
 - `bootstrap` — build and publish the immutable image, then deploy acceptance mode unless a collector is already running;
-- `status` — inspect the container, show a bounded log tail and list the newest run directory;
-- `collect` — copy the newest run directory and container diagnostics into a GitHub Actions artifact;
-- scheduled `monitor` — run hourly, report status, update issue `#148`, and upload a completed run once.
+- `status` — inspect the container, show a bounded log tail, list the newest run directory and publish an aggregate acceptance summary when available;
+- `collect` — explicitly copy the newest run directory and container diagnostics into a GitHub Actions artifact.
+
+The hourly schedule executes `status` only. It does not create or upload artifacts. This prevents a full GitHub Actions storage quota from blocking routine observation or the deployment queue.
 
 A push to `main` that changes the workflow or this directory performs the initial `bootstrap`. An already running collector is preserved and is never replaced by bootstrap.
 
@@ -37,25 +40,26 @@ Issue `#148` is the durable non-secret status board. Every bootstrap and hourly 
 - latest run ID;
 - container start and finish timestamps;
 - operation outcome;
-- timestamp and link to the controlling Actions run.
+- timestamp and link to the controlling Actions run;
+- aggregate acceptance result, failed gate names and per-source event/availability counts when the final report exists.
 
-The issue never receives container logs, exchange credentials, Oteryn secrets or raw liquidation event data. This provides connector-readable visibility without direct DSM or SSH access.
+The issue never receives exchange credentials, Oteryn secrets or raw liquidation event data. A bounded, escaped and credential-redacted log tail is shown only for a stopped container to support failure diagnosis. This provides connector-readable visibility without direct DSM or SSH access.
 
 ## Evidence retention
 
-Completed evidence is uploaded with seven-day GitHub Actions retention to limit storage consumption. After a successful upload, a marker is written to the separate control directory:
+Full immutable evidence stays under:
+
+```text
+/volume1/docker/freqtrade-liquidations/data/runs/
+```
+
+An artifact is uploaded only after an explicit `collect` operation. After a successful upload, a marker is written to the separate control directory:
 
 ```text
 /volume1/docker/freqtrade-liquidations/data/github-uploaded/<run-id>
 ```
 
-The marker is not written into the immutable run directory. Scheduled monitoring therefore avoids duplicate uploads without modifying accepted source evidence.
-
-The durable source data remains under:
-
-```text
-/volume1/docker/freqtrade-liquidations/data/runs/
-```
+The marker is not written into the immutable run directory. A failed upload remains retryable without modifying accepted source evidence.
 
 ## Failure behavior
 
@@ -64,7 +68,7 @@ The workflow fails closed when:
 - Docker is unavailable on the runner;
 - the immutable collector image cannot be built or published;
 - a new container exits immediately after deployment;
-- no run directory exists when collection is requested;
+- no run directory exists when collection is explicitly requested;
 - artifact SHA-256 verification fails;
 - the trusted runner cannot update the fixed non-secret status issue.
 
