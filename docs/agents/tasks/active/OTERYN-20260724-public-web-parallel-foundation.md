@@ -111,7 +111,7 @@ The following exact permission keys are reserved centrally with no role grants: 
 ```yaml
 checkpoint_version: 1
 updated_at: 2026-07-24T18:08:25Z
-head: 5a133318266aa7b3d27d05266fa2c52cde734d9b
+head: 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
 branch: feat/OTERYN-20260724-public-web-parallel-foundation
 pr: 146
 status: ready
@@ -153,7 +153,7 @@ proven:
   - Existing CMS and PublicGameData boundaries provide published-only news, configured channels and TTL-bounded runtime status/counts.
   - The reservation migration creates no role-permission grants.
   - Exact implementation head a5283593788943e0d27bc4491d09dc52922996da passed all seven required GitHub Actions workflows.
-  - Compact handover head 5a133318266aa7b3d27d05266fa2c52cde734d9b passed all seven required GitHub Actions workflows.
+  - Frozen compact handover head 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd passed all seven required GitHub Actions workflows.
 derived:
   - Missing or expired runtime records cannot support an aggregate online count and are represented as STALE.
   - Runtime transport or malformed-data failure cannot support offline or zero claims and is represented as UNAVAILABLE.
@@ -202,30 +202,30 @@ validation:
     evidence: bounded implementation uses existing CMS and PublicGameData reads, exact permission keys, route filtering and shared focus and responsive foundations
   - command: CI
     result: PASS
-    evidence: workflow run 30116319634 passed Composer validation and audit, Pint, PHPStan and the full test suite on 5a133318266aa7b3d27d05266fa2c52cde734d9b
+    evidence: workflow run 30116626671 passed Composer validation and audit, Pint, PHPStan and the full test suite on 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
   - command: Acceptance E2E and Visual UX
     result: PASS
-    evidence: workflow run 30116319521 passed Chromium smoke, portability, desktop tablet mobile responsive, resilience and keyboard accessibility profiles on 5a133318266aa7b3d27d05266fa2c52cde734d9b
+    evidence: workflow run 30116626579 passed Chromium smoke, portability, desktop tablet mobile responsive, resilience and keyboard accessibility profiles on 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
   - command: Phase 7 Production-Like Validation
     result: PASS
-    evidence: workflow run 30116319519 passed production-like deployment, privilege, runtime, configuration, regression, health, restore and upgrade validation on 5a133318266aa7b3d27d05266fa2c52cde734d9b
+    evidence: workflow run 30116626580 passed production-like deployment, privilege, runtime, configuration, regression, health, restore and upgrade validation on 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
   - command: Platform DB Outage Validation
     result: PASS
-    evidence: workflow run 30116319498 passed on 5a133318266aa7b3d27d05266fa2c52cde734d9b
+    evidence: workflow run 30116626577 passed on 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
   - command: Agent Governance
     result: PASS
-    evidence: workflow run 30116319539 passed on 5a133318266aa7b3d27d05266fa2c52cde734d9b
+    evidence: workflow run 30116626642 passed on 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
   - command: Game Auth Ticket Concurrency
     result: PASS
-    evidence: workflow run 30116319492 passed on 5a133318266aa7b3d27d05266fa2c52cde734d9b
+    evidence: workflow run 30116626602 passed on 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
   - command: Build Synology Staging Images
     result: PASS
-    evidence: workflow run 30116319496 passed on 5a133318266aa7b3d27d05266fa2c52cde734d9b
+    evidence: workflow run 30116626645 passed on 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd
   - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTERYN-20260724-public-web-parallel-foundation.md --require-checkpoint
     result: PASS
     evidence: validated one task checkpoint against governance contract v1 before compact resume generation
 blockers: []
-next_action: Review and merge PR #146 after confirming its live head contains only this frozen compact handover update after validated head 5a133318266aa7b3d27d05266fa2c52cde734d9b and required checks remain green.
+next_action: Review and merge PR #146 after confirming its live head contains only this immutable compact handover update after validated head 16a71ceb320df4ee7dbac9b2fe3295f5d57115bd and required checks remain green.
 ```
 
 ## Notes
