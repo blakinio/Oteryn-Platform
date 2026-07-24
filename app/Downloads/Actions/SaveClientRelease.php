@@ -23,39 +23,38 @@ final readonly class SaveClientRelease
         ?string $releaseNotes,
         array $artifacts,
     ): ClientRelease {
+        $releaseId = $release?->id;
+
         return DB::transaction(function () use (
             $actor,
-            $release,
+            $releaseId,
             $version,
             $channel,
             $releaseNotes,
             $artifacts,
         ): ClientRelease {
-            $created = $release === null;
+            $created = $releaseId === null;
+            $storedRelease = $created
+                ? new ClientRelease
+                : ClientRelease::query()->lockForUpdate()->findOrFail($releaseId);
 
-            if ($release === null) {
-                $release = new ClientRelease;
-            } else {
-                $release = ClientRelease::query()->lockForUpdate()->findOrFail($release->id);
-
-                if ($release->published_at !== null) {
-                    throw ValidationException::withMessages([
-                        'release' => 'Published releases are immutable. Create a new release for changed artifact metadata.',
-                    ]);
-                }
+            if ($storedRelease->published_at !== null) {
+                throw ValidationException::withMessages([
+                    'release' => 'Published releases are immutable. Create a new release for changed artifact metadata.',
+                ]);
             }
 
-            $release->fill([
+            $storedRelease->fill([
                 'version' => $version,
                 'channel' => $channel,
                 'release_notes' => $releaseNotes,
                 'published_at' => null,
                 'is_current' => false,
             ]);
-            $release->save();
+            $storedRelease->save();
 
-            $release->artifacts()->delete();
-            $release->artifacts()->createMany($artifacts);
+            $storedRelease->artifacts()->delete();
+            $storedRelease->artifacts()->createMany($artifacts);
 
             $enabledArtifactCount = 0;
 
@@ -69,16 +68,16 @@ final readonly class SaveClientRelease
                 $actor->id,
                 $created ? 'downloads.release_created' : 'downloads.release_updated',
                 'client_release',
-                (string) $release->id,
+                (string) $storedRelease->id,
                 [
-                    'version' => $release->version,
-                    'channel' => $release->channel,
+                    'version' => $storedRelease->version,
+                    'channel' => $storedRelease->channel,
                     'artifact_count' => count($artifacts),
                     'enabled_artifact_count' => $enabledArtifactCount,
                 ],
             );
 
-            return $release->load('artifacts');
+            return $storedRelease->load('artifacts');
         }, 3);
     }
 }
