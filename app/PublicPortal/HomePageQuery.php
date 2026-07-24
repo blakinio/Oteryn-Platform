@@ -9,6 +9,7 @@ use App\PublicPortal\ViewModels\HomeNewsSummary;
 use App\PublicPortal\ViewModels\HomePageViewModel;
 use App\PublicPortal\ViewModels\HomeWorldChannel;
 use App\PublicPortal\ViewModels\HomeWorldSummary;
+use stdClass;
 use Throwable;
 use UnexpectedValueException;
 
@@ -54,8 +55,9 @@ final readonly class HomePageQuery
                 return new HomeWorldSummary(PublicContentState::EMPTY, [], null);
             }
 
+            /** @var list<int> $channelIds */
             $channelIds = $channels
-                ->map(fn (object $channel): int => $this->channelId($channel->id ?? null))
+                ->map(fn (stdClass $channel): int => $this->channelId($channel->id ?? null))
                 ->values()
                 ->all();
             $runtimeSnapshot = $this->runtime->snapshot($channelIds);
@@ -70,6 +72,7 @@ final readonly class HomePageQuery
                 $runtime = $runtimeSnapshot->available
                     ? $runtimeSnapshot->forChannel($channelId)
                     : null;
+                $maintenanceMessage = $channel->maintenance_message ?? null;
 
                 if ($runtimeSnapshot->available && $runtime === null) {
                     $state = PublicContentState::STALE;
@@ -84,9 +87,7 @@ final readonly class HomePageQuery
                     pvpType: (string) ($channel->pvp_type ?? ''),
                     maxPlayers: (int) ($channel->max_players ?? 0),
                     maintenance: (bool) ($channel->maintenance ?? false),
-                    maintenanceMessage: is_string($channel->maintenance_message ?? null)
-                        ? $channel->maintenance_message
-                        : null,
+                    maintenanceMessage: is_string($maintenanceMessage) ? $maintenanceMessage : null,
                     runtimeStatus: $runtime?->status,
                     playersOnline: $runtime?->playersOnline,
                 );
