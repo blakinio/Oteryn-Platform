@@ -56,8 +56,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T11:10:00+02:00
-head: 661e3e00bb0cdc389aa510d56c7b760df09b96b7
+updated_at: 2026-07-24T11:25:00+02:00
+head: 97217f7a78c87d95f84f9ae1f8e2cf68c82c9c82
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
 pr: 126
 status: validating
@@ -80,24 +80,26 @@ proven:
   - MariaDB final-server readiness, MYSQL_PWD compatibility and deterministic schema imports are proven; Redis read-only ACL write rejection is proven.
   - Credential overlap and native issuer activation pass for current/previous Platform and Canary credentials.
   - TLS validation passes for trusted CA/hostnames, wrong CA, hostname mismatch, non-loopback HTTP dependency rejection, private issuer isolation, no verification bypass and no retained private keys.
-  - Rehearsal run 30077854561 proved real OAuth Authorization Code + PKCE behavior, verifier rejection, code reuse rejection, scope enforcement and token-family revocation, then isolated obsolete ticket status and OAuth cache-header assertions.
+  - Rehearsal run 30080910260 passed the complete OAuth PKCE matrix, ticket HTTP 200 contract and sensitive cache headers before reaching the authorization-code expiry test.
+  - Passport authorization-code expiry is encoded in the authorization code itself; changing only oauth_auth_codes.expires_at does not create a genuinely expired code.
+  - Commit 97217f7a78c87d95f84f9ae1f8e2cf68c82c9c82 mounts host libfaketime read-only into only the ephemeral Platform container and advances only that process by two hours for the controlled expiry exchange, then restores normal time.
   - Canary harness 9200c562e7e87dd098c1205c1df83c9d9ce95c1b accepts the documented Game Login Ticket HTTP 200 contract and has green required CI.
   - Platform b5dd6a7be5c704d5706241240e06f8bb8c4b5efe combines explicit trusted-proxy handling with complete OAuth token cache headers and passed Composer validation, audit, Pint, PHPStan and full PHPUnit in run 30079059960.
   - acceptance_extensions.py adds physical invalid-session rejection, unauthorized-character burn, restart invalidation/recovery, account-override rejection, malformed Canary-to-Gateway and Gateway-to-OTClient failures, complete cache-header checks, correlation IDs and JWT-like sensitive scanning.
-  - exact_runner.py preserves the checked-out Canary harness bytes while applying ephemeral trusted-proxy deployment configuration and recording exact component/build metadata.
 derived:
-  - The final run exercises every identified product and environment gap on exact validated revisions instead of relying on proxy-only or stubbed behavior.
+  - The expiry assertion now evaluates Passport's real token clock semantics without changing product source, host time, database time or any other component process.
 unknown:
-  - final runtime result and retained evidence identifiers for the complete matrix
+  - downstream ticket, Gateway, Game Session, physical OTClient, logout, replay, rotation, failure-injection and rollback results after the corrected expiry checkpoint
 conflicts: []
 first_failure:
-  marker: none-before-final-run
-  evidence: every previously isolated environment, harness and product defect has a committed, CI-validated correction or an exact built artifact
+  marker: oauth-code-expiry-simulation
+  evidence: run 30080910260 returned a successful exchange after only oauth_auth_codes.expires_at was changed; the encoded authorization-code expiry remained valid
 rejected_hypotheses:
+  - treat the successful exchange as a Passport product defect: rejected because the test changed only database metadata, not the expiry encoded in the code
+  - change the host or database clock: rejected because the rehearsal must isolate time manipulation to the Platform process under test
+  - sleep until natural expiration: rejected because it is slow and nondeterministic for CI
   - disable TLS verification: rejected because TLS verification already passes and remains mandatory
-  - rewrite Platform or OAuth responses only in the probe: rejected because production source fixes own those boundaries
   - patch Canary binary during build without a source commit: rejected; exact source commit b15b7d54 is checked out and recorded by the artifact
-  - accept only source/unit evidence for physical failures: rejected; final matrix drives the real OTClient binary and private TLS services
 changed_paths:
   - .github/workflows/native-auth-canary-cache-build.yml
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
@@ -106,9 +108,9 @@ changed_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 validation:
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30077854561
+  - command: Native Auth Ephemeral Cutover Rehearsal run 30080910260
     result: FAIL
-    evidence: real OAuth behavior passed; obsolete ticket status and missing OAuth cache headers were isolated and fixed
+    evidence: exact revisions, artifacts, provisioning, credential overlap, TLS, OAuth PKCE, ticket status and cache headers passed; first failure was the DB-only authorization-code expiry simulation
   - command: Platform CI run 30079059960
     result: PASS
     evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed for Platform b5dd6a7
@@ -123,5 +125,5 @@ validation:
     evidence: artifact 8591665710 built from b15b7d544f4795e3a2a65b88de35391b9fd0a20d and was uploaded with retained digest
 blockers:
   - none
-next_action: execute the final exact-revision rehearsal and repair only the first concrete runtime failure until the complete matrix passes or a genuine external production-only gate remains.
+next_action: execute the exact-revision rehearsal with isolated Platform fake time and repair only the first concrete downstream failure.
 ```
