@@ -1,0 +1,58 @@
+name: Diagnose Phase 7 Critical Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnose-phase7-critical-tests.yml"
+      - "app/Http/Middleware/**"
+      - "bootstrap/app.php"
+      - "config/http.php"
+      - "tests/**"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    env:
+      APP_ENV: testing
+      APP_DEBUG: "false"
+      APP_URL: https://staging.oteryn.internal
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      CACHE_STORE: array
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      SESSION_SECURE_COOKIE: "true"
+      SESSION_HTTP_ONLY: "true"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          extensions: pdo_sqlite
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Run and retain complete test output
+        id: tests
+        shell: bash
+        run: |
+          set +e
+          composer test > phase7-test-output.txt 2>&1
+          status=$?
+          cat phase7-test-output.txt
+          echo "status=${status}" >> "${GITHUB_OUTPUT}"
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase7-critical-test-output
+          path: phase7-test-output.txt
+          if-no-files-found: error
+          retention-days: 1
+      - name: Preserve failing conclusion
+        run: test "${{ steps.tests.outputs.status }}" = "0"
