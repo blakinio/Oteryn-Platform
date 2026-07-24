@@ -1,8 +1,8 @@
 <?php
 
-/**
- * @return list<string>
- */
+use Closure;
+
+/** @var Closure(mixed): list<string> $hostList */
 $hostList = static function (mixed $value): array {
     if (! is_string($value) || trim($value) === '') {
         return [];
