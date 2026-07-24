@@ -2,19 +2,25 @@
 
 This package targets early local/staging testing on Synology Container Manager. It is intentionally not a production deployment topology and does not satisfy the Production Go-Live Gate.
 
-The NAS is a runtime target only. Platform, Game Gateway and the dedicated deployment-runner images are built on GitHub-hosted Actions runners. Canary must also be supplied as a compatible prebuilt image. The Synology deployment path performs image pulls, database/runtime initialization, migrations, health checks and runtime-image rollback; it does not compile C++ or Go source on the NAS.
+The NAS is a runtime target only. Platform, Game Gateway and the dedicated deployment-runner images are built on GitHub-hosted Actions runners. Canary must also be supplied as a compatible prebuilt image. The Synology deployment path performs image pulls, database/runtime initialization, migrations, health checks, World Registry configuration and runtime-image rollback; it does not compile C++ or Go source on the NAS.
 
 ## Runtime topology
 
 ```text
-workstation/browser/OTClient
+workstation/browser
         |
-        | SSH loopback forwarding for early tests
+        | DSM reverse proxy (controlled HTTP/HTTPS ingress)
         v
 Synology host loopback
   8000 -> Platform
   8080 -> Game Gateway
   7171 -> Canary legacy login rollback path
+
+workstation/OTClient
+        |
+        | optional direct private-LAN game TCP only
+        v
+Synology exact private address
   7172 -> Canary game protocol
 
 Docker private bridge
@@ -24,13 +30,14 @@ Docker private bridge
   Gateway -> HTTPS internal proxy -> Canary Game Session issuer
 ```
 
-The Gateway never receives database credentials. Its non-loopback dependencies use generated staging-only TLS certificates and hostname verification. MariaDB and Redis are not published on host ports.
+The Gateway never receives database credentials. Its non-loopback dependencies use generated staging-only TLS certificates and hostname verification. MariaDB and Redis are not published on host ports. Platform, Gateway and Canary legacy login remain host-loopback-only even when game TCP is deliberately enabled for the LAN.
 
 ## Repository workflows
 
 - `Build Synology Staging Images` runs on GitHub-hosted runners. Pull requests build without publishing. Trusted `main` pushes and explicit manual runs publish GHCR images tagged with `sha-<full-sha>`; `main` also receives the moving `main` tag.
 - `Deploy Synology Staging` is manual only, refuses non-`main` workflow dispatches and targets only the custom runner label `oteryn-staging`.
 - The deployment runner is registered with `--no-default-labels`, so generic repository jobs targeting ordinary `self-hosted` runners do not match it.
+- Any temporary one-shot deployment workflow must be removed after its bounded deployment and sanitized evidence are complete.
 
 ## First-time setup order
 
@@ -103,7 +110,6 @@ OTERYN_STAGING_GAME_SESSION_PREVIOUS_SERVICE_TOKEN_SHA256
 Recommended variables:
 
 ```text
-OTERYN_STAGING_BIND_ADDRESS=127.0.0.1
 OTERYN_STAGING_STATE_DIR=/var/lib/oteryn-staging-state
 OTERYN_STAGING_APP_URL=http://127.0.0.1:8000
 ```
@@ -112,24 +118,42 @@ Generate independent high-entropy staging service tokens and store their exact S
 
 For database passwords used by the staging grant renderer, use random hexadecimal/alphanumeric values. The deploy script rejects unsupported characters rather than attempting unsafe SQL interpolation.
 
+## Binding policy
+
+The rendered deployment environment has four separate host bind controls:
+
+```text
+PLATFORM_BIND_ADDRESS=127.0.0.1
+GATEWAY_BIND_ADDRESS=127.0.0.1
+CANARY_LOGIN_BIND_ADDRESS=127.0.0.1
+CANARY_GAME_BIND_ADDRESS=127.0.0.1
+```
+
+The first three must remain exact loopback. `CANARY_GAME_BIND_ADDRESS` may be loopback or one exact RFC1918 private IPv4 address. Wildcard, public, multicast and link-local addresses are rejected.
+
+`CANARY_SERVER_IP` and `GAME_WORLD_HOST` must exactly equal `CANARY_GAME_BIND_ADDRESS`; `GAME_WORLD_PORT` must equal `CANARY_GAME_PORT`. This prevents Gateway from returning an unreachable or different route to OTClient.
+
 ## Deployment behavior
 
 A `deploy` run:
 
 1. checks out trusted `main` on the self-hosted runner;
 2. logs in to GHCR with the job-scoped token;
-3. writes a permission-restricted ephemeral `.env` from GitHub Environment secrets;
-4. validates required values and service-token hashes;
-5. pulls prebuilt images;
-6. starts MariaDB, Redis and internal TLS bootstrap;
-7. starts Canary and waits for the required schema tables;
-8. applies the repository-owned least-privilege Canary SQL grant templates without emitting `SHOW GRANTS` output;
-9. configures the read-only runtime Redis ACL;
-10. starts Platform, runs migrations and ensures the native OAuth client exists;
-11. runs the three Canary database privilege verifiers;
-12. starts the internal TLS proxy and Game Gateway;
-13. verifies Platform/Gateway health and Canary TCP reachability;
-14. removes the ephemeral `.env` after the job.
+3. validates all bind, route, image and secret inputs;
+4. writes a permission-restricted ephemeral `.env` from GitHub Environment secrets;
+5. validates required values and service-token hashes;
+6. pulls prebuilt images;
+7. starts MariaDB, Redis and internal TLS bootstrap;
+8. starts Canary and waits for the required schema tables;
+9. applies the repository-owned least-privilege Canary SQL grant templates without emitting `SHOW GRANTS` output;
+10. configures the read-only runtime Redis ACL;
+11. starts Platform, runs migrations and ensures the native OAuth client exists;
+12. runs the three Canary database privilege verifiers;
+13. starts the internal TLS proxy and Game Gateway;
+14. verifies Platform/Gateway health, Canary TCP reachability and every exact host-port binding;
+15. when a private game bind is configured, proves the game TCP endpoint is reachable through that NAS address;
+16. only after those checks, creates or updates the exact enabled online Platform World Registry route;
+17. removes the ephemeral `.env` after the job.
 
 The script snapshots currently running Platform/Gateway/Canary image references before an update. `rollback` restores those runtime images and re-runs health checks. It intentionally does **not** reverse database migrations automatically.
 
@@ -147,6 +171,24 @@ ssh \
 ```
 
 For this early loopback path, configure OTClient's Oteryn endpoints as literal `http://127.0.0.1` URLs and enable its development-only insecure-loopback option. Do not use this HTTP exception for a LAN hostname, public hostname or production environment.
+
+## Deliberate local-LAN game access
+
+For the current Synology host at `192.168.1.2`, the guarded staging deployment uses:
+
+```text
+CANARY_GAME_BIND_ADDRESS=192.168.1.2
+CANARY_SERVER_IP=192.168.1.2
+GAME_WORLD_ID=1
+GAME_WORLD_HOST=192.168.1.2
+GAME_WORLD_PORT=7172
+```
+
+This exposes only Canary game TCP `192.168.1.2:7172`. Platform `8000`, Gateway `8080` and legacy login `7171` remain on `127.0.0.1`.
+
+DSM Firewall must permit inbound TCP `7172` only from the trusted home LAN subnet or, preferably, the exact workstation address. Do not create router/NAT forwarding for `7172` as part of LAN-only testing.
+
+The browser/OAuth and Gateway endpoints are separate HTTP surfaces. A native OTClient using a LAN hostname requires controlled HTTPS endpoints with a certificate trusted by the workstation; direct game TCP exposure alone does not configure the desktop client.
 
 ## Manual local execution
 
@@ -175,5 +217,6 @@ bash deploy/synology/scripts/rollback.sh
 - This package does not make staging evidence `PRODUCTION_PROVEN`.
 - It does not expose DSM, Docker Engine TCP, MariaDB, Redis or the Canary Game Session issuer publicly.
 - It does not build Canary on Synology.
-- Native-auth activation remains blocked until `CANARY_IMAGE` points to a compatible prebuilt image containing the required Oteryn Game Session issuer.
-- The self-hosted runner cannot be registered purely by repository contents; GitHub requires a one-time registration token obtained by the repository owner.
+- It does not authorize router port forwarding or Internet exposure of game TCP.
+- It does not activate legacy password authentication for Platform-created Canary accounts.
+- A fully usable desktop native-login flow additionally requires an exact compatible OTClient build and trusted browser/OAuth/Gateway endpoint configuration.
