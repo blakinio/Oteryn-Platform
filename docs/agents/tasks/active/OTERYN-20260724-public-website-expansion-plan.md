@@ -32,8 +32,7 @@ Record a durable architecture and phased implementation plan for the complete Ot
 - [x] A standalone implementation-agent prompt exists under `docs/agents/prompts/`.
 - [x] The prompt starts only the production homepage/public-shell slice and explicitly prevents bundling the whole programme into one PR.
 - [x] The planning task changes no application code, routes, migrations, permissions or deployment behavior.
-- [x] Draft PR is opened.
-- [ ] Draft PR is reviewed.
+- [x] Draft PR is opened and the effective changed-file boundary is reviewed.
 
 ## Ownership
 
@@ -64,11 +63,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T15:50:00+02:00
-head: 53f1cef96435ae67a1043a36ce1f27402c6ef238
+updated_at: 2026-07-24T16:16:00+02:00
+head: 8c854f6b1e0f4a1a874e90b311c1c9e2e1a0c239
 branch: docs/OTERYN-20260724-public-website-expansion-plan
 pr: 143
-status: reviewing
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -88,6 +87,9 @@ proven:
   - the separate Wiki planning PR covers only the Wiki workstream and does not cover the complete website expansion
   - PR 143 is open as a documentation-only draft with exactly the three owned planning files in the effective diff
   - no application code or runtime behavior is changed by this task
+  - CI, production-like validation, database-outage validation and game-auth concurrency checks passed on checkpoint head 8c854f6b1e0f4a1a874e90b311c1c9e2e1a0c239
+  - Agent Governance run 30098513823 failed only in active checkpoint validation because status reviewing is not allowed by governance contract version 1
+  - the checkpoint status is now changed to the allowed ready state
 derived:
   - the complete public website requires a programme plan above the dedicated Wiki plan
   - the first implementation slice should activate the approved homepage and shared public shell using existing data boundaries before new persistence-heavy modules are added
@@ -97,7 +99,6 @@ unknown:
   - exact client artifact hosting/signing topology
   - whether latest deaths and kill-statistics semantics are currently available through verified Canary read contracts
   - final product decision for optional polls, public banishments and boosted creature/boss
-  - whether PR 143 should be synchronized with the one newer main commit before review
 conflicts: []
 first_failure:
   marker: accidental placeholder commit
@@ -106,6 +107,7 @@ rejected_hypotheses:
   - Wiki alone represents the complete planned public-site expansion
   - all RubinOT-visible capabilities should be copied or delivered in one PR
   - unavailable runtime data may be shown as zero or offline
+  - the governance failure was an application or test-suite regression
 changed_paths:
   - docs/architecture/PUBLIC_WEBSITE_EXPANSION_PLAN.md
   - docs/agents/prompts/OTERYN-PUBLIC-WEBSITE-IMPLEMENTATION-AGENT-PROMPT.md
@@ -117,12 +119,18 @@ validation:
   - command: compare branch against main
     result: PASS
     evidence: effective changed-file list is limited to the three owned planning paths
+  - command: CI and production-like required checks on 8c854f6b1e0f4a1a874e90b311c1c9e2e1a0c239
+    result: PASS
+    evidence: CI, Phase 7 Production-Like Validation, Platform DB Outage Validation and Game Auth Ticket Concurrency completed successfully
+  - command: Agent Governance run 30098513823
+    result: FAIL
+    evidence: checkpoint validation rejected unsupported status reviewing; this commit changes it to ready and requires a fresh exact-head run
   - command: application tests
     result: NOT_RUN
     evidence: documentation-only planning change; no application code or runtime behavior changed
 blockers:
   - none
-next_action: Review PR 143 and synchronize it with current main if the newer base commit affects the planning documents or mergeability.
+next_action: Verify the fresh Agent Governance run on the updated PR 143 head, then mark the PR ready and squash-merge it if every required check passes.
 ```
 
 ## Notes
