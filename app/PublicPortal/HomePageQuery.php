@@ -2,6 +2,7 @@
 
 namespace App\PublicPortal;
 
+use App\Cms\Models\NewsPost;
 use App\Cms\PublicNewsQuery;
 use App\PublicGameData\CanaryChannelRuntimeService;
 use App\PublicGameData\CanaryGameDataRepository;
@@ -43,7 +44,10 @@ final readonly class HomePageQuery
             return new HomeNewsSummary(PublicContentState::EMPTY, []);
         }
 
-        return new HomeNewsSummary(PublicContentState::AVAILABLE, $posts->values()->all());
+        /** @var list<NewsPost> $latestPosts */
+        $latestPosts = array_values($posts->all());
+
+        return new HomeNewsSummary(PublicContentState::AVAILABLE, $latestPosts);
     }
 
     private function worldSummary(): HomeWorldSummary
@@ -83,10 +87,10 @@ final readonly class HomePageQuery
 
                 $worldChannels[] = new HomeWorldChannel(
                     id: $channelId,
-                    name: (string) ($channel->name ?? ''),
-                    pvpType: (string) ($channel->pvp_type ?? ''),
-                    maxPlayers: (int) ($channel->max_players ?? 0),
-                    maintenance: (bool) ($channel->maintenance ?? false),
+                    name: $this->requiredString($channel->name ?? null, 'name'),
+                    pvpType: $this->requiredString($channel->pvp_type ?? null, 'pvp_type'),
+                    maxPlayers: $this->nonNegativeInteger($channel->max_players ?? null, 'max_players'),
+                    maintenance: $this->booleanValue($channel->maintenance ?? null, 'maintenance'),
                     maintenanceMessage: is_string($maintenanceMessage) ? $maintenanceMessage : null,
                     runtimeStatus: $runtime?->status,
                     playersOnline: $runtime?->playersOnline,
@@ -112,5 +116,50 @@ final readonly class HomePageQuery
         }
 
         throw new UnexpectedValueException('Configured Canary channel ID is invalid.');
+    }
+
+    private function requiredString(mixed $value, string $field): string
+    {
+        if (is_string($value) && trim($value) !== '') {
+            return $value;
+        }
+
+        throw new UnexpectedValueException("Configured Canary channel {$field} is invalid.");
+    }
+
+    private function nonNegativeInteger(mixed $value, string $field): int
+    {
+        if (is_int($value) && $value >= 0) {
+            return $value;
+        }
+
+        if (is_string($value) && ctype_digit($value)) {
+            $parsed = filter_var($value, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 0],
+            ]);
+
+            if (is_int($parsed)) {
+                return $parsed;
+            }
+        }
+
+        throw new UnexpectedValueException("Configured Canary channel {$field} is invalid.");
+    }
+
+    private function booleanValue(mixed $value, string $field): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if ($value === 0 || $value === '0') {
+            return false;
+        }
+
+        if ($value === 1 || $value === '1') {
+            return true;
+        }
+
+        throw new UnexpectedValueException("Configured Canary channel {$field} is invalid.");
     }
 }
