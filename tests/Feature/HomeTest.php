@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Cms\Models\NewsPost;
 use App\Identity\Models\Identity;
+use App\Identity\Sessions\WebSessionState;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Redis\Connections\Connection;
@@ -139,6 +140,7 @@ final class HomeTest extends TestCase
         ]);
 
         $this->actingAs($identity)
+            ->withSession([WebSessionState::GENERATION_KEY => $identity->web_session_generation])
             ->get('/')
             ->assertOk()
             ->assertSee('Open account center')
