@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,8 +19,20 @@ def required(name: str) -> str:
     return value
 
 
+def ensure_faketime_library() -> Path:
+    candidates = sorted(Path("/usr/lib").glob("**/faketime/libfaketime.so.1"))
+    if not candidates:
+        subprocess.run(["sudo", "apt-get", "update"], check=True)
+        subprocess.run(["sudo", "apt-get", "install", "-y", "--no-install-recommends", "libfaketime"], check=True)
+        candidates = sorted(Path("/usr/lib").glob("**/faketime/libfaketime.so.1"))
+    if not candidates:
+        raise RuntimeError("libfaketime.so.1 was not found after installation")
+    return candidates[0].resolve()
+
+
 def install_exact_harness_adapter() -> None:
     original_load_harness = platform_runner.load_harness
+    faketime_library = ensure_faketime_library()
 
     def load_harness_with_exact_metadata() -> Any:
         harness = original_load_harness()
@@ -31,14 +44,76 @@ def install_exact_harness_adapter() -> None:
         harness.OTCLIENT_BUILD_ARTIFACT_ID = int(required("OTCLIENT_ARTIFACT_ID"))
         harness.OTCLIENT_BUILD_ARTIFACT_DIGEST = required("OTCLIENT_ARTIFACT_DIGEST")
 
+        original_harness_docker = harness.docker
+
+        def docker_with_platform_faketime_mount(*args: str, **kwargs: Any) -> Any:
+            normalized = list(args)
+            if normalized and normalized[0] == "create":
+                image_index = next(
+                    (index for index, value in enumerate(normalized) if value.endswith("-platform:latest")),
+                    None,
+                )
+                if image_index is not None:
+                    normalized[image_index:image_index] = [
+                        "-v",
+                        f"{faketime_library}:/usr/local/lib/libfaketime.so.1:ro",
+                    ]
+            return original_harness_docker(*normalized, **kwargs)
+
+        harness.docker = docker_with_platform_faketime_mount
         original_platform_env = harness.Rehearsal.platform_env
 
         def platform_env_with_trusted_proxy(self: Any, previous: bool) -> list[str]:
             env = original_platform_env(self, previous)
             env.extend(["-e", "TRUSTED_PROXIES=10.201.3.0/24"])
+            time_offset = getattr(self, "platform_time_offset", None)
+            if time_offset:
+                env.extend(
+                    [
+                        "-e",
+                        "LD_PRELOAD=/usr/local/lib/libfaketime.so.1",
+                        "-e",
+                        f"FAKETIME={time_offset}",
+                        "-e",
+                        "FAKETIME_DONT_FAKE_MONOTONIC=1",
+                    ]
+                )
             return env
 
+        def validate_oauth_matrix_with_real_expiry(self: Any) -> None:
+            if self.run_oauth_probe(["matrix", "--output", "/evidence/oauth-pkce-result.json"]) != 0:
+                raise harness.RehearsalError("OAuth PKCE negative matrix failed")
+
+            secret_dir = self.temp / "secret-code"
+            secret_dir.mkdir(exist_ok=True)
+            secret_path = secret_dir / "code.json"
+            if self.run_oauth_probe(
+                ["issue-code", "--secret-output", "/secret/code.json"],
+                secret_mount=secret_dir,
+            ) != 0:
+                raise harness.RehearsalError("could not issue authorization code for expiry test")
+
+            try:
+                self.platform_time_offset = "+2h"
+                self.start_platform(previous=True)
+                if self.run_oauth_probe(
+                    [
+                        "exchange-code",
+                        "--secret-input",
+                        "/secret/code.json",
+                        "--output",
+                        "/evidence/oauth-code-expiry.json",
+                    ],
+                    secret_mount=secret_dir,
+                ) != 0:
+                    raise harness.RehearsalError("expired authorization code was not rejected")
+            finally:
+                self.platform_time_offset = None
+                self.start_platform(previous=True)
+                secret_path.unlink(missing_ok=True)
+
         harness.Rehearsal.platform_env = platform_env_with_trusted_proxy
+        harness.Rehearsal.validate_oauth_matrix = validate_oauth_matrix_with_real_expiry
         acceptance_extensions.install(harness)
 
         extended_sensitive_scan = harness.Rehearsal.sensitive_scan
