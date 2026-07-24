@@ -1,5 +1,8 @@
 <?php
 
+/**
+ * @return list<string>
+ */
 $hostList = static function (mixed $value): array {
     if (! is_string($value) || trim($value) === '') {
         return [];
