@@ -2,7 +2,7 @@
 
 return [
     'header' => [
-        ['label' => "Beginner's Guide", 'route' => 'editorial.getting-started', 'active' => 'editorial.getting-started', 'priority' => 55],
+        ['label' => 'Beginner\'s Guide', 'route' => 'editorial.getting-started', 'active' => 'editorial.getting-started', 'priority' => 55],
         ['label' => 'Support', 'route' => 'support.index', 'active' => 'support.*', 'priority' => 70],
     ],
     'footer' => [
@@ -11,7 +11,7 @@ return [
             'label' => 'Learn',
             'priority' => 30,
             'items' => [
-                ['label' => "Beginner's Guide", 'route' => 'editorial.getting-started', 'active' => 'editorial.getting-started', 'priority' => 10],
+                ['label' => 'Beginner\'s Guide', 'route' => 'editorial.getting-started', 'active' => 'editorial.getting-started', 'priority' => 10],
                 ['label' => 'Server Information', 'route' => 'editorial.server-information', 'active' => 'editorial.server-information', 'priority' => 20],
                 ['label' => 'Rules', 'route' => 'editorial.rules', 'active' => 'editorial.rules', 'priority' => 30],
             ],
