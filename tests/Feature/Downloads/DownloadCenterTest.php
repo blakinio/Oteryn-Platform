@@ -9,6 +9,7 @@ use App\Downloads\Models\ClientRelease;
 use App\Identity\Models\Identity;
 use App\Identity\Sessions\WebSessionState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -175,8 +176,10 @@ final class DownloadCenterTest extends TestCase
         $this->post(route('admin.downloads.publish', $second), ['make_current' => true])
             ->assertRedirect(route('admin.downloads.edit', $second));
 
-        self::assertFalse($first->fresh()->is_current);
-        self::assertTrue($second->fresh()->is_current);
+        $first->refresh();
+        $second->refresh();
+        self::assertFalse($first->is_current);
+        self::assertTrue($second->is_current);
         $this->get(route('downloads.index'))
             ->assertOk()
             ->assertSeeText('Oteryn Client 3.1.0')
@@ -184,7 +187,8 @@ final class DownloadCenterTest extends TestCase
 
         $this->put(route('admin.downloads.update', $second), $this->releasePayload('3.1.1'))
             ->assertSessionHasErrors('release');
-        self::assertSame('3.1.0', $second->fresh()->version);
+        $second->refresh();
+        self::assertSame('3.1.0', $second->version);
     }
 
     public function test_administrator_validation_rejects_javascript_data_and_unapproved_hosts(): void
@@ -255,7 +259,7 @@ final class DownloadCenterTest extends TestCase
     private function createRelease(
         string $version,
         string $channel,
-        mixed $publishedAt,
+        ?Carbon $publishedAt,
         bool $isCurrent,
     ): ClientRelease {
         return ClientRelease::query()->create([
