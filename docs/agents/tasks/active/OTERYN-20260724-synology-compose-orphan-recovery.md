@@ -43,6 +43,7 @@ modules:
   - self-hosted deployment runner boundary
 dependencies:
   - existing oteryn-staging self-hosted runner
+  - private issue 163 for sanitized operational evidence
 blockers:
   - none
 cross_repository_tasks:
@@ -53,11 +54,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T23:35:00+02:00
-head: c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
-branch: fix/OTERYN-20260724-synology-compose-orphan-recovery
-pr: 162
-status: ready
+updated_at: 2026-07-24T23:45:00+02:00
+head: 77e7a99a2c66d08a7ddd87be9f6740b81d5ad040
+branch: fix/OTERYN-20260724-synology-compose-repair-evidence
+pr: 164
+status: implementing
 context_routes:
   - agent-governance
   - testing
@@ -71,13 +72,16 @@ proven:
   - Synology Container Manager shows blank container ID/project metadata and reports Container undefined does not exist.
   - Gateway reverse proxy http://synology:8089/ready returns status ready.
   - The Compose file uses project name oteryn-staging and named persistent volumes.
-  - PR 162 contains a bounded runner workflow that verifies exact Compose labels before using docker rename.
-  - Exact implementation head c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7 passed CI 30127654178, Agent Governance 30127654186, Platform DB Outage Validation 30127654225, Phase 7 Production-Like Validation 30127654182 and Game Auth Ticket Concurrency 30127654171.
+  - PR 162 added bounded label-verified docker rename recovery and merged as a9498dacd8a18b51f1bfd940f61796ca76bb393e.
+  - Exact PR 162 implementation head c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7 passed CI 30127654178, Agent Governance 30127654186, Platform DB Outage Validation 30127654225, Phase 7 Production-Like Validation 30127654182 and Game Auth Ticket Concurrency 30127654171.
+  - Exact PR 162 final head 604d1c26c253cb5086c240630057ed893c1bd987 passed CI 30127928095, Agent Governance 30127928088, Platform DB Outage Validation 30127928075, Phase 7 Production-Like Validation 30127928076 and Game Auth Ticket Concurrency 30127928081.
+  - Private issue 163 exists as a sanitized connector-readable repair evidence channel.
 derived:
   - Platform and Canary are stale Compose replacement containers left under temporary short-ID-prefixed names.
   - Renaming verified running containers to their canonical names avoids data loss, restart and unrelated workload interruption.
+  - Publishing only repaired service names, running-state summary and the public OAuth client id does not expose deployment secrets.
 unknown:
-  - exact live container labels before runner-side execution
+  - whether the first main push repair already renamed the live candidates
   - exact public native OAuth client id stored in the Platform database
 conflicts: []
 first_failure:
@@ -94,22 +98,13 @@ validation:
   - command: live Gateway /ready through Synology reverse proxy
     result: PASS
     evidence: user observed {"status":"ready"}
-  - command: CI 30127654178 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
+  - command: PR 162 exact-head repository checks
     result: PASS
-    evidence: Composer validation/audit, formatting, static analysis and tests passed.
-  - command: Agent Governance 30127654186 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
-    result: PASS
-    evidence: checkpoint and workflow governance passed.
-  - command: Platform DB Outage Validation 30127654225 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
-    result: PASS
-    evidence: fail-closed database outage validation passed.
-  - command: Phase 7 Production-Like Validation 30127654182 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
-    result: PASS
-    evidence: production-like validation passed.
-  - command: Game Auth Ticket Concurrency 30127654171 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
-    result: PASS
-    evidence: ticket concurrency validation passed.
+    evidence: all required CI, governance, outage, Phase 7 and concurrency checks passed before squash merge a9498dacd8a18b51f1bfd940f61796ca76bb393e.
+  - command: PR 164 exact-head repository checks
+    result: NOT_RUN
+    evidence: sanitized issue reporting workflow change is awaiting exact-head CI and governance validation.
 blockers:
   - none
-next_action: Squash-merge PR 162 and inspect the automatic runner repair result before removing the one-shot push trigger.
+next_action: Validate and merge PR 164, then read private issue 163 for the sanitized live repair result and public OAuth client id.
 ```
