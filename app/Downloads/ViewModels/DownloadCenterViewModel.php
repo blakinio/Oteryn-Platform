@@ -8,11 +8,18 @@ use App\Downloads\Models\ClientRelease;
 final readonly class DownloadCenterViewModel
 {
     /**
+     * @var list<ClientRelease>
+     */
+    public array $releases;
+
+    /**
      * @param  list<ClientRelease>  $releases
      */
     public function __construct(
         public DownloadCenterState $state,
-        public array $releases,
+        array $releases,
         public ?string $platform,
-    ) {}
+    ) {
+        $this->releases = $releases;
+    }
 }
