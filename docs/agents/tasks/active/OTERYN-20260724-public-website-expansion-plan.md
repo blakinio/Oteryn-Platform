@@ -32,7 +32,8 @@ Record a durable architecture and phased implementation plan for the complete Ot
 - [x] A standalone implementation-agent prompt exists under `docs/agents/prompts/`.
 - [x] The prompt starts only the production homepage/public-shell slice and explicitly prevents bundling the whole programme into one PR.
 - [x] The planning task changes no application code, routes, migrations, permissions or deployment behavior.
-- [ ] Draft PR is opened and reviewed.
+- [x] Draft PR is opened.
+- [ ] Draft PR is reviewed.
 
 ## Ownership
 
@@ -63,11 +64,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T15:20:00+02:00
-head: 544574fa88e5147e1636a3c03269e5da34969b17
+updated_at: 2026-07-24T15:50:00+02:00
+head: 53f1cef96435ae67a1043a36ce1f27402c6ef238
 branch: docs/OTERYN-20260724-public-website-expansion-plan
-pr: none
-status: documenting
+pr: 143
+status: reviewing
 context_routes:
   - agent-governance
   - architecture
@@ -85,6 +86,7 @@ proven:
   - the current application already delivers public Home, News, Online, Highscores, Servers, character search/profile and guild detail surfaces
   - existing CMS, PublicGameData, Identity, Admin/RBAC and Audit provide reusable boundaries for the wider portal
   - the separate Wiki planning PR covers only the Wiki workstream and does not cover the complete website expansion
+  - PR 143 is open as a documentation-only draft with exactly the three owned planning files in the effective diff
   - no application code or runtime behavior is changed by this task
 derived:
   - the complete public website requires a programme plan above the dedicated Wiki plan
@@ -95,10 +97,11 @@ unknown:
   - exact client artifact hosting/signing topology
   - whether latest deaths and kill-statistics semantics are currently available through verified Canary read contracts
   - final product decision for optional polls, public banishments and boosted creature/boss
+  - whether PR 143 should be synchronized with the one newer main commit before review
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
+  marker: accidental placeholder commit
+  evidence: a one-line placeholder path was created by an incorrect tool call and immediately removed in the following commit; the effective PR diff contains only the three intended planning files
 rejected_hypotheses:
   - Wiki alone represents the complete planned public-site expansion
   - all RubinOT-visible capabilities should be copied or delivered in one PR
@@ -111,12 +114,15 @@ validation:
   - command: architecture review against current routes, module catalog and existing Wiki plan
     result: PASS
     evidence: the plan preserves the Laravel modular monolith and reuses CMS, PublicGameData, Identity, exact RBAC/MFA and Audit boundaries
+  - command: compare branch against main
+    result: PASS
+    evidence: effective changed-file list is limited to the three owned planning paths
   - command: application tests
     result: NOT_RUN
     evidence: documentation-only planning change; no application code or runtime behavior changed
 blockers:
   - none
-next_action: Open the documentation-only draft PR and verify the changed-file list contains only the three owned planning paths.
+next_action: Review PR 143 and synchronize it with current main if the newer base commit affects the planning documents or mergeability.
 ```
 
 ## Notes
