@@ -244,6 +244,6 @@ fi
 
 "${compose[@]}" up -d internal-proxy gateway
 
-OTERYN_ENV_FILE="$ENV_FILE" "$SCRIPT_DIR/health-check.sh"
+OTERYN_ENV_FILE="$ENV_FILE" bash "$SCRIPT_DIR/health-check.sh"
 
 echo "Oteryn Synology staging deployment is healthy."
