@@ -1,9 +1,9 @@
 name: Public Web Static Debug
 
 on:
-  pull_request:
+  push:
     branches:
-      - main
+      - feat/OTERYN-20260724-public-web-parallel-foundation
 
 permissions:
   contents: read
