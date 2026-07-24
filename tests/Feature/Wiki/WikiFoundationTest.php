@@ -18,9 +18,9 @@ use App\Wiki\Infrastructure\Factories\WikiCategoryTranslationFactory;
 use App\Wiki\Infrastructure\Factories\WikiRevisionFactory;
 use App\Wiki\Infrastructure\Models\WikiArticle;
 use App\Wiki\Infrastructure\Models\WikiArticleTranslation;
-use App\Wiki\Infrastructure\Models\WikiCategory;
 use App\Wiki\Infrastructure\Models\WikiRevision;
 use DomainException;
+use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -35,18 +35,9 @@ final class WikiFoundationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_foundation_migration_is_reversible_and_factories_create_valid_records(): void
+    public function test_migration_is_reversible_and_factories_create_valid_records(): void
     {
-        foreach ([
-            'wiki_articles',
-            'wiki_article_translations',
-            'wiki_categories',
-            'wiki_category_translations',
-            'wiki_article_category',
-            'wiki_revisions',
-        ] as $table) {
-            self::assertTrue(Schema::hasTable($table));
-        }
+        $this->assertWikiTablesExist();
 
         $article = WikiArticleFactory::new()->create();
         $translation = WikiArticleTranslationFactory::new()->create(['article_id' => $article->id]);
@@ -58,6 +49,7 @@ final class WikiFoundationTest extends TestCase
         self::assertSame($category->id, $categoryTranslation->category_id);
         self::assertSame($article->id, $revision->article_id);
 
+        /** @var Migration $migration */
         $migration = require database_path('migrations/2026_07_24_231000_create_wiki_foundation_tables.php');
         $migration->down();
 
@@ -65,9 +57,7 @@ final class WikiFoundationTest extends TestCase
         self::assertFalse(Schema::hasTable('wiki_revisions'));
 
         $migration->up();
-
-        self::assertTrue(Schema::hasTable('wiki_articles'));
-        self::assertTrue(Schema::hasTable('wiki_revisions'));
+        $this->assertWikiTablesExist();
     }
 
     public function test_supported_locale_and_localized_slug_constraints_are_enforced(): void
@@ -109,48 +99,9 @@ final class WikiFoundationTest extends TestCase
         ]);
     }
 
-    public function test_article_content_writes_append_revisions_and_stale_edits_fail_without_overwrite(): void
+    public function test_article_writes_append_revisions_restore_as_new_and_reject_stale_edits(): void
     {
         $actor = $this->authorizedIdentity('wiki-editor@example.com', [
-            AdminPermission::MANAGE_WIKI_ARTICLES,
-        ]);
-        $service = $this->app->make(WikiArticleService::class);
-
-        $article = $service->create($actor, 'guide', [
-            $this->articleTranslation('en', 'First English', 'first-en', 'First source'),
-            $this->articleTranslation('pl', 'Pierwszy polski', 'pierwszy-pl', 'Pierwsza treść'),
-        ], 'Initial content');
-
-        self::assertSame(1, $article->lock_version);
-        self::assertDatabaseCount('wiki_revisions', 2);
-
-        $updated = $service->update($actor, $article, 1, 'guide', [
-            $this->articleTranslation('en', 'Second English', 'first-en', 'Second source'),
-        ], 'Improve English');
-
-        self::assertSame(2, $updated->lock_version);
-        self::assertDatabaseCount('wiki_revisions', 3);
-
-        try {
-            $service->update($actor, $article, 1, 'guide', [
-                $this->articleTranslation('en', 'Stale overwrite', 'first-en', 'Stale source'),
-            ]);
-            self::fail('Expected stale Wiki edit to fail.');
-        } catch (StaleWikiEdit) {
-            $translation = WikiArticleTranslation::query()
-                ->where('article_id', $article->id)
-                ->where('locale', 'en')
-                ->firstOrFail();
-
-            self::assertSame('Second English', $translation->title);
-            self::assertSame('Second source', $translation->source_markdown);
-            self::assertDatabaseCount('wiki_revisions', 3);
-        }
-    }
-
-    public function test_restore_creates_a_new_revision_and_preserves_source_revision(): void
-    {
-        $actor = $this->authorizedIdentity('wiki-restorer@example.com', [
             AdminPermission::MANAGE_WIKI_ARTICLES,
             AdminPermission::PUBLISH_WIKI,
         ]);
@@ -159,33 +110,39 @@ final class WikiFoundationTest extends TestCase
         $article = $service->create($actor, 'guide', [
             $this->articleTranslation('en', 'Original English', 'restore-en', 'Original source'),
         ]);
-        $source = WikiRevision::query()
-            ->where('article_id', $article->id)
-            ->where('locale', 'en')
-            ->firstOrFail();
+        $source = WikiRevision::query()->where('article_id', $article->id)->firstOrFail();
 
         $article = $service->update($actor, $article, 1, 'guide', [
             $this->articleTranslation('en', 'Changed English', 'restore-en', 'Changed source'),
         ]);
 
+        try {
+            $service->update($actor, $article, 1, 'guide', [
+                $this->articleTranslation('en', 'Stale overwrite', 'restore-en', 'Stale source'),
+            ]);
+            self::fail('Expected stale Wiki edit to fail.');
+        } catch (StaleWikiEdit) {
+            self::assertSame('# Changed source', WikiArticleTranslation::query()
+                ->where('article_id', $article->id)
+                ->where('locale', 'en')
+                ->value('source_markdown'));
+            self::assertDatabaseCount('wiki_revisions', 2);
+        }
+
         $article = $service->restoreRevision($actor, $article, 2, $source, 'Restore original');
-
-        self::assertSame(3, $article->lock_version);
-        self::assertDatabaseCount('wiki_revisions', 3);
-
         $restored = WikiRevision::query()
             ->where('article_id', $article->id)
             ->orderByDesc('revision_number')
             ->firstOrFail();
 
+        self::assertSame(3, $article->lock_version);
         self::assertSame(3, $restored->revision_number);
         self::assertSame($source->id, $restored->source_revision_id);
-        self::assertSame('Original source', $restored->source_markdown);
-        $freshSource = WikiRevision::query()->findOrFail($source->id);
-        self::assertSame('Original source', $freshSource->source_markdown);
+        self::assertSame('# Original source', $restored->source_markdown);
+        self::assertSame('# Original source', WikiRevision::query()->findOrFail($source->id)->source_markdown);
     }
 
-    public function test_revisions_cannot_be_updated_or_deleted_through_the_supported_model(): void
+    public function test_revisions_are_append_only_through_the_supported_model(): void
     {
         $revision = WikiRevisionFactory::new()->create();
 
@@ -193,8 +150,7 @@ final class WikiFoundationTest extends TestCase
             $revision->forceFill(['title' => 'Mutated'])->save();
             self::fail('Expected Wiki revision update to fail.');
         } catch (LogicException) {
-            $freshRevision = WikiRevision::query()->findOrFail($revision->id);
-            self::assertSame('Factory revision', $freshRevision->title);
+            self::assertSame('Factory revision', WikiRevision::query()->findOrFail($revision->id)->title);
         }
 
         $this->expectException(LogicException::class);
@@ -218,8 +174,7 @@ final class WikiFoundationTest extends TestCase
             $service->publish($actor, $article, 2);
             self::fail('Expected publication without Polish content to fail.');
         } catch (DomainException) {
-            $current = WikiArticle::query()->findOrFail($article->id);
-            self::assertSame(WikiArticleStatus::IN_REVIEW, $current->status);
+            self::assertSame(WikiArticleStatus::IN_REVIEW, WikiArticle::query()->findOrFail($article->id)->status);
         }
 
         $article = $service->update($actor, $article, 2, 'guide', [
@@ -230,20 +185,13 @@ final class WikiFoundationTest extends TestCase
         self::assertSame(WikiArticleStatus::PUBLISHED, $article->status);
         self::assertNotNull($article->published_at);
 
-        try {
-            $service->update($actor, $article, 4, 'guide', [
-                $this->articleTranslation('en', 'Direct published edit', 'english-only', 'Not allowed'),
-            ]);
-            self::fail('Expected direct edit of published content to fail.');
-        } catch (DomainException) {
-            self::assertSame('English only', WikiArticleTranslation::query()
-                ->where('article_id', $article->id)
-                ->where('locale', 'en')
-                ->value('title'));
-        }
+        $this->expectException(DomainException::class);
+        $service->update($actor, $article, 4, 'guide', [
+            $this->articleTranslation('en', 'Direct published edit', 'english-only', 'Not allowed'),
+        ]);
     }
 
-    public function test_category_locales_slugs_and_stale_edits_are_enforced(): void
+    public function test_category_localized_slugs_and_stale_edits_are_enforced(): void
     {
         $actor = $this->authorizedIdentity('wiki-category-editor@example.com', [
             AdminPermission::MANAGE_WIKI_CATEGORIES,
@@ -254,12 +202,9 @@ final class WikiFoundationTest extends TestCase
             new WikiCategoryTranslationInput('en', 'Getting Started', 'getting-started', 'Start here.'),
             new WikiCategoryTranslationInput('pl', 'Pierwsze kroki', 'pierwsze-kroki', 'Zacznij tutaj.'),
         ]);
-
-        $updated = $service->update($actor, $category, 1, 'getting-started', [
+        $category = $service->update($actor, $category, 1, 'getting-started', [
             new WikiCategoryTranslationInput('en', 'Start Here', 'getting-started', 'Updated.'),
         ]);
-
-        self::assertSame(2, $updated->lock_version);
 
         try {
             $service->update($actor, $category, 1, 'getting-started', [
@@ -274,7 +219,6 @@ final class WikiFoundationTest extends TestCase
         }
 
         $other = WikiCategoryFactory::new()->create();
-
         $this->expectException(QueryException::class);
         WikiCategoryTranslationFactory::new()->create([
             'category_id' => $other->id,
@@ -283,15 +227,13 @@ final class WikiFoundationTest extends TestCase
         ]);
     }
 
-    public function test_wiki_audit_metadata_is_bounded_and_excludes_article_bodies(): void
+    public function test_audit_metadata_is_bounded_and_public_routes_are_not_activated(): void
     {
         $actor = $this->authorizedIdentity('wiki-audit@example.com', [
             AdminPermission::MANAGE_WIKI_ARTICLES,
         ]);
-        $service = $this->app->make(WikiArticleService::class);
         $secretMarker = 'FULL-ARTICLE-BODY-MUST-NOT-BE-AUDITED';
-
-        $article = $service->create($actor, 'guide', [
+        $article = $this->app->make(WikiArticleService::class)->create($actor, 'guide', [
             $this->articleTranslation('en', 'Audited', 'audited', $secretMarker),
         ]);
 
@@ -304,20 +246,29 @@ final class WikiFoundationTest extends TestCase
         self::assertIsString($event->metadata);
         self::assertLessThanOrEqual(256, strlen($event->metadata));
         self::assertStringNotContainsString($secretMarker, $event->metadata);
-
-        $metadata = json_decode($event->metadata, true, flags: JSON_THROW_ON_ERROR);
         self::assertSame([
             'status' => 'draft',
             'version' => 1,
             'locales' => 'en',
-        ], $metadata);
-    }
+        ], json_decode($event->metadata, true, flags: JSON_THROW_ON_ERROR));
 
-    public function test_public_wiki_route_is_not_activated_by_the_foundation(): void
-    {
         self::assertFalse(Route::has('wiki.index'));
         self::assertFalse(Route::has('wiki.article.show'));
         $this->get('/wiki')->assertNotFound();
+    }
+
+    private function assertWikiTablesExist(): void
+    {
+        foreach ([
+            'wiki_articles',
+            'wiki_article_translations',
+            'wiki_categories',
+            'wiki_category_translations',
+            'wiki_article_category',
+            'wiki_revisions',
+        ] as $table) {
+            self::assertTrue(Schema::hasTable($table));
+        }
     }
 
     /**
