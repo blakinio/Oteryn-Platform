@@ -51,11 +51,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T10:17:00Z
-head: 1e83f9db36e4bcf35dbc2e484c1e760ab308f879
+updated_at: 2026-07-24T10:20:00Z
+head: 1496f55fcb1fd1fe717c08994233fb3fe0adaf6b
 branch: fix/OTERYN-20260724-synology-deploy-runtime-evidence
 pr: 135
-status: in_progress
+status: validating
 context_routes:
   - agent-governance
   - testing
@@ -113,9 +113,6 @@ validation:
   - command: temporary self-hosted runner diagnostic run 30085403003
     result: PASS
     evidence: job 89456309129 proved MariaDB eventually became healthy without restart or OOM
-  - command: PR 135 exact-head CI and Synology build validations
-    result: PENDING
-    evidence: readiness timeout fix changes the bounded wait from 120 to 420 seconds and adds timeout diagnostics
 blockers:
   - merge the validated readiness timeout fix from PR 135, then rerun deploy job 89454820564 against trusted main
 next_action: Complete exact-head validation for PR 135, merge the bounded MariaDB readiness fix, and rerun the failed deployment job.
