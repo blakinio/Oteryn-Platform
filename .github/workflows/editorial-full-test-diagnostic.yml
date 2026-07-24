@@ -1,0 +1,34 @@
+name: Editorial Full Test Diagnostic
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  full-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch pull-request merge quietly
+        shell: bash
+        run: |
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch -q --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q --detach FETCH_HEAD
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies quietly
+        run: composer install --no-interaction --prefer-dist --no-progress --quiet
+
+      - name: Run full tests
+        run: vendor/bin/phpunit --colors=never
