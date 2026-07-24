@@ -15,6 +15,7 @@ use DomainException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 final class AdminEventController
 {
@@ -136,7 +137,12 @@ final class AdminEventController
     {
         $validated = $request->validated();
         $rawTranslations = $validated['translations'] ?? [];
-        abort_unless(is_array($rawTranslations), 422);
+
+        if (! is_array($rawTranslations)) {
+            throw ValidationException::withMessages([
+                'translations' => 'Event translations must be an object.',
+            ]);
+        }
 
         $translations = [];
 
@@ -147,10 +153,10 @@ final class AdminEventController
                 continue;
             }
 
-            $title = trim((string) ($raw['title'] ?? ''));
-            $slug = trim((string) ($raw['slug'] ?? ''));
-            $summary = trim((string) ($raw['summary'] ?? ''));
-            $body = trim((string) ($raw['body'] ?? ''));
+            $title = $this->translationString($raw, $locale, 'title');
+            $slug = $this->translationString($raw, $locale, 'slug');
+            $summary = $this->translationString($raw, $locale, 'summary');
+            $body = $this->translationString($raw, $locale, 'body');
 
             if ($locale === 'pl' && $title === '' && $slug === '' && $summary === '' && $body === '') {
                 continue;
@@ -164,9 +170,29 @@ final class AdminEventController
             ];
         }
 
-        abort_unless(isset($translations['en']), 422, 'An English event translation is required.');
+        if (! isset($translations['en'])) {
+            throw ValidationException::withMessages([
+                'translations.en' => 'An English event translation is required.',
+            ]);
+        }
 
         return $translations;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $translation
+     */
+    private function translationString(array $translation, string $locale, string $field): string
+    {
+        $value = $translation[$field] ?? '';
+
+        if (! is_string($value)) {
+            throw ValidationException::withMessages([
+                "translations.{$locale}.{$field}" => 'Event translation fields must be strings.',
+            ]);
+        }
+
+        return trim($value);
     }
 
     private function utc(string $value): CarbonImmutable
