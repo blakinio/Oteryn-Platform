@@ -37,7 +37,7 @@ jobs:
               r'dependency failed|service .* failed)',
               re.IGNORECASE,
           )
-          secretish = re.compile(r'(?<![A-Za-z0-9])[A-Za-z0-9+/=_-]{24,}(?![A-Za-z0-9])')
+          secretish = re.compile(r'(?<![A-Za-z0-9_])(?:[A-Fa-f0-9]{64}|[A-Za-z0-9+/=]{32,})(?![A-Za-z0-9_])')
           matches = []
           for raw in Path('/tmp/deploy.log').read_text(errors='replace').splitlines():
               line = ansi.sub('', raw)
@@ -86,7 +86,7 @@ jobs:
           import re
           from pathlib import Path
 
-          secretish = re.compile(r'(?<![A-Za-z0-9])[A-Za-z0-9+/=_-]{24,}(?![A-Za-z0-9])')
+          secretish = re.compile(r'(?<![A-Za-z0-9_])(?:[A-Fa-f0-9]{64}|[A-Za-z0-9+/=]{32,})(?![A-Za-z0-9_])')
           interesting = re.compile(r'(error|fatal|exception|failed|failure|shutdown|restart|terminated|segmentation|killed|unable|cannot)', re.IGNORECASE)
           lines = Path('/tmp/canary.log').read_text(errors='replace').splitlines()
           selected = [line for line in lines if interesting.search(line)]
