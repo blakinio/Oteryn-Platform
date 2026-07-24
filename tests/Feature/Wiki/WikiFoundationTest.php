@@ -49,7 +49,7 @@ final class WikiFoundationTest extends TestCase
         self::assertSame($category->id, $categoryTranslation->category_id);
         self::assertSame($article->id, $revision->article_id);
 
-        /** @var Migration $migration */
+        /** @var Migration */
         $migration = require database_path('migrations/2026_07_24_231000_create_wiki_foundation_tables.php');
         $migration->down();
 
