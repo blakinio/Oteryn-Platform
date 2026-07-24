@@ -1,0 +1,52 @@
+name: Inspect Synology Runtime Failure
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/inspect-synology-runtime-failure.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract sanitized runtime failure
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          job_id=89454820564
+          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}" \
+            --jq '{id,name,status,conclusion,runner_name,runner_group_name,labels,steps:[.steps[]|{number,name,status,conclusion}]}'
+          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/logs" > /tmp/deploy-runtime.log
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          ansi = re.compile(r'\x1b\[[0-9;]*m')
+          safe_patterns = re.compile(
+              r'(Process completed with exit code|Error response from daemon|'
+              r'failed|failure|error|denied|unauthorized|not found|no such|unhealthy|'
+              r'did not become ready|refusing|mismatch|unable|cannot|connection refused|'
+              r'timed out|timeout|manifest unknown|pull access denied|permission denied)',
+              re.IGNORECASE,
+          )
+          secretish = re.compile(r'(?<![A-Za-z0-9])[A-Za-z0-9+/=_-]{24,}(?![A-Za-z0-9])')
+          matches = []
+          for raw in Path('/tmp/deploy-runtime.log').read_text(errors='replace').splitlines():
+              line = ansi.sub('', raw)
+              if '[36;1m' in raw or line.lstrip().startswith(('APP_KEY=', 'MARIADB_', 'PLATFORM_DB_', 'CANARY_DB_', 'REDIS_', 'OTERYN_PLATFORM_SERVICE_TOKEN=', 'GAME_SESSION_SERVICE_TOKEN=')):
+                  continue
+              if safe_patterns.search(line):
+                  matches.append(secretish.sub('<redacted>', line))
+          if not matches:
+              raise SystemExit('No sanitized runtime failure lines found.')
+          print('--- sanitized failure lines ---')
+          for line in matches[-120:]:
+              print(line)
+          PY
