@@ -90,6 +90,23 @@ test.afterEach(async ({ page }, testInfo) => {
   await attachDiagnostics(testInfo, page.__acceptanceDiagnostics);
 });
 
+test('@accessibility production homepage navigation and character search are keyboard operable', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Answer the call of Oteryn' })).toBeVisible();
+
+  const newsLink = page.getByRole('navigation', { name: 'Public navigation' }).getByRole('link', { name: 'News' });
+  await tabTo(page, newsLink, 'public News navigation link');
+
+  const characterName = page.getByLabel('Character name');
+  await tabTo(page, characterName, 'homepage character search');
+  await page.keyboard.type('Acceptance Hero');
+
+  const search = page.getByRole('button', { name: 'Search' });
+  await tabTo(page, search, 'homepage character search submit');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Acceptance Hero' })).toBeVisible();
+});
+
 test('@accessibility login and password-recovery forms are keyboard reachable and activatable', async ({ page }) => {
   const email = uniqueEmail('accessibility-login');
   seedReadyAccount(email);
