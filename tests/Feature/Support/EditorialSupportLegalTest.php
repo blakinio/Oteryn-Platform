@@ -120,16 +120,20 @@ final class EditorialSupportLegalTest extends TestCase
         ])->assertRedirect();
 
         $page = ManagedPage::query()->where('slug', EditorialPageKey::Support->managedPageSlug())->firstOrFail();
-        $audit = DB::table('admin_audit_events')
+        $auditQuery = DB::table('admin_audit_events')
             ->where('target_type', 'managed_page')
-            ->where('target_id', (string) $page->id)
-            ->first();
+            ->where('target_id', (string) $page->id);
+        $auditAction = $auditQuery->value('action');
+        $auditMetadata = $auditQuery->value('metadata');
 
-        self::assertNotNull($audit);
-        self::assertSame('support.content_created', $audit->action);
-        self::assertStringNotContainsString('player@example.com', (string) $audit->metadata);
-        self::assertStringNotContainsString('MFA-SECRET-EXAMPLE', (string) $audit->metadata);
-        self::assertStringNotContainsString($sensitiveBody, (string) $audit->metadata);
+        if (! is_string($auditAction) || ! is_string($auditMetadata)) {
+            self::fail('Expected string audit action and metadata values.');
+        }
+
+        self::assertSame('support.content_created', $auditAction);
+        self::assertStringNotContainsString('player@example.com', $auditMetadata);
+        self::assertStringNotContainsString('MFA-SECRET-EXAMPLE', $auditMetadata);
+        self::assertStringNotContainsString($sensitiveBody, $auditMetadata);
     }
 
     public function test_legal_versions_and_effective_dates_are_preserved_and_immutable_per_version(): void
