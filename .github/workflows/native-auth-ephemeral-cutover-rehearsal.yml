@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PLATFORM_REF: 53158217a6c6017230301cf4daa783b04fcc13d5
+  PLATFORM_REF: 9b80d3f4399c2d4a638a4d040f34cf60792acefc
   GATEWAY_REF: 53158217a6c6017230301cf4daa783b04fcc13d5
   CANARY_REF: 981c82f5ebb6bc22c867312c2b274a71f6aeeb3e
   OTCLIENT_REF: bb87346f6c516a19d19497d82bb01fb389334ff5
@@ -134,6 +134,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m py_compile \
+            tests/e2e/native_auth_ephemeral_cutover/exact_runner.py \
             tests/e2e/native_auth_ephemeral_cutover/platform_runner.py \
             canary-harness/tests/e2e/native_auth_ephemeral_cutover/run_rehearsal.py \
             canary-harness/tests/e2e/native_auth_ephemeral_cutover/browser_driver.py \
@@ -162,7 +163,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${REHEARSAL_EVIDENCE_DIR}"
-          python3 tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
+          python3 tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
 
       - name: Assert retained result classification
         if: success()
