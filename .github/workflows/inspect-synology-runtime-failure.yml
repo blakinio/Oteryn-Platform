@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  inspect-actions-log:
     runs-on: ubuntu-latest
     steps:
       - name: Extract sanitized runtime failure
@@ -48,5 +48,33 @@ jobs:
               raise SystemExit('No sanitized runtime failure lines found.')
           print('--- sanitized failure lines ---')
           for line in matches[-120:]:
+              print(line)
+          PY
+
+  inspect-mariadb-runner-state:
+    runs-on: oteryn-staging
+    steps:
+      - name: Inspect sanitized MariaDB state and logs
+        run: |
+          set -euo pipefail
+          cid="$(docker ps -aq \
+            --filter label=com.docker.compose.project=oteryn-staging \
+            --filter label=com.docker.compose.service=mariadb \
+            | head -n 1)"
+          if [[ -z "$cid" ]]; then
+            echo 'No oteryn-staging MariaDB container exists.'
+            exit 1
+          fi
+          docker inspect --format \
+            'status={{.State.Status}} exit_code={{.State.ExitCode}} oom_killed={{.State.OOMKilled}} error={{printf "%q" .State.Error}} health={{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}} restart_count={{.RestartCount}}' \
+            "$cid"
+          docker logs --tail 250 "$cid" 2>&1 > /tmp/mariadb.log
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          secretish = re.compile(r'(?<![A-Za-z0-9])[A-Za-z0-9+/=_-]{24,}(?![A-Za-z0-9])')
+          for raw in Path('/tmp/mariadb.log').read_text(errors='replace').splitlines():
+              line = secretish.sub('<redacted>', raw)
               print(line)
           PY
