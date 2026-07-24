@@ -53,11 +53,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T23:25:00+02:00
-head: 05bbefba7b607069865c0700c82d34c090d68f8d
+updated_at: 2026-07-24T23:35:00+02:00
+head: c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
 branch: fix/OTERYN-20260724-synology-compose-orphan-recovery
 pr: 162
-status: implementing
+status: ready
 context_routes:
   - agent-governance
   - testing
@@ -72,6 +72,7 @@ proven:
   - Gateway reverse proxy http://synology:8089/ready returns status ready.
   - The Compose file uses project name oteryn-staging and named persistent volumes.
   - PR 162 contains a bounded runner workflow that verifies exact Compose labels before using docker rename.
+  - Exact implementation head c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7 passed CI 30127654178, Agent Governance 30127654186, Platform DB Outage Validation 30127654225, Phase 7 Production-Like Validation 30127654182 and Game Auth Ticket Concurrency 30127654171.
 derived:
   - Platform and Canary are stale Compose replacement containers left under temporary short-ID-prefixed names.
   - Renaming verified running containers to their canonical names avoids data loss, restart and unrelated workload interruption.
@@ -93,10 +94,22 @@ validation:
   - command: live Gateway /ready through Synology reverse proxy
     result: PASS
     evidence: user observed {"status":"ready"}
-  - command: exact-head repository checks
-    result: NOT_RUN
-    evidence: PR 162 is open as draft and CI must validate the workflow/task head.
+  - command: CI 30127654178 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
+    result: PASS
+    evidence: Composer validation/audit, formatting, static analysis and tests passed.
+  - command: Agent Governance 30127654186 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
+    result: PASS
+    evidence: checkpoint and workflow governance passed.
+  - command: Platform DB Outage Validation 30127654225 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
+    result: PASS
+    evidence: fail-closed database outage validation passed.
+  - command: Phase 7 Production-Like Validation 30127654182 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
+    result: PASS
+    evidence: production-like validation passed.
+  - command: Game Auth Ticket Concurrency 30127654171 on c2c6b73ee4dedbd7b41e5fb72d90d6c42c8c74d7
+    result: PASS
+    evidence: ticket concurrency validation passed.
 blockers:
   - none
-next_action: Complete PR 162 exact-head checks, merge it, and inspect the automatic runner repair result before removing the one-shot push trigger.
+next_action: Squash-merge PR 162 and inspect the automatic runner repair result before removing the one-shot push trigger.
 ```
