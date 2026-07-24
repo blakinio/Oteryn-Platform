@@ -72,7 +72,7 @@ updated_at: 2026-07-25T00:25:26+02:00
 head: 97d1ad9157f7761914157b679bf7a5baafe88a40
 branch: feat/OTERYN-20260724-wiki-foundation
 pr: 158
-status: ready_for_review
+status: ready
 context_routes:
   - agent-governance
   - architecture
