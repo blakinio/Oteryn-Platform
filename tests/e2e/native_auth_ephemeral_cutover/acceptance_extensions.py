@@ -4,6 +4,7 @@ import json
 import re
 import secrets
 import shutil
+import time
 from pathlib import Path
 from typing import Any
 
@@ -389,10 +390,21 @@ def install(harness: Any) -> None:
             token=self.platform_current,
         )
         platform_request_id = platform_headers.get("x-request-id", "")
-        platform_logs = harness.docker("logs", self.container("platform"), check=False)
-        gateway_logs = harness.docker("logs", self.container("gateway"), check=False)
-        platform_log_text = ((platform_logs.stdout or b"") + (platform_logs.stderr or b"")).decode("utf-8", errors="replace")
-        gateway_log_text = ((gateway_logs.stdout or b"") + (gateway_logs.stderr or b"")).decode("utf-8", errors="replace")
+        platform_log_text = ""
+        for _ in range(40):
+            platform_logs = harness.docker("logs", self.container("platform"), check=False)
+            platform_log_text = ((platform_logs.stdout or b"") + (platform_logs.stderr or b"")).decode("utf-8", errors="replace")
+            if platform_request_id and platform_request_id in platform_log_text:
+                break
+            time.sleep(0.25)
+
+        gateway_log_text = ""
+        for _ in range(40):
+            gateway_logs = harness.docker("logs", self.container("gateway"), check=False)
+            gateway_log_text = ((gateway_logs.stdout or b"") + (gateway_logs.stderr or b"")).decode("utf-8", errors="replace")
+            if correlation_id in gateway_log_text:
+                break
+            time.sleep(0.25)
 
         cache_result = {
             "schema_version": 1,
