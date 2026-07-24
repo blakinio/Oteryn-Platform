@@ -54,11 +54,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-25T00:05:00+02:00
-head: 18776d692761a4e037246acc59ab40ed9e6876ec
+updated_at: 2026-07-25T00:15:00+02:00
+head: aa73838655084f29944c1efaa94b59af21b3ce33
 branch: fix/OTERYN-20260724-synology-oauth-evidence-parse
 pr: 166
-status: implementing
+status: ready
 context_routes:
   - agent-governance
   - testing
@@ -79,6 +79,7 @@ proven:
   - PR 164 added sanitized issue reporting and merged as 63c7d7e9b6dc2584919be0fadd64f68f8d7ef0d1 after all exact-head checks passed.
   - Synology runner execution 30128638979 reached Docker access and failed inside the combined repair/OAuth step; its always-run evidence publisher succeeded and disclosed no secrets.
   - PR 166 separates container repair verification from OAuth extraction and parses no-ANSI Laravel output with a bounded message search.
+  - Exact PR 166 implementation head aa73838655084f29944c1efaa94b59af21b3ce33 passed CI 30128821535, Agent Governance 30128821583, Platform DB Outage Validation 30128821579, Phase 7 Production-Like Validation 30128821552 and Game Auth Ticket Concurrency 30128821566.
 derived:
   - Platform and Canary originated as stale Compose replacement containers left under temporary short-ID-prefixed names.
   - Renaming verified running containers to their canonical names avoids data loss, restart and unrelated workload interruption.
@@ -111,10 +112,22 @@ validation:
   - command: Synology repair execution 30128638979
     result: FAIL
     evidence: Docker access and sanitized issue reporting passed, but the combined repair/OAuth step failed without publishing raw Docker or secret data.
-  - command: PR 166 exact-head repository checks
-    result: NOT_RUN
-    evidence: separated repair/OAuth evidence workflow is awaiting exact-head validation.
+  - command: CI 30128821535 on aa73838655084f29944c1efaa94b59af21b3ce33
+    result: PASS
+    evidence: Composer validation/audit, formatting, static analysis and tests passed.
+  - command: Agent Governance 30128821583 on aa73838655084f29944c1efaa94b59af21b3ce33
+    result: PASS
+    evidence: checkpoint and workflow governance passed.
+  - command: Platform DB Outage Validation 30128821579 on aa73838655084f29944c1efaa94b59af21b3ce33
+    result: PASS
+    evidence: fail-closed database outage validation passed.
+  - command: Phase 7 Production-Like Validation 30128821552 on aa73838655084f29944c1efaa94b59af21b3ce33
+    result: PASS
+    evidence: production-like validation passed.
+  - command: Game Auth Ticket Concurrency 30128821566 on aa73838655084f29944c1efaa94b59af21b3ce33
+    result: PASS
+    evidence: ticket concurrency validation passed.
 blockers:
   - none
-next_action: Validate and merge PR 166, then read issue 163 for separate live repair and OAuth extraction outcomes.
+next_action: Squash-merge PR 166, then read issue 163 for separate live repair and OAuth extraction outcomes.
 ```
