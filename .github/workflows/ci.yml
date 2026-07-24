@@ -62,8 +62,33 @@ jobs:
       - name: Check formatting
         run: vendor/bin/pint --test
 
-      - name: Run static analysis
-        run: composer analyse
+      - name: Capture static analysis
+        run: |
+          set +e
+          composer analyse > wiki-phpstan.txt 2>&1
+          echo "$?" > wiki-phpstan.exit
+          exit 0
 
-      - name: Run tests
-        run: composer test
+      - name: Capture tests
+        run: |
+          set +e
+          composer test > wiki-tests.txt 2>&1
+          echo "$?" > wiki-tests.exit
+          exit 0
+
+      - name: Upload Wiki validation diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: wiki-validation-diagnostics
+          path: |
+            wiki-phpstan.txt
+            wiki-phpstan.exit
+            wiki-tests.txt
+            wiki-tests.exit
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Fail on validation errors
+        run: |
+          test "$(cat wiki-phpstan.exit)" -eq 0
+          test "$(cat wiki-tests.exit)" -eq 0
