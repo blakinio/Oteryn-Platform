@@ -2,10 +2,8 @@ name: Inspect Synology Actions Evidence
 
 on:
   pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/inspect-synology-actions-evidence.yml
+    branches: [main]
+    paths: [.github/workflows/inspect-synology-actions-evidence.yml]
 
 permissions:
   actions: read
@@ -13,63 +11,16 @@ permissions:
 
 jobs:
   inventory:
-    name: Inventory Synology workflow runs and jobs
     runs-on: ubuntu-latest
     steps:
-      - name: List exact deployment workflow runs and jobs
+      - name: List one-shot and deployment runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          target_sha='e08548866e6edc70f69eaba40249303b69236625'
-          since='2026-07-24T07:33:44Z'
-          workflows=(
-            build-synology-staging-images.yml
-            one-shot-synology-staging-deploy.yml
-            deploy-synology-staging.yml
-          )
-
-          for workflow in "${workflows[@]}"; do
-            echo "=== WORKFLOW $workflow ==="
-            runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?per_page=100")"
-
-            if [[ "$workflow" == deploy-synology-staging.yml ]]; then
-              filter='select(.event == "workflow_dispatch" and .head_sha == $target_sha and .created_at >= $since)'
-            else
-              filter='select(.event == "push" and .head_sha == $target_sha)'
-            fi
-
-            jq -c --arg target_sha "$target_sha" --arg since "$since" ".workflow_runs[] | $filter | {
-              id,
-              name,
-              event,
-              status,
-              conclusion,
-              head_branch,
-              head_sha,
-              run_attempt,
-              created_at,
-              updated_at,
-              html_url
-            }" <<<"$runs_json"
-
-            while IFS= read -r run_id; do
-              [[ -n "$run_id" ]] || continue
-              echo "--- RUN $run_id JOBS ---"
-              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" \
-                --jq '.jobs[] | {
-                  id,
-                  name,
-                  status,
-                  conclusion,
-                  started_at,
-                  completed_at,
-                  runner_name,
-                  runner_group_name,
-                  labels,
-                  steps: [.steps[]? | {number, name, status, conclusion}]
-                }'
-            done < <(
-              jq -r --arg target_sha "$target_sha" --arg since "$since" ".workflow_runs[] | $filter | .id" <<<"$runs_json"
-            )
+          sha=e08548866e6edc70f69eaba40249303b69236625
+          for wf in one-shot-synology-staging-deploy.yml deploy-synology-staging.yml; do
+            echo "=== $wf ==="
+            gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/$wf/runs?per_page=100" \
+              --jq ".workflow_runs[] | select(.head_sha == \"$sha\") | {id,name,event,status,conclusion,head_sha,created_at,updated_at}"
           done
