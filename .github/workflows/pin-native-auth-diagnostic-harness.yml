@@ -1,0 +1,43 @@
+name: Pin Native Auth Diagnostic Harness
+
+on:
+  push:
+    branches:
+      - test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
+    paths:
+      - ".github/workflows/pin-native-auth-diagnostic-harness.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  pin-and-remove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout task branch
+        uses: actions/checkout@v6
+        with:
+          ref: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
+          fetch-depth: 0
+
+      - name: Pin exact diagnostic harness and remove helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('.github/workflows/native-auth-ephemeral-cutover-rehearsal.yml')
+          text = path.read_text(encoding='utf-8')
+          old = '1046687e44aa2f9321cf7d71364dc076aedf08c5'
+          new = 'f1434b2c299a07175a3c870168b7b6222b4677a7'
+          if text.count(old) != 2:
+              raise SystemExit(f'expected exactly two old harness references, found {text.count(old)}')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+          git rm .github/workflows/pin-native-auth-diagnostic-harness.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
+          git commit -m "test(e2e): pin diagnostic Canary harness"
+          git push origin HEAD:test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
