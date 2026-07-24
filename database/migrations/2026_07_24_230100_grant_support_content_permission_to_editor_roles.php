@@ -38,11 +38,19 @@ return new class extends Migration
             return;
         }
 
-        $roleIds = DB::table('admin_roles')
-            ->whereIn('key', self::ROLE_KEYS)
-            ->pluck('id')
-            ->map(static fn (mixed $id): int => (int) $id)
-            ->all();
+        $roleIds = [];
+
+        foreach (DB::table('admin_roles')->whereIn('key', self::ROLE_KEYS)->pluck('id') as $roleId) {
+            if (is_int($roleId)) {
+                $roleIds[] = $roleId;
+
+                continue;
+            }
+
+            if (is_string($roleId) && ctype_digit($roleId)) {
+                $roleIds[] = (int) $roleId;
+            }
+        }
 
         DB::table('admin_role_permissions')
             ->where('permission_id', (int) $permissionId)
