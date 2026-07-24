@@ -57,6 +57,14 @@ final readonly class SaveClientRelease
             $release->artifacts()->delete();
             $release->artifacts()->createMany($artifacts);
 
+            $enabledArtifactCount = 0;
+
+            foreach ($artifacts as $artifact) {
+                if ($artifact['is_enabled']) {
+                    $enabledArtifactCount++;
+                }
+            }
+
             $this->audit->record(
                 $actor->id,
                 $created ? 'downloads.release_created' : 'downloads.release_updated',
@@ -66,10 +74,7 @@ final readonly class SaveClientRelease
                     'version' => $release->version,
                     'channel' => $release->channel,
                     'artifact_count' => count($artifacts),
-                    'enabled_artifact_count' => count(array_filter(
-                        $artifacts,
-                        static fn (array $artifact): bool => $artifact['is_enabled'],
-                    )),
+                    'enabled_artifact_count' => $enabledArtifactCount,
                 ],
             );
 
