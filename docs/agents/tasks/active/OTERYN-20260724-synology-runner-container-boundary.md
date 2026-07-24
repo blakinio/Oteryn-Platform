@@ -20,7 +20,7 @@ Make the Synology deployment package work when the GitHub Actions deployment run
 - [x] Runtime Compose does not require repository checkout paths to exist on the Synology host.
 - [x] Repository-owned TLS and nginx bootstrap files are transferred through the Docker API into a named volume before services start.
 - [x] Health checks probe service network namespaces rather than the runner container loopback.
-- [ ] Focused validation and repository CI pass on the final head.
+- [x] Focused validation and repository CI pass on the validated implementation head.
 
 ## Ownership
 
@@ -35,8 +35,7 @@ modules:
   - Synology staging deployment
 dependencies:
   - merged Synology staging package PR #127
-blockers:
-  - GitHub-hosted Actions jobs currently fail before any step starts; current connector evidence exposes no job log payload
+blockers: []
 cross_repository_tasks: []
 ```
 
@@ -44,11 +43,11 @@ cross_repository_tasks: []
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T06:02:00Z
-head: e0cee8a19bccda473cf2a4b79df25aa5ba3b1efc
+updated_at: 2026-07-24T06:31:00Z
+validated_head: e9bcc2eda5984f71bb5ac760af91586e86a35255
 branch: fix/OTERYN-20260724-synology-runner-container-boundary
 pr: 128
-status: blocked
+status: ready_to_merge
 context_routes:
   - agent-governance
   - architecture
@@ -67,15 +66,16 @@ proven:
   - TLS and nginx bootstrap files are staged through docker cp into a named volume owned by the Synology Docker daemon
   - service health probes use target container network namespaces rather than runner loopback
   - PR 128 contains only the bounded Synology runner-boundary repair paths
-  - workflow run 30070806697 and its single failed-job rerun both completed with failure before any job step was created
-derived:
-  - the current CI failure is external to executed repository steps because no runner step began
-unknown:
-  - exact GitHub UI reason shown for the pre-step GitHub-hosted runner failures
+  - repository visibility was restored to public for the active development and CI phase
+  - all six pull-request workflows completed successfully on validated head e9bcc2eda5984f71bb5ac760af91586e86a35255
+unknown: []
 conflicts: []
 first_failure:
-  marker: Build Synology Staging Images run 30070806697
-  evidence: all four jobs concluded failure with steps absent; one rerun reproduced the same pre-step failure
+  marker: GitHub-hosted jobs were blocked before runner allocation while the repository was private
+  evidence: GitHub UI reported failed account payments or an insufficient spending limit
+resolution:
+  - repository visibility was changed back to public for the development phase
+  - failed workflow jobs were rerun and completed successfully
 rejected_hypotheses:
   - expose staging ports on all interfaces solely for runner health checks: rejected because it weakens the staging boundary
   - run ordinary CI on the Synology self-hosted deployment runner: rejected because it violates the no-build-on-NAS and trusted-runner boundary
@@ -86,13 +86,19 @@ changed_paths:
   - deploy/synology/scripts/health-check.sh
   - .github/workflows/build-synology-staging-images.yml
 validation:
-  - command: Build Synology Staging Images run 30070806697
-    result: BLOCKED
-    evidence: initial attempt and failed-job rerun both failed before any step started; GitHub returned no downloadable job log
-  - command: repository pull-request workflows on e0cee8a19bccda473cf2a4b79df25aa5ba3b1efc
-    result: BLOCKED
-    evidence: CI, governance, outage, phase-7 and concurrency jobs also failed before steps started
-blockers:
-  - inspect the GitHub Actions UI banner for a billing, policy, availability or hosted-runner allocation explanation
-next_action: inspect the latest failed Build Synology Staging Images run in the GitHub UI and capture the pre-step failure banner.
+  - command: Build Synology Staging Images run 30070992698
+    result: PASS
+    evidence: validation plus all three image build jobs completed successfully after rerun
+  - command: CI run 30070992736
+    result: PASS
+  - command: Agent Governance run 30070992760
+    result: PASS
+  - command: Phase 7 Production-Like Validation run 30070992747
+    result: PASS
+  - command: Game Auth Ticket Concurrency run 30070992716
+    result: PASS
+  - command: Platform DB Outage Validation run 30070992757
+    result: PASS
+blockers: []
+next_action: merge PR 128, wait for main image publication, then run the guarded Synology staging deployment workflow.
 ```
