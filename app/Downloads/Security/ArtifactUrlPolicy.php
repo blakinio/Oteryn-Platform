@@ -2,10 +2,18 @@
 
 namespace App\Downloads\Security;
 
-use Illuminate\Support\Facades\Config;
+use Illuminate\Container\Attributes\Config;
 
-final class ArtifactUrlPolicy
+final readonly class ArtifactUrlPolicy
 {
+    /**
+     * @param  list<string>  $allowedHosts
+     */
+    public function __construct(
+        #[Config('downloads.allowed_artifact_hosts', [])]
+        private array $allowedHosts = [],
+    ) {}
+
     public function isApproved(string $url): bool
     {
         return $this->rejectionReason($url) === null;
@@ -103,16 +111,9 @@ final class ArtifactUrlPolicy
      */
     private function allowedHosts(): array
     {
-        $configuredHosts = Config::array('downloads.allowed_artifact_hosts', []);
-
-        /** @var list<string> $allowedHosts */
         $allowedHosts = [];
 
-        foreach ($configuredHosts as $configuredHost) {
-            if (! is_string($configuredHost)) {
-                continue;
-            }
-
+        foreach ($this->allowedHosts as $configuredHost) {
             $host = strtolower(rtrim(trim($configuredHost), '.'));
 
             if ($host !== '' && ! in_array($host, $allowedHosts, true)) {
