@@ -18,9 +18,10 @@ Every agent starts with:
 1. root `AGENTS.md`;
 2. `docs/agents/REPOSITORY_MAP.md`;
 3. `docs/agents/PROJECT_STATE.md`;
-4. the active task record, when one exists;
-5. the live PR for that task, when one exists;
-6. the nearest nested `AGENTS.md`, when present.
+4. `docs/agents/BUILD_TEST_MATRIX.md`;
+5. the active task record, when one exists;
+6. the live PR for that task, when one exists;
+7. the nearest nested `AGENTS.md`, when present.
 
 Then classify the task and load only the matching context.
 
@@ -39,7 +40,7 @@ Then classify the task and load only the matching context.
 | `admin-rbac` | admin panel, roles, policies, privileged actions | Read `SECURITY_ARCHITECTURE.md`, Admin module catalog section, authorization policies and audit requirements. Deny by default. |
 | `api` | REST/API endpoints, external clients | Load routes, request validation, auth middleware, rate limits and API tests. Reuse module services rather than duplicating business logic. |
 | `security` | vulnerability, secret, traversal, XSS, CSRF, SSRF, injection, abuse | Read `SECURITY_ARCHITECTURE.md` and affected surface/tests. Record threat assumptions explicitly and add regression tests where practical. |
-| `testing` | test infrastructure, CI validation, E2E | Read `TEST_STRATEGY.md` and affected contracts/modules. Tie compatibility evidence to exact versions/SHAs where practical. |
+| `testing` | test infrastructure, CI validation, E2E | Apply `BUILD_TEST_MATRIX.md`, then read `TEST_STRATEGY.md` and affected contracts/modules. Tie compatibility evidence to exact versions/SHAs where practical. |
 | `payments` | payment provider, coins, premium currency, webhook, shop | Read ADR 0003 and security/data ownership sections. Payments are deferred unless the user explicitly starts that phase. Require a new payment ADR/threat model. |
 | `ci-repair` | required GitHub check fails | Read the failing workflow/job/step and current task. Investigate root cause before rerun. |
 
