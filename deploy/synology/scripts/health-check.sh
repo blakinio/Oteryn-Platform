@@ -12,6 +12,7 @@ load_oteryn_env_file "$ENV_FILE"
 
 compose=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 
+declare -A container_ids=()
 for service in mariadb redis canary platform internal-proxy gateway; do
     container_id="$("${compose[@]}" ps -q "$service")"
     if [[ -z "$container_id" ]]; then
@@ -23,14 +24,22 @@ for service in mariadb redis canary platform internal-proxy gateway; do
         echo "Service is not running: $service" >&2
         exit 1
     fi
+    container_ids["$service"]="$container_id"
 done
 
 probe_url() {
-    local url="$1"
-    local label="$2"
+    local service="$1"
+    local port="$2"
+    local path="$3"
+    local label="$4"
+    local container_id="${container_ids[$service]}"
 
     for _ in $(seq 1 30); do
-        if curl --fail --silent --show-error --max-time 5 "$url" >/dev/null; then
+        if docker run --rm \
+            --network "container:$container_id" \
+            alpine:3.22 \
+            /bin/sh -ec \
+            "wget -qO- -T 5 'http://127.0.0.1:${port}${path}' >/dev/null"; then
             return 0
         fi
         sleep 2
@@ -40,13 +49,17 @@ probe_url() {
     return 1
 }
 
-probe_url "http://${OTERYN_BIND_ADDRESS}:${PLATFORM_PORT}/health" "Platform /health"
-probe_url "http://${OTERYN_BIND_ADDRESS}:${GATEWAY_PORT}/health" "Gateway /health"
-probe_url "http://${OTERYN_BIND_ADDRESS}:${GATEWAY_PORT}/ready" "Gateway /ready"
-probe_url "http://${OTERYN_BIND_ADDRESS}:${GATEWAY_PORT}/version" "Gateway /version"
+probe_url platform 8000 /health "Platform /health"
+probe_url gateway 8080 /health "Gateway /health"
+probe_url gateway 8080 /ready "Gateway /ready"
+probe_url gateway 8080 /version "Gateway /version"
 
-if ! timeout 3 bash -c "exec 3<>/dev/tcp/${OTERYN_BIND_ADDRESS}/${CANARY_GAME_PORT}" 2>/dev/null; then
-    echo "Canary game TCP port is not reachable on the configured staging bind address." >&2
+if ! docker run --rm \
+    --network "container:${container_ids[canary]}" \
+    alpine:3.22 \
+    /bin/sh -ec \
+    "nc -z -w 3 127.0.0.1 '${CANARY_GAME_PORT}'"; then
+    echo "Canary game TCP port is not reachable inside the Canary network namespace." >&2
     exit 1
 fi
 
