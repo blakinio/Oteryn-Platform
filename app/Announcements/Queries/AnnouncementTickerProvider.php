@@ -2,6 +2,7 @@
 
 namespace App\Announcements\Queries;
 
+use App\Announcements\Models\SiteAnnouncement;
 use App\Announcements\ViewModels\AnnouncementTicker;
 use App\PublicPortal\PublicContentState;
 use DateTimeInterface;
@@ -24,7 +25,7 @@ final class AnnouncementTickerProvider
             return new AnnouncementTicker(PublicContentState::EMPTY, []);
         }
 
-        /** @var list<\App\Announcements\Models\SiteAnnouncement> $list */
+        /** @var list<SiteAnnouncement> $list */
         $list = array_values($items->all());
 
         return new AnnouncementTicker(PublicContentState::AVAILABLE, $list);
