@@ -137,9 +137,9 @@ final class EventCalendarQuery
 
         return [
             ...$summary,
-            'body' => (string) $data['body'],
-            'news_slug' => $data['news_slug'] === null ? null : (string) $data['news_slug'],
-            'news_title' => $data['news_title'] === null ? null : (string) $data['news_title'],
+            'body' => $this->stringValue($data['body'], 'body'),
+            'news_slug' => $this->nullableStringValue($data['news_slug'], 'news_slug'),
+            'news_title' => $this->nullableStringValue($data['news_title'], 'news_title'),
         ];
     }
 
@@ -159,9 +159,9 @@ final class EventCalendarQuery
      */
     private function summary(array $row, CarbonImmutable $at): array
     {
-        $startsAt = CarbonImmutable::parse((string) $row['starts_at'], 'UTC');
-        $endsAt = CarbonImmutable::parse((string) $row['ends_at'], 'UTC');
-        $persistedStatus = (string) $row['status'];
+        $startsAt = CarbonImmutable::parse($this->stringValue($row['starts_at'], 'starts_at'), 'UTC');
+        $endsAt = CarbonImmutable::parse($this->stringValue($row['ends_at'], 'ends_at'), 'UTC');
+        $persistedStatus = $this->stringValue($row['status'], 'status');
 
         if (! in_array($persistedStatus, Event::publicStatuses(), true)) {
             throw new UnexpectedValueException('Unexpected persisted event state.');
@@ -175,14 +175,14 @@ final class EventCalendarQuery
         };
 
         return [
-            'id' => (int) $row['id'],
-            'title' => (string) $row['title'],
-            'slug' => (string) $row['slug'],
-            'summary' => (string) $row['summary'],
+            'id' => $this->integerValue($row['id'], 'id'),
+            'title' => $this->stringValue($row['title'], 'title'),
+            'slug' => $this->stringValue($row['slug'], 'slug'),
+            'summary' => $this->stringValue($row['summary'], 'summary'),
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
             'status' => $status,
-            'featured' => (bool) $row['featured'],
+            'featured' => $this->booleanValue($row['featured'], 'featured'),
         ];
     }
 
@@ -202,6 +202,46 @@ final class EventCalendarQuery
     private static function compareCancelled(array $left, array $right): int
     {
         return $right['starts_at']->getTimestamp() <=> $left['starts_at']->getTimestamp();
+    }
+
+    private function stringValue(mixed $value, string $field): string
+    {
+        if (! is_string($value)) {
+            throw new UnexpectedValueException("Unexpected {$field} value.");
+        }
+
+        return $value;
+    }
+
+    private function nullableStringValue(mixed $value, string $field): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return $this->stringValue($value, $field);
+    }
+
+    private function integerValue(mixed $value, string $field): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        throw new UnexpectedValueException("Unexpected {$field} value.");
+    }
+
+    private function booleanValue(mixed $value, string $field): bool
+    {
+        return match ($value) {
+            true, 1, '1' => true,
+            false, 0, '0' => false,
+            default => throw new UnexpectedValueException("Unexpected {$field} value."),
+        };
     }
 
     private function assertLocale(string $locale): void
