@@ -67,16 +67,10 @@ final class ArtifactUrlPolicy
      */
     private function allowedSchemes(): array
     {
-        $schemes = config('downloads.allowed_artifact_schemes', ['https']);
-
-        if (! is_array($schemes)) {
-            return [];
-        }
-
-        return array_values(array_unique(array_filter(array_map(
-            static fn (mixed $scheme): string => is_string($scheme) ? strtolower(trim($scheme)) : '',
-            $schemes,
-        ))));
+        return $this->normalizeConfigList(
+            config('downloads.allowed_artifact_schemes', ['https']),
+            false,
+        );
     }
 
     /**
@@ -84,15 +78,40 @@ final class ArtifactUrlPolicy
      */
     private function allowedHosts(): array
     {
-        $hosts = config('downloads.allowed_artifact_hosts', []);
+        return $this->normalizeConfigList(
+            config('downloads.allowed_artifact_hosts', []),
+            true,
+        );
+    }
 
-        if (! is_array($hosts)) {
+    /**
+     * @return list<string>
+     */
+    private function normalizeConfigList(mixed $configured, bool $trimTrailingDot): array
+    {
+        if (! is_array($configured)) {
             return [];
         }
 
-        return array_values(array_unique(array_filter(array_map(
-            static fn (mixed $host): string => is_string($host) ? strtolower(rtrim(trim($host), '.')) : '',
-            $hosts,
-        ))));
+        /** @var array<string, true> $unique */
+        $unique = [];
+
+        foreach ($configured as $value) {
+            if (! is_string($value)) {
+                continue;
+            }
+
+            $normalized = strtolower(trim($value));
+
+            if ($trimTrailingDot) {
+                $normalized = rtrim($normalized, '.');
+            }
+
+            if ($normalized !== '') {
+                $unique[$normalized] = true;
+            }
+        }
+
+        return array_keys($unique);
     }
 }
