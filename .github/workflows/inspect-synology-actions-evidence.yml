@@ -1,0 +1,75 @@
+name: Inspect Synology Actions Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/inspect-synology-actions-evidence.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inventory:
+    name: Inventory Synology workflow runs and jobs
+    runs-on: ubuntu-latest
+    steps:
+      - name: List targeted workflow runs and jobs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          since='2026-07-24T07:33:44Z'
+          workflows=(
+            build-synology-staging-images.yml
+            one-shot-synology-staging-deploy.yml
+            deploy-synology-staging.yml
+          )
+
+          for workflow in "${workflows[@]}"; do
+            echo "=== WORKFLOW $workflow ==="
+            runs_json="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?per_page=100")"
+            jq -c --arg since "$since" '
+              .workflow_runs[]
+              | select(.created_at >= $since)
+              | {
+                  id,
+                  name,
+                  event,
+                  status,
+                  conclusion,
+                  head_branch,
+                  head_sha,
+                  run_attempt,
+                  created_at,
+                  updated_at,
+                  html_url
+                }
+            ' <<<"$runs_json"
+
+            while IFS= read -r run_id; do
+              [[ -n "$run_id" ]] || continue
+              echo "--- RUN $run_id JOBS ---"
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100" \
+                --jq '.jobs[] | {
+                  id,
+                  name,
+                  status,
+                  conclusion,
+                  started_at,
+                  completed_at,
+                  runner_name,
+                  runner_group_name,
+                  labels,
+                  steps: [.steps[] | {number, name, status, conclusion}]
+                }'
+            done < <(
+              jq -r --arg since "$since" '
+                .workflow_runs[]
+                | select(.created_at >= $since)
+                | .id
+              ' <<<"$runs_json"
+            )
+          done
