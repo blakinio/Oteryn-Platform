@@ -14,8 +14,6 @@ use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
 use Mockery\CompositeExpectation;
-use Mockery\ExpectationInterface;
-use Mockery\HigherOrderMessage;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
@@ -203,7 +201,7 @@ final class HomeTest extends TestCase
         $expectation = $this->commandExpectation($connection);
         $expectation->__call('once', []);
         $expectation->__call('with', [$command, $arguments]);
-        $expectation->__call('andReturn', [$result]);
+        $expectation->andReturn($result);
     }
 
     /**
@@ -221,9 +219,11 @@ final class HomeTest extends TestCase
         $expectation->__call('andThrow', [$exception]);
     }
 
-    private function commandExpectation(
-        MockInterface $connection,
-    ): CompositeExpectation|ExpectationInterface|HigherOrderMessage {
-        return $connection->shouldReceive('command');
+    private function commandExpectation(MockInterface $connection): CompositeExpectation
+    {
+        /** @var CompositeExpectation */
+        $expectation = $connection->shouldReceive('command');
+
+        return $expectation;
     }
 }
