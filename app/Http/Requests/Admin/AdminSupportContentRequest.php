@@ -21,6 +21,7 @@ final class AdminSupportContentRequest extends FormRequest
         $isLegal = $key?->isLegal() ?? false;
         $isPublishing = $this->filled('published_at');
 
+        /** @var array<string, list<mixed>> $rules */
         $rules = [
             'title' => ['required', 'string', 'max:200'],
             'body' => ['required', 'string', 'max:100000'],
