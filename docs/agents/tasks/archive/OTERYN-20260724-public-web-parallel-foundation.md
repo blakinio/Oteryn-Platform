@@ -116,6 +116,7 @@ changed_paths:
   - scripts/acceptance/tests/responsive-critical.spec.mjs
   - scripts/acceptance/tests/accessibility-critical.spec.mjs
   - docs/contracts/PUBLIC_PORTAL_EXTENSION_CONTRACT.md
+  - docs/agents/tasks/active/OTERYN-20260724-public-web-parallel-foundation.md
   - docs/agents/tasks/archive/OTERYN-20260724-public-web-parallel-foundation.md
 validation:
   - command: CI
@@ -142,6 +143,12 @@ validation:
   - command: squash merge PR #146
     result: PASS
     evidence: GitHub created main commit adebabf322ff52b0d0bb7d4eee95da3ec7b3aae1
+  - command: python tools/agents/checkpoint.py docs/agents/tasks/active/OTERYN-20260724-public-web-parallel-foundation.md --require-checkpoint
+    result: PASS
+    evidence: validated the final task checkpoint against governance contract v1 before archival
+  - command: python tools/agents/resume.py --task docs/agents/tasks/active/OTERYN-20260724-public-web-parallel-foundation.md
+    result: PASS
+    evidence: generated the compact final handover before moving the completed task to archive
 blockers: []
 next_action: Start the next independently scoped task from current main; do not continue PR #146.
 ```
