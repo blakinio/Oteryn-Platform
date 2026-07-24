@@ -12,6 +12,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 use Tests\TestCase;
 
 final class AnnouncementsModuleTest extends TestCase
@@ -104,9 +105,14 @@ final class AnnouncementsModuleTest extends TestCase
             'target_id' => (string) $announcement->id,
         ]);
 
-        $auditPayload = (string) DB::table('admin_audit_events')
+        $auditPayload = DB::table('admin_audit_events')
             ->where('target_type', 'site_announcement')
             ->value('metadata');
+
+        if (! is_string($auditPayload)) {
+            throw new RuntimeException('Expected announcement audit metadata to be a string.');
+        }
+
         self::assertStringNotContainsString($announcement->title, $auditPayload);
         self::assertStringNotContainsString($announcement->body, $auditPayload);
         self::assertStringNotContainsString((string) $announcement->action_url, $auditPayload);
@@ -191,11 +197,13 @@ final class AnnouncementsModuleTest extends TestCase
         ]);
 
         foreach ($permissions as $permission) {
-            $permissionId = DB::table('admin_permissions')->where('key', $permission)->value('id');
-            self::assertNotNull($permissionId);
+            $permissionId = $this->integerDatabaseValue(
+                DB::table('admin_permissions')->where('key', $permission)->value('id'),
+                "permission {$permission}",
+            );
             DB::table('admin_role_permissions')->insert([
                 'role_id' => $roleId,
-                'permission_id' => (int) $permissionId,
+                'permission_id' => $permissionId,
             ]);
         }
 
@@ -203,6 +211,19 @@ final class AnnouncementsModuleTest extends TestCase
             'identity_id' => $identity->id,
             'role_id' => $roleId,
         ]);
+    }
+
+    private function integerDatabaseValue(mixed $value, string $description): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        throw new RuntimeException("Expected an integer-compatible {$description} id.");
     }
 
     private function actingAsCurrent(Identity $identity): void
