@@ -30,7 +30,7 @@ Record a durable architecture and phased implementation plan for a first-party O
 - [x] A standalone implementation-agent prompt exists under `docs/agents/prompts/`.
 - [x] The prompt requires lean preflight, a dedicated implementation task/branch/PR and only the first bounded implementation slice.
 - [x] No application code, migrations, routes, permissions or deployment behavior are changed by this planning task.
-- [ ] Draft PR is opened and reviewed.
+- [x] Draft PR is opened and the changed-file boundary is reviewed.
 
 ## Ownership
 
@@ -57,11 +57,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T13:30:00Z
-head: 87350f36b67affe4cc777300aa8c59710d4de00a
+updated_at: 2026-07-24T13:40:00Z
+head: dea5583fc98a7d877599e2920ae6b8c6eecb0890
 branch: docs/OTERYN-20260724-wiki-architecture-plan
-pr: none
-status: documenting
+pr: 142
+status: reviewing
 context_routes:
   - agent-governance
   - architecture
@@ -81,6 +81,7 @@ proven:
   - privileged routes use authentication, confirmed MFA and exact deny-by-default permissions
   - administrator CMS mutations use bounded audit records
   - no active Wiki task or Wiki branch was found before this task began
+  - PR 142 contains only four documentation and agent-governance paths
 derived:
   - Wiki should reuse shared Identity, RBAC and Audit but own a dedicated content and revision model
   - the programme must be delivered as multiple small vertical slices rather than one large PR
@@ -99,16 +100,20 @@ changed_paths:
   - docs/architecture/WIKI_IMPLEMENTATION_PLAN.md
   - docs/agents/prompts/OTERYN-WIKI-IMPLEMENTATION-AGENT-PROMPT.md
   - docs/agents/tasks/active/OTERYN-20260724-wiki-architecture-plan.md
+  - docs/agents/ACTIVE_WORK.md
 validation:
   - command: repository documentation review against AGENTS.md, MODULE_CATALOG.md and routes/web.php
     result: PASS
     evidence: plan preserves the current modular monolith, exact RBAC/MFA model and explicit upload-security requirement
+  - command: compare main...docs/OTERYN-20260724-wiki-architecture-plan
+    result: PASS
+    evidence: four documentation/governance paths changed; no application, route, migration, configuration or deployment file changed
   - command: application tests
     result: NOT_RUN
     evidence: documentation-only planning change; no application code or runtime behavior changed
 blockers:
   - none
-next_action: Open the documentation-only draft PR and review the changed-file list for unintended application changes.
+next_action: Review PR 142 and merge the documentation plan when governance checks pass, then start the implementation prompt in a new dedicated task branch.
 ```
 
 ## Notes
