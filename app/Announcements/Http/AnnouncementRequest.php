@@ -4,6 +4,7 @@ namespace App\Announcements\Http;
 
 use App\Announcements\Links\AnnouncementActionLink;
 use App\Announcements\Models\SiteAnnouncement;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
@@ -33,7 +34,7 @@ final class AnnouncementRequest extends FormRequest
                 'string',
                 'max:2048',
                 'required_with:action_label',
-                function (string $attribute, mixed $value, \Closure $fail): void {
+                function (string $attribute, mixed $value, Closure $fail): void {
                     try {
                         AnnouncementActionLink::normalize(is_string($value) ? $value : null);
                     } catch (InvalidArgumentException $exception) {
