@@ -19,11 +19,12 @@ Make Oteryn Platform generate externally correct HTTPS URLs when deployed behind
 
 ## Acceptance criteria
 
-- [ ] Forwarded scheme/host/port headers are trusted only when `TRUSTED_PROXIES` explicitly configures the presenting proxy IP or CIDR.
-- [ ] HTTPS requests forwarded by a configured proxy generate HTTPS absolute form actions and URLs.
-- [ ] Direct/unconfigured clients cannot spoof forwarded scheme or host.
-- [ ] `.env.example` documents the deployment boundary.
+- [x] Forwarded scheme/host/port headers are trusted only when `TRUSTED_PROXIES` explicitly configures the presenting proxy IP or CIDR.
+- [x] HTTPS requests forwarded by a configured proxy generate HTTPS absolute form actions and URLs in implementation.
+- [x] Direct/unconfigured clients cannot spoof forwarded scheme or host in regression coverage.
+- [x] `.env.example` documents the deployment boundary.
 - [ ] Focused regression tests and required Platform CI pass.
+- [ ] Exact product-fix SHA passes the native-auth ephemeral cutover rehearsal.
 
 ## Ownership
 
@@ -33,6 +34,7 @@ owned_paths:
   - bootstrap/app.php
   - .env.example
   - tests/Feature/Security/TrustedProxySchemeTest.php
+  - .github/workflows/trusted-proxy-static-analysis-diagnostic.yml
 modules:
   - Laravel reverse-proxy request boundary
   - native OAuth browser flow URL generation
@@ -48,11 +50,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T09:34:00+02:00
-head: 60b12fb2d1748fb016484eca521a6c61af505d37
+updated_at: 2026-07-24T09:44:00+02:00
+head: 1d99a7bcd4424b7e45dde5f8bc7977125b55bed4
 branch: fix/OTERYN-20260724-trusted-reverse-proxy-scheme
-pr: none
-status: implementing
+pr: 131
+status: validating
 context_routes:
   - auth-identity
   - security
@@ -62,29 +64,38 @@ owned_paths:
   - bootstrap/app.php
   - .env.example
   - tests/Feature/Security/TrustedProxySchemeTest.php
+  - .github/workflows/trusted-proxy-static-analysis-diagnostic.yml
 proven:
   - Native-auth rehearsal run 30069293159 attempt 4 reached the real OAuth browser flow and failed because the login form action resolved to the internal HTTP listener rather than the external HTTPS origin.
   - The rehearsal Nginx proxy sends X-Forwarded-Proto https.
-  - bootstrap/app.php does not currently configure trusted proxies.
+  - Prior bootstrap/app.php did not configure trusted proxies.
   - Laravel 13 provides Middleware::trustProxies with explicit proxy IP/CIDR and forwarded-header selection.
+  - PR 131 implements explicit comma-separated proxy IP/CIDR trust, rejects wildcard trust, documents TRUSTED_PROXIES and includes trusted/untrusted login-form regressions.
 derived:
-  - Platform is ignoring the forwarded HTTPS boundary and generating internal HTTP absolute URLs.
+  - Platform ignored the forwarded HTTPS boundary and generated internal HTTP absolute URLs.
 unknown:
+  - exact PHPStan diagnostic text from CI run 30076173754
   - final focused test and CI result
 conflicts: []
 first_failure:
-  marker: forwarded-https-not-trusted
-  evidence: oauth-probe-diagnostics.log from artifact 8589703457 shows login POST connection refused after successful HTTPS login-page retrieval
+  marker: phpstan-before-tests
+  evidence: CI run 30076173754 passed Composer validation/audit and Pint, then failed static analysis before PHPUnit
 rejected_hypotheses:
   - disable TLS verification: rejected because certificate and hostname validation already pass
   - rewrite form actions only inside the rehearsal probe: rejected because production URL generation must respect the reverse-proxy boundary
 changed_paths:
+  - .env.example
+  - bootstrap/app.php
   - docs/agents/tasks/active/OTERYN-20260724-trusted-reverse-proxy-scheme.md
+  - tests/Feature/Security/TrustedProxySchemeTest.php
 validation:
   - command: Native Auth Ephemeral Cutover Rehearsal run 30069293159 attempt 4
     result: FAIL
     evidence: first product failure isolated to untrusted forwarded HTTPS metadata
+  - command: CI run 30076173754 on 1d99a7bcd4424b7e45dde5f8bc7977125b55bed4
+    result: FAIL
+    evidence: Composer validation/audit and Pint passed; PHPStan failed; PHPUnit was skipped
 blockers:
   - none
-next_action: implement explicit TRUSTED_PROXIES parsing, regression tests and environment documentation.
+next_action: retain the exact PHPStan output as an artifact, fix the reported type issue, and rerun required CI.
 ```
