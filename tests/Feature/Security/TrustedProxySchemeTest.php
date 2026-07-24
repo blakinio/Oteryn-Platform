@@ -71,13 +71,7 @@ final class TrustedProxySchemeTest extends TestCase
             self::fail('Login form action was not present in the response.');
         }
 
-        $action = $matches[1] ?? null;
-
-        if (! is_string($action) || $action === '') {
-            self::fail('Login form action was empty.');
-        }
-
-        return html_entity_decode($action, ENT_QUOTES | ENT_HTML5);
+        return html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5);
     }
 
     /**
