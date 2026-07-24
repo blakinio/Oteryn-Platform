@@ -56,8 +56,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T11:35:00+02:00
-head: 0685c447d780a8d36724bab21bb56cb00af69178
+updated_at: 2026-07-24T11:45:00+02:00
+head: b4f83a0a2ffcf2d7254cdaa05cff71c3fe2b0ea9
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
 pr: 126
 status: validating
@@ -80,27 +80,27 @@ proven:
   - MariaDB final-server readiness, MYSQL_PWD compatibility and deterministic schema imports are proven; Redis read-only ACL write rejection is proven.
   - Credential overlap and native issuer activation pass for current/previous Platform and Canary credentials.
   - TLS validation passes for trusted CA/hostnames, wrong CA, hostname mismatch, non-loopback HTTP dependency rejection, private issuer isolation, no verification bypass and no retained private keys.
-  - Rehearsal run 30081998956 passed the complete OAuth PKCE matrix and the real authorization-code expiry check using isolated Platform fake time.
-  - The same run passed expired Game Login Ticket rejection, first use, replay rejection, wrong protocol, invalid Platform and Canary service credentials, wrong account and wrong world routing.
-  - Run 30081998956 failed only when the harness restarted Platform after an injected outage and immediately probed health while the new server was still starting.
-  - The restart bug was caused by a stale platform-bootstrap.json marker surviving between container stages; it was not a Platform product failure.
-  - Commit 0685c447d780a8d36724bab21bb56cb00af69178 removes the stale marker before every Platform start and requires a real internal HTTP 200 before returning.
+  - Rehearsal run 30082489849 passed the complete OAuth PKCE matrix, real authorization-code expiry, ticket issue/expiry/replay/protocol checks, service credential checks, wrong account/world checks and Platform outage fail-closed recovery.
+  - The first remaining failure in run 30082489849 was HTTP 429 on a later controlled login because all independent OAuth probe containers appeared to Platform as the same reverse-proxy source IP.
+  - Platform production rate limiters are correctly active: identity-login allows five attempts per minute per canonical email and source IP, while identity-login-source allows twenty attempts per minute per source IP.
+  - Commit b4f83a0a2ffcf2d7254cdaa05cff71c3fe2b0ea9 keeps those limiters enabled, forwards X-Forwarded-For through the trusted TLS proxy and assigns each independent probe a unique deterministic client-subnet IP.
+  - Platform restart readiness now deletes the stale bootstrap marker and requires live internal HTTP 200 before returning.
   - Canary harness 9200c562e7e87dd098c1205c1df83c9d9ce95c1b accepts the documented Game Login Ticket HTTP 200 contract and has green required CI.
   - Platform b5dd6a7be5c704d5706241240e06f8bb8c4b5efe combines explicit trusted-proxy handling with complete OAuth token cache headers and passed Composer validation, audit, Pint, PHPStan and full PHPUnit in run 30079059960.
   - acceptance_extensions.py adds physical invalid-session rejection, unauthorized-character burn, restart invalidation/recovery, account-override rejection, malformed Canary-to-Gateway and Gateway-to-OTClient failures, complete cache-header checks, correlation IDs and JWT-like sensitive scanning.
 derived:
-  - Platform outage recovery will now be measured only after a fresh bootstrap and live HTTP readiness, eliminating the false 502 race.
+  - Independent OAuth client processes will now exercise production throttling under distinct, correctly forwarded source identities instead of sharing the proxy identity.
 unknown:
-  - downstream Canary outage/recovery, physical OTClient, logout, replay, rotation, malformed-response, correlation, cache, rollback and final smoke results after the corrected Platform restart checkpoint
+  - downstream Canary outage/recovery, physical OTClient, logout, replay, rotation, malformed-response, correlation, cache, rollback and final smoke results after source-IP isolation
 conflicts: []
 first_failure:
-  marker: stale-platform-restart-readiness
-  evidence: run 30081998956 retained OAuth expiry PASS and failure-injection booleans through platform_redemption_unavailable_fail_closed, then failed because start_platform reused the previous bootstrap marker before the replacement server listened
+  marker: collapsed-oauth-probe-source-identity
+  evidence: run 30082489849 retained all prior PASS evidence and oauth-probe-diagnostics.log recorded login submit status 429 on the sixth same-email login behind the proxy
 rejected_hypotheses:
-  - classify the health race as a Platform availability defect: rejected because retained logs show the replacement process running migrations after the immediate failed probe
-  - add an arbitrary fixed sleep: rejected because readiness must be state-based and deterministic
-  - probe through the public proxy before it exists: rejected; the adapter uses the isolated platform_service network and backend alias
-  - change product source or product SHA: rejected because the defect belongs to rehearsal orchestration
+  - disable or raise Platform rate limits: rejected because the production control is working as designed and remains part of the security boundary
+  - clear the file cache between probes: rejected because that would erase production limiter state rather than model independent clients
+  - wait a fixed minute: rejected because it would make the matrix slower and timing-dependent
+  - change product source or product SHA: rejected because the defect belongs to proxy/client topology in the rehearsal
   - disable TLS verification: rejected because TLS verification already passes and remains mandatory
 changed_paths:
   - .github/workflows/native-auth-canary-cache-build.yml
@@ -110,12 +110,12 @@ changed_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 validation:
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30081998956
+  - command: Native Auth Ephemeral Cutover Rehearsal run 30082489849
     result: FAIL
-    evidence: OAuth PKCE, real code expiry, tickets and the first failure-injection assertions passed; first failure was the stale-marker Platform restart readiness race
-  - command: Platform Agent Governance run 30081998951
+    evidence: all previous checkpoints plus Platform outage recovery passed; first failure was production login throttling caused by collapsed probe source identity
+  - command: Platform Agent Governance run 30082489828
     result: PASS
-    evidence: active task checkpoint validation passed on the fake-time fix head
+    evidence: active task checkpoint validation passed on the restart-readiness head
   - command: Platform CI run 30079059960
     result: PASS
     evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed for Platform b5dd6a7
@@ -127,5 +127,5 @@ validation:
     evidence: artifact 8591665710 built from b15b7d544f4795e3a2a65b88de35391b9fd0a20d and was uploaded with retained digest
 blockers:
   - none
-next_action: execute the exact-revision rehearsal with fresh Platform restart readiness and repair only the first concrete downstream failure.
+next_action: execute the exact-revision rehearsal with distinct forwarded OAuth probe source IPs and repair only the first concrete downstream failure.
 ```
