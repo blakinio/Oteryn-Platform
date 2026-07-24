@@ -1,0 +1,58 @@
+name: OAuth Cache Format Diagnostic
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oauth-cache-format-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Apply repository formatter and capture diff
+        id: format
+        shell: bash
+        run: |
+          set +e
+          vendor/bin/pint
+          git diff -- . ':!composer.lock' > pint.diff
+          if [[ -s pint.diff ]]; then
+            cat pint.diff
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          fi
+          exit 0
+
+      - name: Upload formatter diff
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: oauth-cache-pint-diff
+          path: pint.diff
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Enforce clean formatting
+        if: steps.format.outputs.changed == 'true'
+        run: exit 1
