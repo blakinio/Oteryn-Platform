@@ -69,7 +69,7 @@ final class EnsureGameWorld extends Command
         try {
             DB::transaction(function () use ($id, $slug, $name, $region, $host, $port, $worldStatus, $loginEnabled): void {
                 $slugOwner = GameWorld::query()->where('slug', $slug)->lockForUpdate()->first();
-                if ($slugOwner !== null && (int) $slugOwner->getKey() !== $id) {
+                if ($slugOwner !== null && $slugOwner->id !== $id) {
                     throw new LogicException('World slug is already assigned to another world identifier.');
                 }
 
