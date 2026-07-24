@@ -41,6 +41,7 @@
                 <span></span>
             </div>
             <h2 id="home-character-search-heading">Find your character</h2>
+            <p class="preview-sr-only">Find a character. Search by exact character name.</p>
 
             <form class="preview-search-form" method="GET" action="{{ route('game.characters.search') }}">
                 <label class="preview-sr-only" for="home-character-name">Character name</label>
