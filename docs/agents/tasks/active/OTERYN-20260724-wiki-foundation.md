@@ -68,8 +68,8 @@ cross_repository_tasks: []
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-25T00:25:26+02:00
-head: 97d1ad9157f7761914157b679bf7a5baafe88a40
+updated_at: 2026-07-25T00:39:24+02:00
+head: b577c582744d83a902aaf99f0af22fd7b1d5b5f2
 branch: feat/OTERYN-20260724-wiki-foundation
 pr: 158
 status: ready
@@ -99,6 +99,7 @@ proven:
   - publication requires complete English and Polish content.
   - Wiki application services require one exact permission and fail closed without it; no role receives Wiki authority implicitly.
   - audit events contain bounded state metadata and exclude complete article bodies and category descriptions.
+  - content type, category key and revision-note limits match their schema columns exactly.
   - no public Wiki route, route provider, navigation contribution or homepage change exists in this slice.
   - restricted Markdown source rejects raw HTML and dangerous protocols; rendering remains a later reviewed slice.
 derived:
@@ -107,7 +108,7 @@ unknown: []
 conflicts: []
 first_failure:
   marker: none
-  evidence: all implementation gates pass on 97d1ad9157f7761914157b679bf7a5baafe88a40
+  evidence: formatting, PHPStan and the full PHPUnit suite pass on b577c582744d83a902aaf99f0af22fd7b1d5b5f2
 rejected_hypotheses:
   - Wiki permission keys require a shared-registry edit: PR 146 already reserved all four keys.
   - the parallel editorial CMS task overlaps Wiki ownership: PR 159 is confined to managed pages and Support/legal paths.
@@ -127,19 +128,19 @@ validation:
   - command: precondition and ownership-overlap verification
     result: PASS
     evidence: PR 142 and PR 146 are merged; PR 159 has no Wiki path ownership overlap.
-  - command: php -l on all 25 added PHP files
+  - command: php -l on all added PHP files and final boundary changes
     result: PASS
     evidence: no syntax errors detected in the local sandbox copies.
   - command: vendor/bin/pint --test
     result: PASS
-    evidence: CI run 30130788360, head 97d1ad9157f7761914157b679bf7a5baafe88a40.
+    evidence: CI run 30131483590, head b577c582744d83a902aaf99f0af22fd7b1d5b5f2.
   - command: composer analyse
     result: PASS
-    evidence: CI run 30130788360, head 97d1ad9157f7761914157b679bf7a5baafe88a40.
+    evidence: CI run 30131483590, head b577c582744d83a902aaf99f0af22fd7b1d5b5f2.
   - command: composer test
     result: PASS
-    evidence: CI run 30130788360; 40 tests passed with 1773 assertions.
-  - command: exact-permission, locale, slug, lifecycle, stale-edit, revision, restore, audit and no-public-route coverage
+    evidence: CI run 30131483590, head b577c582744d83a902aaf99f0af22fd7b1d5b5f2.
+  - command: exact-permission, locale, slug, lifecycle, stale-edit, revision, restore, audit, schema-bound length and no-public-route coverage
     result: PASS
     evidence: focused Wiki tests are included in the passing full suite.
   - command: final PR changed-path review
