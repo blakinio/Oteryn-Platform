@@ -4,9 +4,9 @@ namespace Tests\Feature;
 
 use Tests\TestCase;
 
-class HomePreviewTest extends TestCase
+final class HomePreviewTest extends TestCase
 {
-    public function test_isolated_homepage_design_preview_renders(): void
+    public function test_isolated_homepage_design_preview_remains_available_and_noindexed(): void
     {
         $response = $this->get('/design/home-v2');
 
@@ -18,13 +18,15 @@ class HomePreviewTest extends TestCase
         $response->assertSee('noindex,nofollow', false);
     }
 
-    public function test_current_homepage_remains_the_default_root_view(): void
+    public function test_production_homepage_uses_the_approved_visual_foundation_without_preview_notice(): void
     {
         $response = $this->get('/');
 
         $response->assertOk();
-        $response->assertSee('Enter the world of Oteryn');
+        $response->assertSee('Answer the call of Oteryn');
+        $response->assertSee('css/home-preview.css', false);
+        $response->assertSee('css/home-production.css', false);
         $response->assertDontSee('Design preview.');
-        $response->assertDontSee('css/home-preview.css', false);
+        $response->assertDontSee('noindex,nofollow', false);
     }
 }
