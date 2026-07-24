@@ -102,7 +102,6 @@ jobs:
   inspect-runtime:
     needs: resolve-actions-evidence
     runs-on: oteryn-staging
-    environment: synology-staging
     timeout-minutes: 15
     steps:
       - name: Verify live services, images and bindings
