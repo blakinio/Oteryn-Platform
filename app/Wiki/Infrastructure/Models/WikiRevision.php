@@ -58,11 +58,11 @@ final class WikiRevision extends Model
             $revision->created_at ??= now();
         });
 
-        static::updating(static function (): never {
+        static::updating(static function (self $revision): void {
             throw new LogicException('Wiki revisions are append-only and cannot be updated.');
         });
 
-        static::deleting(static function (): never {
+        static::deleting(static function (self $revision): void {
             throw new LogicException('Wiki revisions are append-only and cannot be deleted.');
         });
     }
