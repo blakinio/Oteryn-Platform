@@ -27,7 +27,7 @@ Use the existing `oteryn-staging` self-hosted GitHub Actions runner on Synology 
 - [ ] The workflow deploys acceptance mode only when it will not interrupt an already running collector.
 - [ ] Scheduled monitoring reports container state and bounded logs without restarting the collector.
 - [ ] A completed run is copied from the Synology bind mount and uploaded once as a GitHub Actions artifact.
-- [ ] The collector receives no exchange keys, trading credentials, Docker socket, inbound ports or restart policy.
+- [x] The collector receives no exchange keys, trading credentials, Docker socket, inbound ports or restart policy.
 - [ ] The exact workflow is exercised on the `oteryn-staging` runner and the resulting state is recorded.
 
 ## Ownership
@@ -56,11 +56,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T15:10:00Z
-head: UNKNOWN
+updated_at: 2026-07-24T15:20:00Z
+head: 4c56703f956c6212061d6f6eea3931fd2022b08a
 branch: feat/OTERYN-20260724-liquid20-synology-control
-pr: none
-status: implementing
+pr: 147
+status: validating
 context_routes:
   - testing
   - security
@@ -76,27 +76,39 @@ proven:
   - Existing Oteryn deployment workflow uses runs-on oteryn-staging and validates Docker, Compose, curl, Python, sha256sum and timeout on the runner.
   - The user-provided Liquid20 smoke artifacts prove both exchange clocks synchronized, both collectors completed, and no trading credentials were present.
   - Freqtrade commit c00a091c5adc67cf75c46db5805e358ffc72fad7 contains the reviewed Liquid20 Dockerfile and data-only entrypoint.
+  - PR 147 contains separate bootstrap and observe jobs so only bootstrap receives packages write permission.
+  - The runtime script preserves any already running collector and never restarts or replaces it.
+  - Upload markers are stored under data/github-uploaded rather than inside immutable run directories.
 derived:
   - The Oteryn runner can control a sibling Liquid20 container through the host Docker daemon without granting the Liquid20 container Docker access.
   - A GHCR image plus runner workflow removes the fragile DSM inline-command deployment path.
+  - Hourly observation can expose bounded logs and final artifacts through GitHub without assistant access to DSM.
 unknown:
   - Whether the Oteryn repository GITHUB_TOKEN can publish the new ghcr.io/blakinio/liquid20-collector package.
-  - Whether a Liquid20 container is currently running on Synology when the first control workflow executes.
+  - Whether a Liquid20 container is currently running on Synology when the first bootstrap workflow executes.
+  - Whether current GitHub Actions storage quota permits immediate final artifact upload; failed upload remains retryable because the external marker is written only after success.
 conflicts: []
 first_failure:
   marker: none
-  evidence: implementation not yet executed on the self-hosted runner
+  evidence: self-hosted bootstrap has not executed because the change is still under PR validation
 rejected_hypotheses:
   - Direct assistant access to DSM or the container: no such connection is available; visibility must be mediated through GitHub Actions.
+  - Store upload marker inside the run directory: rejected because acceptance evidence must remain immutable.
 changed_paths:
+  - .github/workflows/liquid20-synology-control.yml
+  - deploy/liquid20/synology-control.sh
+  - deploy/liquid20/README.md
   - docs/agents/tasks/active/OTERYN-20260724-liquid20-synology-control.md
 validation:
-  - command: not-run
+  - command: Liquid20 Synology Control PR workflow run 30104623644
     result: NOT_RUN
-    evidence: implementation in progress
+    evidence: queued/pending on current pre-checkpoint head
+  - command: repository required checks on PR 147
+    result: NOT_RUN
+    evidence: queued or in progress
 blockers:
   - none
-next_action: Add the bounded runner control script and workflow, then open a draft PR for repository validation.
+next_action: Wait for exact-head PR checks, fix any reported root cause, then merge so the path-scoped push trigger can bootstrap the Synology runner control path.
 ```
 
 ## Notes
