@@ -62,44 +62,8 @@ jobs:
       - name: Check formatting
         run: vendor/bin/pint --test
 
-      - name: Capture static analysis diagnostics
-        shell: bash
-        run: |
-          set +e
-          vendor/bin/phpstan analyse --memory-limit=1G --error-format=json > phpstan-result.json 2>&1
-          echo "$?" > phpstan-exit-code.txt
-          exit 0
+      - name: Run static analysis
+        run: composer analyse
 
-      - name: Upload static analysis diagnostics
-        uses: actions/upload-artifact@v6
-        with:
-          name: public-web-phpstan-${{ github.run_id }}
-          path: |
-            phpstan-result.json
-            phpstan-exit-code.txt
-          retention-days: 1
-
-      - name: Enforce static analysis result
-        shell: bash
-        run: exit "$(cat phpstan-exit-code.txt)"
-
-      - name: Capture test diagnostics
-        shell: bash
-        run: |
-          set +e
-          composer test > test-result.txt 2>&1
-          echo "$?" > test-exit-code.txt
-          exit 0
-
-      - name: Upload test diagnostics
-        uses: actions/upload-artifact@v6
-        with:
-          name: public-web-tests-${{ github.run_id }}
-          path: |
-            test-result.txt
-            test-exit-code.txt
-          retention-days: 1
-
-      - name: Enforce test result
-        shell: bash
-        run: exit "$(cat test-exit-code.txt)"
+      - name: Run tests
+        run: composer test
