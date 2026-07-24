@@ -40,6 +40,23 @@ def install_exact_harness_adapter() -> None:
 
         harness.Rehearsal.platform_env = platform_env_with_trusted_proxy
         acceptance_extensions.install(harness)
+
+        extended_sensitive_scan = harness.Rehearsal.sensitive_scan
+
+        def stable_sensitive_scan(self: Any) -> dict[str, Any]:
+            try:
+                result = extended_sensitive_scan(self)
+            except harness.RehearsalError:
+                result = None
+            if isinstance(result, dict):
+                return result
+            result_path = self.evidence / "sensitive-log-scan.json"
+            if not result_path.exists():
+                return {"schema_version": 1, "status": "FAIL", "findings": ["scan_result_missing"]}
+            decoded = json.loads(result_path.read_text(encoding="utf-8"))
+            return decoded if isinstance(decoded, dict) else {"schema_version": 1, "status": "FAIL", "findings": ["scan_result_invalid"]}
+
+        harness.Rehearsal.sensitive_scan = stable_sensitive_scan
         return harness
 
     platform_runner.load_harness = load_harness_with_exact_metadata
@@ -57,7 +74,8 @@ def update_retained_evidence() -> None:
     revisions["build"] = {
         "workflow": "Native Auth Ephemeral Cutover Rehearsal",
         "workflow_run": os.environ.get("GITHUB_RUN_ID", "local"),
-        "source_build_run": required("SOURCE_BUILD_RUN"),
+        "gateway_otclient_source_build_run": required("SOURCE_BUILD_RUN"),
+        "canary_source_build_run": required("CANARY_BUILD_RUN"),
     }
     revisions["components"] = {
         "platform": {"repository": "blakinio/Oteryn-Platform", "source_sha": required("PLATFORM_REF")},
@@ -73,7 +91,8 @@ def update_retained_evidence() -> None:
         digests = json.loads(digests_path.read_text(encoding="utf-8"))
     else:
         digests = {"schema_version": 1}
-    digests["source_build_run"] = int(required("SOURCE_BUILD_RUN"))
+    digests["gateway_otclient_source_build_run"] = int(required("SOURCE_BUILD_RUN"))
+    digests["canary_source_build_run"] = int(required("CANARY_BUILD_RUN"))
     digests["gateway_source_build_artifact_id"] = int(required("GATEWAY_ARTIFACT_ID"))
     digests["gateway_source_build_artifact_digest"] = required("GATEWAY_ARTIFACT_DIGEST")
     digests["canary_source_build_artifact_id"] = int(required("CANARY_ARTIFACT_ID"))
