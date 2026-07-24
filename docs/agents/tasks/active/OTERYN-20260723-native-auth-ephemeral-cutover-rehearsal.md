@@ -56,8 +56,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T11:45:00+02:00
-head: b4f83a0a2ffcf2d7254cdaa05cff71c3fe2b0ea9
+updated_at: 2026-07-24T11:55:00+02:00
+head: 3ac0524b0a5e535ff7f2530ce8b9bdc1af5d2b77
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
 pr: 126
 status: validating
@@ -77,31 +77,28 @@ proven:
   - Oteryn Platform is private while Canary and OTClient are public; Platform PR 126 is the correct Actions execution boundary without a cross-repository PAT.
   - Gateway and OTClient artifacts from source build run 30047343772 are reused only after source-SHA and binary checksum verification.
   - Exact Canary b15b7d544f4795e3a2a65b88de35391b9fd0a20d with the complete private-issuer cache policy was built successfully in run 30080248772; artifact 8591665710 has digest sha256:6b0e13966047c571de2c7a3f948f0f9b54b1619800c4b591cd70adf5a7a860f1.
-  - MariaDB final-server readiness, MYSQL_PWD compatibility and deterministic schema imports are proven; Redis read-only ACL write rejection is proven.
-  - Credential overlap and native issuer activation pass for current/previous Platform and Canary credentials.
-  - TLS validation passes for trusted CA/hostnames, wrong CA, hostname mismatch, non-loopback HTTP dependency rejection, private issuer isolation, no verification bypass and no retained private keys.
-  - Rehearsal run 30082489849 passed the complete OAuth PKCE matrix, real authorization-code expiry, ticket issue/expiry/replay/protocol checks, service credential checks, wrong account/world checks and Platform outage fail-closed recovery.
-  - The first remaining failure in run 30082489849 was HTTP 429 on a later controlled login because all independent OAuth probe containers appeared to Platform as the same reverse-proxy source IP.
-  - Platform production rate limiters are correctly active: identity-login allows five attempts per minute per canonical email and source IP, while identity-login-source allows twenty attempts per minute per source IP.
-  - Commit b4f83a0a2ffcf2d7254cdaa05cff71c3fe2b0ea9 keeps those limiters enabled, forwards X-Forwarded-For through the trusted TLS proxy and assigns each independent probe a unique deterministic client-subnet IP.
-  - Platform restart readiness now deletes the stale bootstrap marker and requires live internal HTTP 200 before returning.
-  - Canary harness 9200c562e7e87dd098c1205c1df83c9d9ce95c1b accepts the documented Game Login Ticket HTTP 200 contract and has green required CI.
-  - Platform b5dd6a7be5c704d5706241240e06f8bb8c4b5efe combines explicit trusted-proxy handling with complete OAuth token cache headers and passed Composer validation, audit, Pint, PHPStan and full PHPUnit in run 30079059960.
-  - acceptance_extensions.py adds physical invalid-session rejection, unauthorized-character burn, restart invalidation/recovery, account-override rejection, malformed Canary-to-Gateway and Gateway-to-OTClient failures, complete cache-header checks, correlation IDs and JWT-like sensitive scanning.
+  - Rehearsal run 30083102212 passed exact revision verification, deterministic data services, credential overlap, TLS, OAuth PKCE, real authorization-code expiry, ticket expiry/replay/protocol checks, service credential checks, wrong account/world checks, Platform and Canary outage fail-closed recovery, account override rejection, malformed Canary response rejection, cache headers and normal happy path without 5xx.
+  - The same run proved the source-IP isolation fix: no later OAuth probe was rejected by the production login rate limiter.
+  - Gateway preserved and logged the supplied correlation ID native-auth-rehearsal-gateway-correlation.
+  - Platform returned request ID 11b6c6af-5724-402b-98b3-3f44316112a0 and the identical ID appears in the final retained Platform log.
+  - The correlation checker read docker logs immediately after the response and raced the logging flush, recording platform_id_logged false despite the retained final log proving the ID.
+  - Commit 3ac0524b0a5e535ff7f2530ce8b9bdc1af5d2b77 adds bounded state-based polling for the exact Platform and Gateway IDs; it passed git diff --check and py_compile, and its one-shot workflow removed itself from the resulting tree.
+  - Platform restart readiness deletes stale bootstrap evidence and requires live internal HTTP 200 before returning.
+  - Platform b5dd6a7be5c704d5706241240e06f8bb8c4b5efe passed Composer validation, audit, Pint, PHPStan and the full PHPUnit suite in run 30079059960.
+  - acceptance_extensions.py adds physical invalid-session rejection, unauthorized-character burn, restart invalidation/recovery, malformed Gateway-to-OTClient failure, complete cache-header checks, correlation IDs and JWT-like sensitive scanning.
 derived:
-  - Independent OAuth client processes will now exercise production throttling under distinct, correctly forwarded source identities instead of sharing the proxy identity.
+  - Correlation is present in both products; only observation readiness in the rehearsal required correction.
 unknown:
-  - downstream Canary outage/recovery, physical OTClient, logout, replay, rotation, malformed-response, correlation, cache, rollback and final smoke results after source-IP isolation
+  - physical OTClient negative and happy flows, logout database state, Game Session replay, credential rotation, rollback and final smoke results after the corrected correlation checkpoint
 conflicts: []
 first_failure:
-  marker: collapsed-oauth-probe-source-identity
-  evidence: run 30082489849 retained all prior PASS evidence and oauth-probe-diagnostics.log recorded login submit status 429 on the sixth same-email login behind the proxy
+  marker: correlation-log-flush-race
+  evidence: run 30083102212 request-correlation.json reported Platform response ID 11b6c6af-5724-402b-98b3-3f44316112a0 but platform_id_logged false; the retained platform.log contains that exact ID
 rejected_hypotheses:
-  - disable or raise Platform rate limits: rejected because the production control is working as designed and remains part of the security boundary
-  - clear the file cache between probes: rejected because that would erase production limiter state rather than model independent clients
-  - wait a fixed minute: rejected because it would make the matrix slower and timing-dependent
-  - change product source or product SHA: rejected because the defect belongs to proxy/client topology in the rehearsal
-  - disable TLS verification: rejected because TLS verification already passes and remains mandatory
+  - add a Platform product propagation fix: rejected because the response ID and retained log ID are identical
+  - accept a missing correlation ID: rejected because both Platform and Gateway IDs remain mandatory
+  - add an arbitrary long sleep: rejected in favor of bounded polling for the exact expected ID
+  - change product source or product SHA: rejected because the defect belongs to evidence observation timing
 changed_paths:
   - .github/workflows/native-auth-canary-cache-build.yml
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
@@ -110,22 +107,19 @@ changed_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 validation:
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30082489849
+  - command: Native Auth Ephemeral Cutover Rehearsal run 30083102212
     result: FAIL
-    evidence: all previous checkpoints plus Platform outage recovery passed; first failure was production login throttling caused by collapsed probe source identity
-  - command: Platform Agent Governance run 30082489828
+    evidence: every matrix assertion through cache headers and correlation response IDs passed; first failure was the pre-flush Platform log observation
+  - command: Platform Agent Governance run 30083102216
     result: PASS
-    evidence: active task checkpoint validation passed on the restart-readiness head
+    evidence: active task checkpoint validation passed on the source-IP isolation head
   - command: Platform CI run 30079059960
     result: PASS
     evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed for Platform b5dd6a7
-  - command: Canary source CI run 30080195391 and 30080469762
-    result: PASS
-    evidence: complete private issuer cache policy passed required Canary CI
   - command: exact Canary build run 30080248772
     result: PASS
     evidence: artifact 8591665710 built from b15b7d544f4795e3a2a65b88de35391b9fd0a20d and was uploaded with retained digest
 blockers:
   - none
-next_action: execute the exact-revision rehearsal with distinct forwarded OAuth probe source IPs and repair only the first concrete downstream failure.
+next_action: execute the exact-revision rehearsal with bounded correlation log readiness and repair only the first concrete downstream failure.
 ```
