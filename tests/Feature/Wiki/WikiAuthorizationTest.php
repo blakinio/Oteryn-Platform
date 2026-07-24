@@ -54,8 +54,11 @@ final class WikiAuthorizationTest extends TestCase
             try {
                 $assertion();
                 self::fail('Expected missing exact Wiki permission to fail closed.');
-            } catch (AuthorizationException) {
-                self::assertTrue(true);
+            } catch (AuthorizationException $exception) {
+                self::assertSame(
+                    'This Identity does not have the required Wiki permission.',
+                    $exception->getMessage(),
+                );
             }
         }
     }
@@ -95,11 +98,11 @@ final class WikiAuthorizationTest extends TestCase
     {
         $roleId = DB::table('admin_roles')->where('key', $roleKey)->value('id');
 
-        self::assertNotNull($roleId);
+        self::assertIsInt($roleId);
 
         DB::table('identity_admin_roles')->insert([
             'identity_id' => $identity->id,
-            'role_id' => (int) $roleId,
+            'role_id' => $roleId,
         ]);
     }
 
@@ -117,11 +120,11 @@ final class WikiAuthorizationTest extends TestCase
 
         foreach ($permissions as $permission) {
             $permissionId = DB::table('admin_permissions')->where('key', $permission)->value('id');
-            self::assertNotNull($permissionId);
+            self::assertIsInt($permissionId);
 
             DB::table('admin_role_permissions')->insert([
                 'role_id' => $roleId,
-                'permission_id' => (int) $permissionId,
+                'permission_id' => $permissionId,
             ]);
         }
 

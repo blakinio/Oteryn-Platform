@@ -36,6 +36,8 @@ final class WikiDomainRulesTest extends TestCase
 
     public function test_restricted_markdown_rejects_raw_html_and_dangerous_protocols(): void
     {
+        $rejectedSources = 0;
+
         foreach ([
             '<script>alert(1)</script>',
             '[unsafe](javascript:alert(1))',
@@ -45,9 +47,11 @@ final class WikiDomainRulesTest extends TestCase
                 new WikiTranslationInput('en', 'Unsafe', 'unsafe', 'Summary', $source);
                 self::fail('Expected restricted Wiki Markdown validation to fail.');
             } catch (InvalidArgumentException) {
-                self::assertTrue(true);
+                $rejectedSources++;
             }
         }
+
+        self::assertSame(3, $rejectedSources);
 
         $safe = new WikiTranslationInput(
             'en',

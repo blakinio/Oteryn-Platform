@@ -20,7 +20,6 @@ use App\Wiki\Infrastructure\Models\WikiArticle;
 use App\Wiki\Infrastructure\Models\WikiArticleTranslation;
 use App\Wiki\Infrastructure\Models\WikiRevision;
 use DomainException;
-use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -49,14 +48,17 @@ final class WikiFoundationTest extends TestCase
         self::assertSame($category->id, $categoryTranslation->category_id);
         self::assertSame($article->id, $revision->article_id);
 
-        /** @var Migration */
         $migration = require database_path('migrations/2026_07_24_231000_create_wiki_foundation_tables.php');
-        $migration->down();
+        $down = [$migration, 'down'];
+        self::assertIsCallable($down);
+        $down();
 
         self::assertFalse(Schema::hasTable('wiki_articles'));
         self::assertFalse(Schema::hasTable('wiki_revisions'));
 
-        $migration->up();
+        $up = [$migration, 'up'];
+        self::assertIsCallable($up);
+        $up();
         $this->assertWikiTablesExist();
     }
 
@@ -289,11 +291,11 @@ final class WikiFoundationTest extends TestCase
 
         foreach ($permissions as $permission) {
             $permissionId = DB::table('admin_permissions')->where('key', $permission)->value('id');
-            self::assertNotNull($permissionId);
+            self::assertIsInt($permissionId);
 
             DB::table('admin_role_permissions')->insert([
                 'role_id' => $roleId,
-                'permission_id' => (int) $permissionId,
+                'permission_id' => $permissionId,
             ]);
         }
 
