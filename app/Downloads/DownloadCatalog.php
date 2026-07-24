@@ -75,21 +75,18 @@ final class DownloadCatalog
 
     public static function formatBytes(int $bytes): string
     {
-        if ($bytes < 1024) {
-            return $bytes.' B';
-        }
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $unitIndex = 0;
+        $value = (float) $bytes;
+        $lastUnitIndex = count($units) - 1;
 
-        $units = ['KB', 'MB', 'GB', 'TB'];
-        $value = $bytes / 1024;
-
-        foreach ($units as $unit) {
-            if ($value < 1024 || $unit === 'TB') {
-                return number_format($value, $value >= 100 ? 0 : 1).' '.$unit;
-            }
-
+        while ($value >= 1024 && $unitIndex < $lastUnitIndex) {
             $value /= 1024;
+            $unitIndex++;
         }
 
-        return $bytes.' B';
+        $decimals = $unitIndex === 0 || $value >= 100 ? 0 : 1;
+
+        return number_format($value, $decimals).' '.$units[$unitIndex];
     }
 }
