@@ -53,11 +53,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T12:02:00Z
-head: 291d23915c9f156e433192a2b0cb799853a5d1f2
+updated_at: 2026-07-24T12:10:00Z
+head: 3f148e0209668e142faa0a4d5e72338b89319659
 branch: task/OTERYN-20260724-homepage-comparison-template
 pr: 139
-status: validating-final-head
+status: validating
 context_routes:
   - web-cms
   - testing
@@ -76,14 +76,15 @@ proven:
   - The preview contains no fabricated player counts, ranking entries, server state, news titles or publication dates.
   - Focused HomePreviewTest coverage proves preview rendering and root-home isolation.
   - Implementation head 291d23915c9f156e433192a2b0cb799853a5d1f2 passed CI run 30091169979, Agent Governance 30091169945, Acceptance E2E and Visual UX 30091170000, Platform DB Outage Validation 30091170055, Phase 7 Production-Like Validation 30091169954, Game Auth Ticket Concurrency 30091169963 and Build Synology Staging Images 30091169953.
+  - The governance contract permits checkpoint statuses investigating, implementing, validating, blocked or ready and validation results PASS, FAIL, BLOCKED or NOT_RUN.
 derived:
   - Replacing Route::view('/', 'home') with Route::view('/', 'home-preview') is the smallest later swap after visual approval.
 unknown:
   - Final subjective visual approval against the supplied mock-up remains a user decision after the preview is opened.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: no implementation or CI failure observed
+  marker: Agent Governance run 30091438279
+  evidence: checkpoint-only commit used unsupported status validating-final-head and validation result UNAVAILABLE; both are corrected in the next commit
 rejected_hypotheses:
   - Replacing the current homepage directly was rejected because the user requested side-by-side comparison first.
   - Fabricating dashboard statistics for visual fidelity was rejected because public game-data claims must remain authoritative.
@@ -103,16 +104,16 @@ validation:
     evidence: browser acceptance and visual/accessibility workflow succeeded on implementation head
   - command: GitHub Actions Agent Governance run 30091169945
     result: PASS
-    evidence: task ownership and governance validation succeeded
+    evidence: task ownership and governance validation succeeded on implementation head
   - command: GitHub Actions supporting required workflows
     result: PASS
-    evidence: runs 30091170055, 30091169954, 30091169963 and 30091169953 succeeded
+    evidence: runs 30091170055, 30091169954, 30091169963 and 30091169953 succeeded on implementation head
   - command: local checkout validation
-    result: UNAVAILABLE
+    result: NOT_RUN
     evidence: sandbox could not resolve github.com, so repository checkout was unavailable; exact-head GitHub CI is authoritative
 blockers:
   - none
-next_action: Verify the checkpoint-only final head checks, update the PR summary and merge if the merge gate remains satisfied.
+next_action: Verify the corrected exact final-head checks, update the PR summary and merge if the merge gate remains satisfied.
 ```
 
 ## Notes
