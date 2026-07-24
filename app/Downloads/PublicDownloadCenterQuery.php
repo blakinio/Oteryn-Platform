@@ -19,13 +19,7 @@ final readonly class PublicDownloadCenterQuery
                 ->whereNotNull('published_at')
                 ->where('published_at', '<=', now())
                 ->where('is_current', true)
-                ->with(['artifacts' => static function ($query): void {
-                    $query
-                        ->where('is_enabled', true)
-                        ->orderBy('platform')
-                        ->orderBy('architecture')
-                        ->orderBy('id');
-                }])
+                ->with('artifacts')
                 ->orderByRaw('CASE WHEN channel = ? THEN 0 ELSE 1 END', [DownloadCatalog::CHANNEL_STABLE])
                 ->orderByDesc('published_at')
                 ->orderByDesc('id')
@@ -42,25 +36,36 @@ final readonly class PublicDownloadCenterQuery
         $rejectedArtifactSeen = false;
 
         foreach ($releases as $release) {
-            $approved = $release->artifacts->filter(function (ClientReleaseArtifact $artifact) use (&$rejectedArtifactSeen): bool {
-                if ($this->artifactUrls->isApproved($artifact->artifact_url)) {
-                    return true;
-                }
+            $approved = $release->artifacts
+                ->filter(function (ClientReleaseArtifact $artifact) use (&$rejectedArtifactSeen): bool {
+                    if (! $artifact->is_enabled) {
+                        return false;
+                    }
 
-                $rejectedArtifactSeen = true;
+                    if ($this->artifactUrls->isApproved($artifact->artifact_url)) {
+                        return true;
+                    }
 
-                return false;
-            });
+                    $rejectedArtifactSeen = true;
+
+                    return false;
+                })
+                ->sortBy([
+                    ['platform', 'asc'],
+                    ['architecture', 'asc'],
+                    ['id', 'asc'],
+                ])
+                ->values();
 
             if ($platform !== null) {
-                $approved = $approved->where('platform', $platform);
+                $approved = $approved->where('platform', $platform)->values();
             }
 
             if ($approved->isEmpty()) {
                 continue;
             }
 
-            $release->setRelation('artifacts', $approved->values());
+            $release->setRelation('artifacts', $approved);
             $publicReleases[] = $release;
         }
 
