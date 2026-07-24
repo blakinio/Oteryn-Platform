@@ -48,6 +48,20 @@ async function openPublicNewsThroughVisibleNavigation(page) {
   await mobilePanel.getByRole('link', { name: 'News' }).click();
 }
 
+async function assertAuthenticatedHeaderState(page) {
+  const desktopAccount = page.getByRole('link', { name: 'Account', exact: true });
+  if (await desktopAccount.isVisible()) {
+    await expect(desktopAccount).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    return;
+  }
+
+  await page.getByText('Menu', { exact: true }).click();
+  const mobilePanel = page.locator('.mobile-nav-panel');
+  await expect(mobilePanel.getByRole('link', { name: 'Account overview' })).toBeVisible();
+  await expect(mobilePanel.getByRole('button', { name: 'Sign out' })).toBeVisible();
+}
+
 test.setTimeout(120_000);
 test.describe.configure({ retries: 0 });
 
@@ -59,9 +73,10 @@ test.afterEach(async ({ page }, testInfo) => {
   await attachDiagnostics(testInfo, page.__acceptanceDiagnostics);
 });
 
-test('@responsive public navigation and Identity entry forms stay usable without horizontal overflow', async ({ page }) => {
+test('@responsive public homepage navigation footer and Identity entry forms stay usable without horizontal overflow', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Oteryn Platform' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Answer the call of Oteryn' })).toBeVisible();
+  await expect(page.getByRole('contentinfo')).toContainText('Live game and service data can become temporarily unavailable');
   await assertAccessibilitySmoke(page);
 
   await openPublicNewsThroughVisibleNavigation(page);
@@ -86,11 +101,15 @@ test('@responsive public navigation and Identity entry forms stay usable without
   await assertAccessibilitySmoke(page);
 });
 
-test('@responsive authenticated Account Overview remains operable at representative viewports', async ({ page }) => {
+test('@responsive authenticated homepage and Account Overview remain operable at representative viewports', async ({ page }) => {
   const email = uniqueEmail('responsive-account');
   seedReadyAccount(email);
 
   await login(page, email, accountPassword);
+  await page.goto('/');
+  await assertAuthenticatedHeaderState(page);
+  await assertAccessibilitySmoke(page);
+
   await page.goto('/account');
   await expect(page.getByRole('heading', { name: 'Account overview' })).toBeVisible();
   await expect(page.getByText('Ready', { exact: true })).toBeVisible();
