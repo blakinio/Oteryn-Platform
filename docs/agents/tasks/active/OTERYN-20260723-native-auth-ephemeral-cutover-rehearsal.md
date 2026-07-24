@@ -2,7 +2,7 @@
 
 ## Goal
 
-Own the GitHub Actions execution boundary for the cross-repository ephemeral production-like native-auth cutover rehearsal. The runner lives in `blakinio/Oteryn-Platform` because Platform is private and repository-scoped Actions credentials cannot check it out from Canary. The validation harness remains owned by Canary task `CAN-20260723-native-auth-ephemeral-cutover-rehearsal` on a public exact revision.
+Own the private-repository GitHub Actions execution boundary for the cross-repository ephemeral production-like native-auth cutover rehearsal joining real Platform, Gateway, Canary and OTClient components.
 
 Maximum evidence classification is `PRODUCTION_LIKE_PROVEN`. This task performs no production deployment, uses no production secrets or user data, does not remove legacy auth, and does not close the manual Production Go-Live Gate.
 
@@ -23,7 +23,7 @@ dependencies:
   - Game Gateway 53158217a6c6017230301cf4daa783b04fcc13d5
   - Canary b15b7d544f4795e3a2a65b88de35391b9fd0a20d
   - OTClient bb87346f6c516a19d19497d82bb01fb389334ff5
-  - Canary rehearsal harness 1046687e44aa2f9321cf7d71364dc076aedf08c5
+  - Canary rehearsal harness f1434b2c299a07175a3c870168b7b6222b4677a7
 blocks:
   - PRODUCTION_LIKE_PROVEN native-auth rehearsal evidence
 cross_repository_tasks:
@@ -37,26 +37,19 @@ cross_repository_tasks:
 
 ## Acceptance criteria
 
-- [x] Runner executes in the private Platform repository so exact Platform/Gateway source is directly available without cross-private-repository credentials.
-- [x] Exact public Canary and OTClient revisions are checked out and exact binary artifacts are checksum-verified before reuse.
-- [x] Exact Canary harness revision is recorded and used without silent fallback or mutation.
-- [x] OAuth PKCE, ticket, Gateway, Game Session, physical OTClient, failure injection, correlation, cache, rotation and rollback assertions are encoded in the final matrix.
-- [ ] Full ephemeral production-like rehearsal completes with sanitized retained evidence.
-- [x] Result is never classified above `PRODUCTION_LIKE_PROVEN`.
-- [x] Manual production gate remains pending.
-
-## Security boundaries
-
-- Trust boundary: OTClient -> Platform public HTTPS -> Gateway public HTTPS -> Platform private HTTPS -> Canary private issuer HTTPS -> Canary game protocol.
-- No PAT or production secret is introduced; runtime credentials are generated ephemerally and excluded from retained evidence.
-- Native issuer/routing activation and rollback are rehearsal-only.
+- [x] Exact source revisions and binary artifact digests are verified before execution.
+- [x] OAuth PKCE, ticket, Gateway, Game Session, TLS, failure injection, cache, correlation and physical negative scenarios are encoded and have passed through the current first failure.
+- [ ] Physical malformed Gateway response reaches the fake Gateway boundary and fails closed in the real OTClient.
+- [ ] Physical happy-path world entry, logout, replay rejection, credential rotation, rollback and final smoke complete.
+- [ ] Full sanitized retained evidence produces `PRODUCTION_LIKE_PROVEN`.
+- [x] Classification never exceeds `PRODUCTION_LIKE_PROVEN`; production go-live remains pending.
 
 ## Context checkpoint
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T12:15:00+02:00
-head: 41c2353e37de9192f260460bb4e21dc2c857f7b3
+updated_at: 2026-07-24T12:35:00+02:00
+head: 36552c2f686ea73f60bf6cdd39f3f7c7a0937879
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
 pr: 126
 status: validating
@@ -73,24 +66,24 @@ owned_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 proven:
-  - Platform run 30083664968 passed every matrix gate through cache headers, correlation, physical random-session rejection, unauthorized-character burn and Canary restart invalidation/recovery.
-  - Its first failure was before the malformed Gateway boundary: browser_driver received HTTP 400 from /oauth/authorize and the fake Gateway access log remained empty.
-  - Canary harness commit fdab1a6b7e4fe8275f12c19812194fbc2ee01c2c aligns malformed-helper readiness with the working happy path by waiting for CharacterList before OterynIdentity.start.
-  - Canary branch head 1046687e44aa2f9321cf7d71364dc076aedf08c5 contains that helper fix plus a documentation-only active-task checkpoint; required CI 30084397393 and ownership 30084528867 passed.
-  - Workflow commit 41c2353e37de9192f260460bb4e21dc2c857f7b3 pins exact harness 1046687e44aa2f9321cf7d71364dc076aedf08c5 and updates the retained-revision assertion accordingly.
-  - The same workflow correction reads failure-injection-summary.json, expects the actual client-events.tsv filename and asserts failure_injection_status PASS; these latent final-gate mismatches were previously hidden because runtime failed before the assertion step.
-  - Product revisions and Gateway/Canary/OTClient binary artifacts remain unchanged and checksum-gated.
+  - Platform run 30084930018 passed every matrix gate through cache headers, correlation, random invalid-session rejection, unauthorized-character burn and Canary restart invalidation/recovery.
+  - Its first failure remained before the malformed Gateway boundary: Platform returned HTTP 400 for /oauth/authorize and malformed-gateway-access.log remained empty.
+  - Canary harness f1434b2c299a07175a3c870168b7b6222b4677a7 adds sanitized authorization-request diagnostics after the CharacterList readiness correction did not change the failure.
+  - Canary required CI 30085602293 and ownership 30085601878 passed on that exact harness head.
+  - The diagnostic retains only query-key names, equality/presence booleans, fixed enum values, lengths, redirect structure, HTTP status/path/phase and fixed classifications; no OAuth state, challenge value, credentials, tokens, cookies or raw body are retained.
+  - Workflow commit 36552c2f686ea73f60bf6cdd39f3f7c7a0937879 pins the exact diagnostic harness in checkout and retained-evidence assertions.
+  - Product revisions and all three product binary artifacts remain unchanged and checksum-gated.
 unknown:
-  - physical malformed Gateway request/access result with corrected UI readiness
-  - final happy-path world entry, logout, Game Session replay, rotation, rollback and final smoke results
+  - exact structural reason Platform rejects the malformed-helper authorization request
+  - downstream physical happy path, logout, replay, rotation, rollback and final smoke results
 conflicts: []
 first_failure:
-  marker: malformed-gateway-native-ui-readiness
-  evidence: run 30083664968 artifact 8592956146 retained no POST /v1/login in malformed-gateway-access.log and Platform recorded /oauth/authorize status 400
+  marker: malformed-gateway-oauth-authorize-400
+  evidence: run 30084930018 artifact 8593440828 recorded browser HTTPError before any POST reached the fake Gateway
 rejected_hypotheses:
   - accept timeout-only Lua evidence: rejected because physical boundary access remains mandatory
-  - weaken final artifact assertions: rejected; filenames and exact harness SHA now match the actual evidence contract
-  - change product revisions: rejected because the defect belongs to validation helper readiness
+  - retain complete authorization URLs or response bodies: rejected because they may contain sensitive OAuth material
+  - change product revisions before identifying the invalid request field: rejected because maintained OAuth flows pass on the same products
 changed_paths:
   - .github/workflows/native-auth-canary-cache-build.yml
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
@@ -99,16 +92,16 @@ changed_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 validation:
-  - command: Platform Native Auth Ephemeral Cutover Rehearsal run 30083664968
+  - command: Platform Native Auth Ephemeral Cutover Rehearsal run 30084930018
     result: FAIL
-    evidence: first failure was malformed Gateway helper readiness after all earlier extended gates passed
-  - command: Canary CI run 30084397393
+    evidence: first failure was malformed-helper OAuth authorization before the fake Gateway boundary
+  - command: Canary CI run 30085602293
     result: PASS
-    evidence: required Canary CI passed on the helper change
-  - command: Canary Agent Task Ownership run 30084528867
+    evidence: required CI passed for sanitized browser diagnostics
+  - command: Canary Agent Task Ownership run 30085601878
     result: PASS
-    evidence: active task ownership and checkpoint validation passed
+    evidence: active ownership and checkpoint validation passed
 blockers:
   - none
-next_action: execute the full exact-revision rehearsal on the corrected harness and repair only the first concrete downstream failure.
+next_action: run the exact diagnostic harness, inspect sanitized OAuth request metadata, and repair only the invalid request contract.
 ```
