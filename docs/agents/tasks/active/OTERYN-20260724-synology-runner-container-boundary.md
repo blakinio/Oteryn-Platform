@@ -43,11 +43,11 @@ cross_repository_tasks: []
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T06:31:00Z
-validated_head: e9bcc2eda5984f71bb5ac760af91586e86a35255
+updated_at: 2026-07-24T06:34:00Z
+head: e9bcc2eda5984f71bb5ac760af91586e86a35255
 branch: fix/OTERYN-20260724-synology-runner-container-boundary
 pr: 128
-status: ready_to_merge
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -67,15 +67,13 @@ proven:
   - service health probes use target container network namespaces rather than runner loopback
   - PR 128 contains only the bounded Synology runner-boundary repair paths
   - repository visibility was restored to public for the active development and CI phase
-  - all six pull-request workflows completed successfully on validated head e9bcc2eda5984f71bb5ac760af91586e86a35255
+  - all six pull-request workflows completed successfully on implementation head e9bcc2eda5984f71bb5ac760af91586e86a35255
+derived: []
 unknown: []
 conflicts: []
 first_failure:
   marker: GitHub-hosted jobs were blocked before runner allocation while the repository was private
   evidence: GitHub UI reported failed account payments or an insufficient spending limit
-resolution:
-  - repository visibility was changed back to public for the development phase
-  - failed workflow jobs were rerun and completed successfully
 rejected_hypotheses:
   - expose staging ports on all interfaces solely for runner health checks: rejected because it weakens the staging boundary
   - run ordinary CI on the Synology self-hosted deployment runner: rejected because it violates the no-build-on-NAS and trusted-runner boundary
@@ -91,14 +89,19 @@ validation:
     evidence: validation plus all three image build jobs completed successfully after rerun
   - command: CI run 30070992736
     result: PASS
+    evidence: repository CI completed successfully after rerun
   - command: Agent Governance run 30070992760
     result: PASS
+    evidence: checkpoint validation completed successfully after rerun
   - command: Phase 7 Production-Like Validation run 30070992747
     result: PASS
+    evidence: production-like validation completed successfully after rerun
   - command: Game Auth Ticket Concurrency run 30070992716
     result: PASS
+    evidence: concurrency proof completed successfully after rerun
   - command: Platform DB Outage Validation run 30070992757
     result: PASS
+    evidence: outage validation completed successfully after rerun
 blockers: []
 next_action: merge PR 128, wait for main image publication, then run the guarded Synology staging deployment workflow.
 ```
