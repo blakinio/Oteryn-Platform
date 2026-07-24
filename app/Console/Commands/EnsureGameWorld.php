@@ -6,6 +6,7 @@ use App\GameAuth\Worlds\GameWorld;
 use App\GameAuth\Worlds\GameWorldStatus;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use Throwable;
 
 final class EnsureGameWorld extends Command
@@ -26,14 +27,16 @@ final class EnsureGameWorld extends Command
     {
         $id = $this->positiveIntegerOption('id');
         $port = $this->positiveIntegerOption('port');
-        $slug = trim((string) $this->option('slug'));
-        $name = trim((string) $this->option('name'));
-        $region = trim((string) $this->option('region'));
-        $host = trim((string) $this->option('host'));
-        $status = trim((string) $this->option('status'));
+        $slug = $this->stringOption('slug');
+        $name = $this->stringOption('name');
+        $region = $this->stringOption('region');
+        $host = $this->stringOption('host');
+        $status = $this->stringOption('status');
         $loginEnabled = $this->booleanOption('login-enabled');
 
-        if ($id === null || $port === null || $port > 65535) {
+        if ($id === null || $port === null || $port > 65535
+            || $slug === null || $name === null || $region === null || $host === null || $status === null
+            || $loginEnabled === null) {
             return self::FAILURE;
         }
         if (preg_match('/^[a-z0-9][a-z0-9-]{0,63}$/', $slug) !== 1) {
@@ -62,15 +65,12 @@ final class EnsureGameWorld extends Command
 
             return self::FAILURE;
         }
-        if ($loginEnabled === null) {
-            return self::FAILURE;
-        }
 
         try {
             DB::transaction(function () use ($id, $slug, $name, $region, $host, $port, $worldStatus, $loginEnabled): void {
                 $slugOwner = GameWorld::query()->where('slug', $slug)->lockForUpdate()->first();
-                if ($slugOwner !== null && $slugOwner->id !== $id) {
-                    throw new \LogicException('World slug is already assigned to another world identifier.');
+                if ($slugOwner !== null && (int) $slugOwner->getKey() !== $id) {
+                    throw new LogicException('World slug is already assigned to another world identifier.');
                 }
 
                 $world = GameWorld::query()->lockForUpdate()->find($id);
@@ -90,10 +90,12 @@ final class EnsureGameWorld extends Command
                 ]);
                 $world->save();
             });
-        } catch (Throwable $exception) {
-            $this->components->error($exception instanceof \LogicException
-                ? $exception->getMessage()
-                : 'World Registry update failed.');
+        } catch (LogicException $exception) {
+            $this->components->error($exception->getMessage());
+
+            return self::FAILURE;
+        } catch (Throwable) {
+            $this->components->error('World Registry update failed.');
 
             return self::FAILURE;
         }
@@ -112,8 +114,8 @@ final class EnsureGameWorld extends Command
 
     private function positiveIntegerOption(string $name): ?int
     {
-        $value = (string) $this->option($name);
-        if ($value === '' || preg_match('/^[1-9][0-9]*$/', $value) !== 1) {
+        $value = $this->stringOption($name);
+        if ($value === null || preg_match('/^[1-9][0-9]*$/', $value) !== 1) {
             $this->components->error(sprintf('--%s must be a positive integer.', $name));
 
             return null;
@@ -124,11 +126,28 @@ final class EnsureGameWorld extends Command
 
     private function booleanOption(string $name): ?bool
     {
-        return match (strtolower(trim((string) $this->option($name)))) {
+        $value = $this->stringOption($name);
+        if ($value === null) {
+            return null;
+        }
+
+        return match (strtolower($value)) {
             '1', 'true', 'yes', 'on' => true,
             '0', 'false', 'no', 'off' => false,
             default => $this->invalidBooleanOption($name),
         };
+    }
+
+    private function stringOption(string $name): ?string
+    {
+        $value = $this->option($name);
+        if (! is_string($value)) {
+            $this->components->error(sprintf('--%s must be a string value.', $name));
+
+            return null;
+        }
+
+        return trim($value);
     }
 
     private function invalidBooleanOption(string $name): null
