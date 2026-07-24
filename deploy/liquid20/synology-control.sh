@@ -149,6 +149,7 @@ deploy_acceptance() {
     docker run --detach \
         --name "$CONTAINER_NAME" \
         --restart no \
+        --user 0:0 \
         --label com.blakinio.liquid20.managed-by=github-actions \
         --label "com.blakinio.liquid20.collector-commit=$COLLECTOR_COMMIT" \
         --env "COLLECTOR_COMMIT=$COLLECTOR_COMMIT" \
