@@ -14,7 +14,6 @@ services:
       PLATFORM_DB_PASSWORD: ${PLATFORM_DB_PASSWORD}
     volumes:
       - mariadb_data:/var/lib/mysql
-      - ./mariadb/init:/docker-entrypoint-initdb.d:ro
     networks:
       - private
     healthcheck:
@@ -151,9 +150,9 @@ services:
     restart: "no"
     environment:
       TLS_DIR: /tls
-    command: ["/bin/sh", "-ec", "apk add --no-cache openssl >/dev/null && sh /init.sh"]
+    command: ["/bin/sh", "-ec", "apk add --no-cache openssl >/dev/null && sh /bootstrap/tls-init.sh"]
     volumes:
-      - ./tls/init.sh:/init.sh:ro
+      - bootstrap_files:/bootstrap
       - internal_tls:/tls
     networks:
       - private
@@ -161,8 +160,9 @@ services:
   internal-proxy:
     image: nginx:1.28-alpine
     restart: unless-stopped
+    command: ["nginx", "-c", "/bootstrap/internal-nginx.conf", "-g", "daemon off;"]
     volumes:
-      - ./nginx/internal.conf:/etc/nginx/nginx.conf:ro
+      - bootstrap_files:/bootstrap:ro
       - internal_tls:/etc/nginx/tls:ro
     networks:
       private:
@@ -204,6 +204,7 @@ volumes:
   redis_data:
   platform_storage:
   canary_data:
+  bootstrap_files:
   internal_tls:
 
 networks:
