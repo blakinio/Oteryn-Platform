@@ -1,6 +1,9 @@
 name: Trusted Proxy Static Analysis Diagnostic
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - fix/OTERYN-20260724-trusted-reverse-proxy-scheme
