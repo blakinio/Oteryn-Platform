@@ -26,11 +26,11 @@ Deliver the smallest complete read-only public-game-statistics capability suppor
 
 ## Acceptance criteria
 
-- [ ] Exact Canary source tables and semantics are recorded from a pinned current Canary head.
-- [ ] The public field allowlist excludes private, disciplinary and unproven fields.
-- [ ] Ordering and pagination are deterministic and bounded.
-- [ ] Empty and dependency-unavailable behavior are distinct.
-- [ ] The implementation uses the database-enforced read-only Canary boundary without N+1 or unbounded queries.
+- [x] Exact Canary source tables and semantics are recorded from a pinned current Canary head.
+- [x] The public field allowlist excludes private, disciplinary and unproven fields.
+- [x] Ordering and pagination are deterministic and bounded.
+- [x] Empty and dependency-unavailable behavior are distinct.
+- [x] The implementation uses the database-enforced read-only Canary boundary without N+1 or unbounded queries.
 - [ ] Focused feature/integration tests and exact-head CI pass.
 
 ## Ownership
@@ -42,7 +42,7 @@ owned_paths:
   - routes/modules/public-game-statistics.php
   - resources/views/game/guilds/index.blade.php
   - tests/Feature/PublicGameData/GuildIndexTest.php
-  - docs/contracts/CANARY_DATA_CONTRACT.md
+  - docs/contracts/PUBLIC_GUILD_INDEX_CONTRACT.md
   - docs/agents/tasks/active/OTERYN-20260724-public-game-statistics.md
 modules:
   - PublicGameData
@@ -59,11 +59,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T23:30:00+02:00
-head: 9245fca6762918f7d2a230b8a7dfe231bd4b8131
+updated_at: 2026-07-24T23:45:00+02:00
+head: 6b5e812eb8b6e0e3663983d4456b615abe48a708
 branch: feat/OTERYN-20260724-public-game-statistics
-pr: none
-status: implementing
+pr: 160
+status: validating
 context_routes:
   - public-game-data
   - canary-integration
@@ -77,37 +77,53 @@ owned_paths:
   - routes/modules/public-game-statistics.php
   - resources/views/game/guilds/index.blade.php
   - tests/Feature/PublicGameData/GuildIndexTest.php
-  - docs/contracts/CANARY_DATA_CONTRACT.md
+  - docs/contracts/PUBLIC_GUILD_INDEX_CONTRACT.md
   - docs/agents/tasks/active/OTERYN-20260724-public-game-statistics.md
 proven:
   - Current Canary head 93413bd53e9a40f0ff3c4f55986036b10be44e0f defines guilds, guild_membership and players in schema.sql.
   - guilds.name is unique; guild_membership.player_id is the membership primary key; players.deletion = 0 is the established active/listable character state.
-  - The existing ot eryn_readonly policy already grants direct SELECT on guilds, guild_membership and players and rejects broader privileges.
+  - The existing oteryn_readonly policy already grants direct SELECT on guilds, guild_membership and players and rejects broader privileges.
   - No open PR owns the guild-index adapter, controller, route, view or test paths.
+  - PR 160 implements GET /guilds with a dedicated query, controller, module route, view and focused tests.
+  - The projection allowlist is guild name plus a derived count of membership rows joined to active players only.
+  - Pagination is fixed at 50 and ordering is guild name ascending with guild ID as a deterministic tie-breaker.
+  - Empty data returns HTTP 200 while Canary query failure returns HTTP 503.
 derived:
-  - A guild index exposing only guild name and a derived active-member count can be implemented without new Canary tables, writes or private fields.
+  - The guild index adds no Canary table grant because every source table is already inside the database-enforced read allowlist.
 unknown:
-  - Product meaning of guild points, level, residence and creationdata remains unverified for this capability and those fields will not be exposed.
+  - Product meaning of guild points, level, residence and creationdata remains unverified for this capability and those fields are not exposed.
 conflicts: []
 first_failure:
   marker: LOCAL_CHECKOUT_UNAVAILABLE
-  evidence: execution sandbox could not resolve github.com; validation must use GitHub CI on the exact branch head
+  evidence: execution sandbox could not resolve github.com; validation uses GitHub CI on the exact branch head
 rejected_hypotheses:
-  - Bundle all three statistics surfaces: rejected because latest-death and kill-statistic semantics were not yet proven and are not required for a complete guild index.
+  - Bundle all three statistics surfaces: rejected because latest-death and kill-statistic semantics were not proven and are not required for a complete guild index.
 changed_paths:
+  - app/Http/Controllers/PublicGameData/GuildIndexController.php
+  - app/PublicGameData/GuildIndexQuery.php
   - docs/agents/tasks/active/OTERYN-20260724-public-game-statistics.md
+  - docs/contracts/PUBLIC_GUILD_INDEX_CONTRACT.md
+  - resources/views/game/guilds/index.blade.php
+  - routes/modules/public-game-statistics.php
+  - tests/Feature/PublicGameData/GuildIndexTest.php
 validation:
   - command: overlap and current-schema discovery
     result: PASS
-    evidence: open PR search plus blakinio/canary schema.sql at 93413bd53e9a40f0ff3c4f55986036b10be44e0f
+    evidence: open PR search plus blakinio/canary schema.sql and src/io/ioguild.cpp at 93413bd53e9a40f0ff3c4f55986036b10be44e0f
+  - command: database privilege boundary review
+    result: PASS
+    evidence: existing verifier and provisioning template require direct SELECT only on guilds, guild_membership and players among the approved tables
   - command: local checkout and tests
     result: BLOCKED
     evidence: sandbox DNS resolution for github.com failed
+  - command: exact-head GitHub Actions
+    result: NOT_RUN
+    evidence: final checkpoint commit pending workflow execution
 blockers:
   - none
-next_action: Implement the bounded guild-index query, controller, module route, view, focused tests and contract update on this branch.
+next_action: Inspect all required GitHub Actions checks on the exact PR head and fix the first failing invariant or mark PR 160 ready when they pass.
 ```
 
 ## Notes
 
-Privacy/moderation review: the index must not expose account IDs, owner IDs, balances, MOTD, invitations, wars, disciplinary data, deleted-character names or raw membership identifiers. Empty guild storage is a successful empty state; Canary query failure is HTTP 503 and must not render the empty-state copy.
+Privacy/moderation review: the index does not expose account IDs, owner IDs, balances, MOTD, invitations, wars, disciplinary data, deleted-character names or raw membership identifiers. Empty guild storage is a successful empty state; Canary query failure is HTTP 503 and does not render the empty-state copy.
