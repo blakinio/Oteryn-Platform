@@ -36,6 +36,7 @@ Use the existing `oteryn-staging` self-hosted GitHub Actions runner on Synology 
 owned_paths:
   - .github/workflows/liquid20-synology-control.yml
   - deploy/liquid20/synology-control.sh
+  - deploy/liquid20/publish-status.sh
   - deploy/liquid20/README.md
   - docs/agents/tasks/active/OTERYN-20260724-liquid20-synology-control.md
   - docs/agents/tasks/archive/OTERYN-20260724-liquid20-synology-control.md
@@ -47,6 +48,7 @@ dependencies:
   - existing online self-hosted runner labeled oteryn-staging
   - read-only Freqtrade source commit c00a091c5adc67cf75c46db5805e358ffc72fad7
   - Synology host data path /volume1/docker/freqtrade-liquidations/data
+  - fixed non-secret status issue 148
 blockers: []
 cross_repository_tasks:
   - blakinio/freqtrade is read-only in this task; its exact approved commit is consumed as image build input
@@ -56,11 +58,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T15:30:00Z
-head: 5489b1967b38e543adfeaa0265738c602b3fce7c
-branch: feat/OTERYN-20260724-liquid20-synology-control
-pr: 147
-status: ready
+updated_at: 2026-07-24T15:45:00Z
+head: f0b1b204edd6fb9ea0d2cae44f5ae7ada42f41ba
+branch: fix/OTERYN-20260724-liquid20-status-board
+pr: none
+status: implementing
 context_routes:
   - testing
   - security
@@ -68,66 +70,48 @@ context_routes:
 owned_paths:
   - .github/workflows/liquid20-synology-control.yml
   - deploy/liquid20/synology-control.sh
+  - deploy/liquid20/publish-status.sh
   - deploy/liquid20/README.md
   - docs/agents/tasks/active/OTERYN-20260724-liquid20-synology-control.md
   - docs/agents/tasks/archive/OTERYN-20260724-liquid20-synology-control.md
 proven:
-  - The existing Synology runner is registered to blakinio/Oteryn-Platform with label oteryn-staging and has the host Docker socket mounted.
-  - Existing Oteryn deployment workflow uses runs-on oteryn-staging and validates Docker, Compose, curl, Python, sha256sum and timeout on the runner.
-  - The user-provided Liquid20 smoke artifacts prove both exchange clocks synchronized, both collectors completed, and no trading credentials were present.
-  - Freqtrade commit c00a091c5adc67cf75c46db5805e358ffc72fad7 contains the reviewed Liquid20 Dockerfile and data-only entrypoint.
-  - PR 147 separates bootstrap from observation so only immutable image publication receives packages write permission.
-  - The runtime script preserves any already running collector and never restarts or replaces it.
-  - Upload markers are stored under data/github-uploaded rather than inside immutable run directories.
-  - Liquid20 Synology Control run 30105124681 passed exact-head workflow and shell-contract validation.
-  - CI run 30105124496 passed Composer validation, audit, formatting, static analysis and the complete test suite.
-  - Agent Governance run 30105124588 passed task checkpoint validation.
-  - Phase 7 Production-Like Validation run 30105124465 passed.
-  - Platform DB Outage Validation run 30105124555 passed.
-  - Game Auth Ticket Concurrency run 30105124564 passed.
+  - PR 147 merged the reviewed runner control plane to main as 52e249d74f462ea17345b0dd1aea89fdd5da3acb.
+  - Its exact final head passed Liquid20 Synology Control run 30105544815, CI run 30105545051, Agent Governance run 30105545025, Phase 7 run 30105544846, DB outage run 30105544936 and concurrency run 30105544975.
+  - The existing Synology runner is registered with label oteryn-staging and has host Docker access while the Liquid20 container does not.
+  - Freqtrade commit c00a091c5adc67cf75c46db5805e358ffc72fad7 contains the reviewed Liquid20 image and data-only entrypoint.
+  - Issue 148 exists as a fixed, non-secret status board.
+  - The follow-up publisher limits the issue body to container state, image, run ID, timestamps, operation outcome and Actions run URL.
+  - No logs, secrets or raw liquidation data are published to the issue.
 derived:
-  - The Oteryn runner can control a sibling Liquid20 container through the host Docker daemon without granting the Liquid20 container Docker access.
-  - A GHCR image plus runner workflow removes the fragile DSM inline-command deployment path.
-  - Hourly observation can expose bounded logs and final artifacts through GitHub without assistant access to DSM.
+  - A fixed issue updated by the trusted runner gives connector-readable visibility without direct DSM or SSH access.
+  - Re-running bootstrap after the status-board merge is safe because the control script preserves an already running collector.
 unknown:
-  - Whether the Oteryn repository GITHUB_TOKEN can publish the new ghcr.io/blakinio/liquid20-collector package.
-  - Whether a Liquid20 container is currently running on Synology when the first bootstrap workflow executes.
-  - Whether current GitHub Actions storage quota permits immediate final artifact upload; failed upload remains retryable because the external marker is written only after success.
+  - The current result of the first post-merge bootstrap from PR 147 is not discoverable through the available connector action, which lists pull-request runs only.
+  - Whether the Oteryn repository token can publish the Liquid20 package and update issue 148 will be proven by the next trusted-main bootstrap.
+  - Whether current Actions storage quota permits the final artifact upload; a failed upload remains retryable and does not alter run evidence.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: implementation merge gate passed; self-hosted bootstrap intentionally waits for merge to trusted main
+  marker: no-connector-readable-runtime-status
+  evidence: runner workflow exists, but the available connector cannot enumerate push and scheduled workflow runs by itself
 rejected_hypotheses:
-  - Direct assistant access to DSM or the container: no such connection is available; visibility must be mediated through GitHub Actions.
-  - Store upload marker inside the run directory: rejected because acceptance evidence must remain immutable.
-  - Give scheduled monitoring packages write permission: rejected because observation requires no package publication.
+  - Direct assistant access to DSM or the container: no such connection is available.
+  - Publish bounded logs or event data to issue 148: rejected because the board must remain non-secret metadata only.
+  - Replace a running acceptance container during the status-board rollout: rejected; bootstrap must preserve it.
 changed_paths:
   - .github/workflows/liquid20-synology-control.yml
-  - deploy/liquid20/synology-control.sh
+  - deploy/liquid20/publish-status.sh
   - deploy/liquid20/README.md
   - docs/agents/tasks/active/OTERYN-20260724-liquid20-synology-control.md
 validation:
-  - command: Liquid20 Synology Control run 30105124681
+  - command: PR 147 merge-gate suite
     result: PASS
-    evidence: exact-head workflow and shell-contract validation succeeded
-  - command: CI run 30105124496
-    result: PASS
-    evidence: repository CI succeeded
-  - command: Agent Governance run 30105124588
-    result: PASS
-    evidence: active checkpoint validation succeeded
-  - command: Phase 7 Production-Like Validation run 30105124465
-    result: PASS
-    evidence: complete production-like validation succeeded
-  - command: Platform DB Outage Validation run 30105124555
-    result: PASS
-    evidence: outage and recovery validation succeeded
-  - command: Game Auth Ticket Concurrency run 30105124564
-    result: PASS
-    evidence: concurrency proof succeeded
+    evidence: all six exact-head workflows passed before merge
+  - command: status-board follow-up validation
+    result: NOT_RUN
+    evidence: implementation branch not yet opened as a PR
 blockers:
   - none
-next_action: Merge PR 147, then inspect the path-scoped bootstrap workflow on oteryn-staging and record the resulting GHCR and Synology container state.
+next_action: Open and validate the status-board follow-up PR, merge it, then read issue 148 to verify GHCR publication and the actual Synology container state.
 ```
 
 ## Notes
