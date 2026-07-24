@@ -86,6 +86,20 @@ state_dir="${OTERYN_STATE_DIR:-/var/lib/oteryn-staging-state}"
 mkdir -p "$state_dir"
 chmod 700 "$state_dir"
 
+stage_bootstrap_files() {
+    local tls_container
+
+    "${compose[@]}" create tls-init >/dev/null
+    tls_container="$("${compose[@]}" ps -a -q tls-init)"
+    if [[ -z "$tls_container" ]]; then
+        echo "Unable to create the TLS bootstrap container." >&2
+        exit 1
+    fi
+
+    docker cp "$DEPLOY_DIR/tls/init.sh" "$tls_container:/bootstrap/tls-init.sh"
+    docker cp "$DEPLOY_DIR/nginx/internal.conf" "$tls_container:/bootstrap/internal-nginx.conf"
+}
+
 snapshot_current_images() {
     local tmp="$state_dir/last-good.env.tmp"
     local found=0
@@ -126,6 +140,7 @@ snapshot_current_images
 
 "${compose[@]}" config --quiet
 "${compose[@]}" pull
+stage_bootstrap_files
 "${compose[@]}" up -d mariadb redis tls-init
 
 mariadb_ready=0

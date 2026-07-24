@@ -66,20 +66,65 @@ jobs:
             deploy/synology/tls/init.sh \
             deploy/synology/mariadb/init/10-platform-database.sh
 
-      - name: Validate Compose manifests
+      - name: Validate Compose manifests and containerized runner boundary
         run: |
           set -euo pipefail
-          cp deploy/synology/.env.example /tmp/oteryn-synology.env
-          sed -E -i 's/=(REQUIRED_[A-Z0-9_]+)$/=localplaceholder/' /tmp/oteryn-synology.env
-          docker compose \
-            --env-file /tmp/oteryn-synology.env \
-            -f deploy/synology/compose.yml \
-            config --quiet
+          env_file=/tmp/oteryn-synology.env
+          project="oteryn-boundary-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          cp deploy/synology/.env.example "$env_file"
+          sed -E -i 's/=(REQUIRED_[A-Z0-9_]+)$/=localplaceholder/' "$env_file"
+
+          runtime_compose=(
+            docker compose
+            -p "$project"
+            --env-file "$env_file"
+            -f deploy/synology/compose.yml
+          )
+          cleanup() {
+            "${runtime_compose[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
+            rm -f "$env_file" /tmp/oteryn-runtime-compose.json
+          }
+          trap cleanup EXIT
+
+          "${runtime_compose[@]}" config --quiet
+          "${runtime_compose[@]}" config --format json > /tmp/oteryn-runtime-compose.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          data = json.loads(Path('/tmp/oteryn-runtime-compose.json').read_text())
+          bind_mounts = []
+          for service_name, service in data.get('services', {}).items():
+              for mount in service.get('volumes', []) or []:
+                  if mount.get('type') == 'bind':
+                      bind_mounts.append((service_name, mount.get('source'), mount.get('target')))
+          if bind_mounts:
+              raise SystemExit(f'runtime Compose must not depend on runner checkout bind mounts: {bind_mounts}')
+          PY
+
+          "${runtime_compose[@]}" pull tls-init
+          "${runtime_compose[@]}" create tls-init
+          tls_container="$("${runtime_compose[@]}" ps -a -q tls-init)"
+          test -n "$tls_container"
+          docker cp deploy/synology/tls/init.sh "$tls_container:/bootstrap/tls-init.sh"
+          docker cp deploy/synology/nginx/internal.conf "$tls_container:/bootstrap/internal-nginx.conf"
+          bootstrap_volume="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/bootstrap"}}{{.Name}}{{end}}{{end}}' "$tls_container")"
+          test -n "$bootstrap_volume"
+          docker run --rm \
+            -v "$bootstrap_volume:/bootstrap:ro" \
+            alpine:3.22 \
+            /bin/sh -ec 'test -s /bootstrap/tls-init.sh && test -s /bootstrap/internal-nginx.conf'
+
+          if grep -q 'http://${OTERYN_BIND_ADDRESS}' deploy/synology/scripts/health-check.sh; then
+            echo 'Health checks must not probe the containerized runner loopback.' >&2
+            exit 1
+          fi
+          grep -q -- '--network "container:' deploy/synology/scripts/health-check.sh
+
           docker compose \
             --env-file deploy/synology/runner/.env.example \
             -f deploy/synology/runner/compose.yml \
             config --quiet
-          rm -f /tmp/oteryn-synology.env
 
   build:
     name: Build ${{ matrix.name }} image
