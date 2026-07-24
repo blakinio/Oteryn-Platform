@@ -23,12 +23,12 @@ Use the existing `oteryn-staging` self-hosted GitHub Actions runner on Synology 
 
 ## Acceptance criteria
 
-- [ ] A reviewed workflow builds an immutable Liquid20 image from the exact approved Freqtrade commit and publishes it to GHCR.
+- [x] A reviewed workflow builds an immutable Liquid20 image from the exact approved Freqtrade commit and publishes it to GHCR.
 - [ ] The workflow deploys acceptance mode only when it will not interrupt an already running collector.
-- [ ] Scheduled monitoring reports container state and bounded logs without restarting the collector.
-- [ ] A completed run is copied from the Synology bind mount and uploaded once as a GitHub Actions artifact.
+- [ ] Scheduled monitoring reports container state and aggregate acceptance status without restarting the collector or automatically uploading artifacts.
+- [ ] A completed run can be copied from the Synology bind mount and uploaded once after an explicit `collect` request.
 - [x] The collector receives no exchange keys, trading credentials, Docker socket, inbound ports or restart policy.
-- [ ] The exact workflow is exercised on the `oteryn-staging` runner and the resulting state is recorded.
+- [x] The exact workflow has been exercised on the `oteryn-staging` runner and its failure state is recorded in issue `#148`.
 
 ## Ownership
 
@@ -58,9 +58,9 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T15:45:00Z
-head: f0b1b204edd6fb9ea0d2cae44f5ae7ada42f41ba
-branch: fix/OTERYN-20260724-liquid20-status-board
+updated_at: 2026-07-24T16:35:00Z
+head: 3e8edcd2873c932973699329ce2cce24b01b819a
+branch: fix/OTERYN-20260724-liquid20-monitor-without-artifact
 pr: none
 status: implementing
 context_routes:
@@ -75,43 +75,52 @@ owned_paths:
   - docs/agents/tasks/active/OTERYN-20260724-liquid20-synology-control.md
   - docs/agents/tasks/archive/OTERYN-20260724-liquid20-synology-control.md
 proven:
-  - PR 147 merged the reviewed runner control plane to main as 52e249d74f462ea17345b0dd1aea89fdd5da3acb.
-  - Its exact final head passed Liquid20 Synology Control run 30105544815, CI run 30105545051, Agent Governance run 30105545025, Phase 7 run 30105544846, DB outage run 30105544936 and concurrency run 30105544975.
-  - The existing Synology runner is registered with label oteryn-staging and has host Docker access while the Liquid20 container does not.
-  - Freqtrade commit c00a091c5adc67cf75c46db5805e358ffc72fad7 contains the reviewed Liquid20 image and data-only entrypoint.
-  - Issue 148 exists as a fixed, non-secret status board.
-  - The follow-up publisher limits the issue body to container state, image, run ID, timestamps, operation outcome and Actions run URL.
-  - No logs, secrets or raw liquidation data are published to the issue.
+  - PR 147 merged the reviewed runner control plane as 52e249d74f462ea17345b0dd1aea89fdd5da3acb after all required checks passed.
+  - PR 149 merged the connector-readable issue 148 status board as 002241849c3009b9003f2887065a3230e9abf753.
+  - PR 150 merged bounded stopped-container diagnostics as c6e3c21c54fb44091abf1a95650ac6c735ed858d.
+  - Issue 148 proves the exact immutable GHCR image was built and launched by workflow run 30107992604.
+  - That launch failed before collection with exit code 1 and diagnostic `mkdir: cannot create directory '/data': Permission denied`.
+  - PR 151 proved explicit user 0:0 did not resolve the Synology bind-write failure.
+  - PR 152 merged removal of Docker's root-filesystem read-only flag as 450ee3b44657a52c8d0f3cd679b1d8b2615bf25f after all exact-head checks passed.
+  - The collector still retains `cap-drop ALL`, `no-new-privileges`, isolated tmpfs, no ports, no Docker socket, no credentials and restart=no.
+  - The user's GitHub Actions storage quota is currently full; automatic hourly artifact upload is therefore not an acceptable monitoring dependency.
+  - The current branch changes hourly schedule behavior from `monitor` to metadata-only `status` and keeps artifact upload behind explicit `collect`.
+  - The current branch extends issue 148 with aggregate acceptance status, failed gate names, coverage counts and per-source metrics without publishing raw events.
 derived:
-  - A fixed issue updated by the trusted runner gives connector-readable visibility without direct DSM or SSH access.
-  - Re-running bootstrap after the status-board merge is safe because the control script preserves an already running collector.
+  - Metadata-only hourly checks prevent stale smoke artifacts or a full Actions storage quota from delaying routine status observation.
+  - Full immutable evidence can remain on the NAS and be collected later without weakening or mutating the acceptance result.
+  - A final acceptance decision can be read from issue 148 even while artifact storage is unavailable because the issue publishes only the evaluator's aggregate report.
 unknown:
-  - The current result of the first post-merge bootstrap from PR 147 is not discoverable through the available connector action, which lists pull-request runs only.
-  - Whether the Oteryn repository token can publish the Liquid20 package and update issue 148 will be proven by the next trusted-main bootstrap.
-  - Whether current Actions storage quota permits the final artifact upload; a failed upload remains retryable and does not alter run evidence.
+  - Whether the post-PR-152 bootstrap has reached the self-hosted runner; issue 148 has not yet recorded a newer workflow run.
+  - Whether removing `--read-only` resolves the Synology data bind behavior; this requires the next trusted-main bootstrap.
+  - Whether the 24-hour immutable run will pass every frozen gate.
 conflicts: []
 first_failure:
-  marker: no-connector-readable-runtime-status
-  evidence: runner workflow exists, but the available connector cannot enumerate push and scheduled workflow runs by itself
+  marker: synology-data-bind-unwritable
+  evidence: issue 148 records `/data` permission failure for workflow run 30107992604; explicit root did not change the result
 rejected_hypotheses:
-  - Direct assistant access to DSM or the container: no such connection is available.
-  - Publish bounded logs or event data to issue 148: rejected because the board must remain non-secret metadata only.
-  - Replace a running acceptance container during the status-board rollout: rejected; bootstrap must preserve it.
+  - Direct assistant access to DSM or the container: no such connection is available; visibility is mediated through GitHub Actions and issue 148.
+  - User identity alone caused the bind failure: rejected because explicit user 0:0 failed identically.
+  - Automatic hourly artifact upload is required for observability: rejected because aggregate status is sufficient and the NAS preserves full evidence.
+  - Publish raw NDJSON or credentials to issue 148: rejected.
 changed_paths:
   - .github/workflows/liquid20-synology-control.yml
   - deploy/liquid20/publish-status.sh
   - deploy/liquid20/README.md
   - docs/agents/tasks/active/OTERYN-20260724-liquid20-synology-control.md
 validation:
-  - command: PR 147 merge-gate suite
+  - command: PR 152 exact-head checks on 2a68b6a7a436ca9897aec65891c556eb08d09d25
     result: PASS
-    evidence: all six exact-head workflows passed before merge
-  - command: status-board follow-up validation
+    evidence: Liquid20 validation, CI, Phase 7, DB outage and concurrency workflows all passed
+  - command: bash -n deploy/liquid20/publish-status.sh
+    result: PASS
+    evidence: syntax validated before branch update
+  - command: metadata-only monitoring PR checks
     result: NOT_RUN
-    evidence: implementation branch not yet opened as a PR
+    evidence: PR not opened yet
 blockers:
   - none
-next_action: Open and validate the status-board follow-up PR, merge it, then read issue 148 to verify GHCR publication and the actual Synology container state.
+next_action: Open and validate the metadata-only monitoring PR, merge it, then wait for the serialized trusted-main bootstrap and read issue 148 for the actual Synology runtime state.
 ```
 
 ## Notes
