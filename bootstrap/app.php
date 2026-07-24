@@ -6,9 +6,11 @@ use App\Http\Middleware\GameAuth\PreventSensitiveGameAuthResponseCaching;
 use App\Http\Middleware\RequestCorrelation;
 use App\Http\Middleware\RequireAdminPermission;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TrustConfiguredProxies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,31 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $configuredProxies = config('http.trusted_proxies', []);
-
-        if (! is_array($configuredProxies)) {
-            throw new RuntimeException('http.trusted_proxies must be an array of proxy IP addresses or CIDRs.');
-        }
-
-        $trustedProxies = [];
-        foreach ($configuredProxies as $proxy) {
-            if (! is_string($proxy)) {
-                throw new RuntimeException('http.trusted_proxies must contain only proxy IP addresses or CIDRs.');
-            }
-
-            $trustedProxies[] = $proxy;
-        }
-
-        if ($trustedProxies !== []) {
-            $middleware->trustProxies(
-                at: $trustedProxies,
-                headers: Request::HEADER_X_FORWARDED_FOR
-                    | Request::HEADER_X_FORWARDED_HOST
-                    | Request::HEADER_X_FORWARDED_PORT
-                    | Request::HEADER_X_FORWARDED_PROTO,
-            );
-        }
-
+        $middleware->replace(TrustProxies::class, TrustConfiguredProxies::class);
         $middleware->append(RequestCorrelation::class);
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/');
