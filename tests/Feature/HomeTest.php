@@ -13,8 +13,13 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Schema;
 use Mockery;
+use Mockery\CompositeExpectation;
+use Mockery\ExpectationInterface;
+use Mockery\HigherOrderMessage;
+use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
+use Throwable;
 
 final class HomeTest extends TestCase
 {
@@ -113,10 +118,12 @@ final class HomeTest extends TestCase
 
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('hmget', ['cluster:channel:1:runtime', ['channel_id', 'status', 'players_online']])
-            ->andThrow(new RuntimeException('Redis unavailable.'));
+        $this->expectCommandThrows(
+            $connection,
+            'hmget',
+            ['cluster:channel:1:runtime', ['channel_id', 'status', 'players_online']],
+            new RuntimeException('Redis unavailable.'),
+        );
 
         $this->get('/')
             ->assertOk()
@@ -166,17 +173,57 @@ final class HomeTest extends TestCase
     {
         $connection = Mockery::mock(Connection::class);
         Redis::shouldReceive('connection')->once()->with('canary_runtime')->andReturn($connection);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('hmget', ['cluster:channel:1:runtime', ['channel_id', 'status', 'players_online']])
-            ->andReturn([
+        $this->expectCommandReturns(
+            $connection,
+            'hmget',
+            ['cluster:channel:1:runtime', ['channel_id', 'status', 'players_online']],
+            [
                 'channel_id' => '1',
                 'status' => $status,
                 'players_online' => (string) $playersOnline,
-            ]);
-        $connection->shouldReceive('command')
-            ->once()
-            ->with('pttl', ['cluster:channel:1:runtime'])
-            ->andReturn($ttlMilliseconds);
+            ],
+        );
+        $this->expectCommandReturns(
+            $connection,
+            'pttl',
+            ['cluster:channel:1:runtime'],
+            $ttlMilliseconds,
+        );
+    }
+
+    /**
+     * @param  list<mixed>  $arguments
+     */
+    private function expectCommandReturns(
+        MockInterface $connection,
+        string $command,
+        array $arguments,
+        mixed $result,
+    ): void {
+        $expectation = $this->commandExpectation($connection);
+        $expectation->__call('once', []);
+        $expectation->__call('with', [$command, $arguments]);
+        $expectation->__call('andReturn', [$result]);
+    }
+
+    /**
+     * @param  list<mixed>  $arguments
+     */
+    private function expectCommandThrows(
+        MockInterface $connection,
+        string $command,
+        array $arguments,
+        Throwable $exception,
+    ): void {
+        $expectation = $this->commandExpectation($connection);
+        $expectation->__call('once', []);
+        $expectation->__call('with', [$command, $arguments]);
+        $expectation->__call('andThrow', [$exception]);
+    }
+
+    private function commandExpectation(
+        MockInterface $connection,
+    ): CompositeExpectation|ExpectationInterface|HigherOrderMessage {
+        return $connection->shouldReceive('command');
     }
 }
