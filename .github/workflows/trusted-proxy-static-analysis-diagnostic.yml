@@ -31,10 +31,19 @@ jobs:
           extensions: pdo_mysql, pcntl
           tools: composer:v2
 
-      - name: Install dependencies from lockfile
-        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Capture dependency installation output
+        id: install
+        shell: bash
+        run: |
+          set +e
+          composer install --no-interaction --prefer-dist --no-progress > composer-install.log 2>&1
+          status=$?
+          cat composer-install.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
 
       - name: Capture PHPStan output
+        if: steps.install.outputs.status == '0'
         id: analyse
         shell: bash
         run: |
@@ -45,15 +54,21 @@ jobs:
           echo "status=$status" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Upload PHPStan diagnostic
+      - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: trusted-proxy-phpstan-diagnostic
-          path: phpstan.log
+          name: trusted-proxy-diagnostic
+          path: |
+            composer-install.log
+            phpstan.log
           if-no-files-found: error
           retention-days: 3
 
+      - name: Enforce dependency installation result
+        if: steps.install.outputs.status != '0'
+        run: exit 1
+
       - name: Enforce PHPStan result
-        if: steps.analyse.outputs.status != '0'
+        if: steps.install.outputs.status == '0' && steps.analyse.outputs.status != '0'
         run: exit 1
