@@ -37,7 +37,7 @@ if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
     if [[ "$state" != "running" ]]; then
         raw_diagnostic="$(docker logs --tail 40 "$CONTAINER_NAME" 2>&1 || true)"
         if [[ -n "$raw_diagnostic" ]]; then
-            diagnostic_html="$([
+            diagnostic_html="$(
                 printf '%s' "$raw_diagnostic" | python3 -c '
 import html
 import re
@@ -55,7 +55,7 @@ print(html.escape("\n".join(lines))[:6000])
     fi
 fi
 
-latest_run_value="$([
+latest_run_value="$(
     docker run --rm \
         -v "$DATA_ROOT:/data:ro" \
         "$ALPINE_IMAGE" \
@@ -67,7 +67,7 @@ if [[ -n "$latest_run_value" ]]; then
 fi
 
 if [[ "$latest_run" != "none" ]]; then
-    report_json="$([
+    report_json="$(
         docker run --rm \
             -v "$DATA_ROOT:/data:ro" \
             "$ALPINE_IMAGE" \
@@ -75,7 +75,7 @@ if [[ "$latest_run" != "none" ]]; then
             2>/dev/null || true
     )"
     if [[ -n "$report_json" ]]; then
-        acceptance_summary="$([
+        acceptance_summary="$(
             printf '%s' "$report_json" | python3 -c '
 import json
 import math
@@ -93,7 +93,11 @@ status = "passed" if passed is True else "failed" if passed is False else "inval
 lines = [f"- Status: `{status}`"]
 failed = report.get("failed_gates", [])
 if isinstance(failed, list):
-    safe_failed = [name for name in failed if isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", name)]
+    safe_failed = [
+        name
+        for name in failed
+        if isinstance(name, str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,120}", name)
+    ]
     lines.append(f"- Failed gates: `{len(safe_failed)}`")
     if safe_failed:
         lines.append("- Gate names: " + ", ".join(f"`{name}`" for name in safe_failed[:20]))
@@ -123,9 +127,17 @@ if isinstance(sources, dict):
             fields.append(f"events={events}")
         if isinstance(symbols, int) and not isinstance(symbols, bool):
             fields.append(f"symbols={symbols}")
-        if isinstance(availability, (int, float)) and not isinstance(availability, bool) and math.isfinite(float(availability)):
+        if (
+            isinstance(availability, (int, float))
+            and not isinstance(availability, bool)
+            and math.isfinite(float(availability))
+        ):
             fields.append(f"availability={float(availability):.6f}")
-        if isinstance(disconnects, (int, float)) and not isinstance(disconnects, bool) and math.isfinite(float(disconnects)):
+        if (
+            isinstance(disconnects, (int, float))
+            and not isinstance(disconnects, bool)
+            and math.isfinite(float(disconnects))
+        ):
             fields.append(f"disconnects/h={float(disconnects):.3f}")
         if fields:
             lines.append(f"- `{source_id}`: " + ", ".join(fields))
@@ -134,9 +146,11 @@ print("\n".join(lines))
 '
         )"
     elif [[ "$state" == "running" ]]; then
-        acceptance_summary="- Status: \`in progress\`\n- Final report: \`not written yet\`"
+        acceptance_summary="- Status: \`in progress\`
+- Final report: \`not written yet\`"
     else
-        acceptance_summary="- Status: \`not available\`\n- Final report: \`missing\`"
+        acceptance_summary="- Status: \`not available\`
+- Final report: \`missing\`"
     fi
 fi
 
