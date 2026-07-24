@@ -90,7 +90,7 @@ final class EditorialSupportLegalTest extends TestCase
     public function test_support_admin_requires_exact_permission_and_confirmed_mfa_and_records_bounded_audit(): void
     {
         $cmsOnly = $this->createIdentity('cms-only@example.com');
-        $this->assignExistingRole($cmsOnly, AdminRoleManager::CONTENT_EDITOR);
+        $this->grantExactPermission($cmsOnly, AdminPermission::MANAGE_PAGES);
         $this->actingAsCurrent($cmsOnly);
 
         $this->put(route('admin.support-content.update', ['editorialPageKey' => EditorialPageKey::Support->value]), [
@@ -99,7 +99,7 @@ final class EditorialSupportLegalTest extends TestCase
         ])->assertForbidden();
 
         $noMfa = $this->createIdentity('support-no-mfa@example.com', false);
-        $this->grantExactPermission($noMfa, AdminPermission::MANAGE_SUPPORT_CONTENT);
+        $this->assignExistingRole($noMfa, AdminRoleManager::CONTENT_EDITOR);
         $this->actingAsCurrent($noMfa);
 
         $this->put(route('admin.support-content.update', ['editorialPageKey' => EditorialPageKey::Support->value]), [
@@ -108,7 +108,7 @@ final class EditorialSupportLegalTest extends TestCase
         ])->assertForbidden();
 
         $actor = $this->createIdentity('support-editor@example.com');
-        $this->grantExactPermission($actor, AdminPermission::MANAGE_SUPPORT_CONTENT);
+        $this->assignExistingRole($actor, AdminRoleManager::CONTENT_EDITOR);
         $this->actingAsCurrent($actor);
 
         $sensitiveBody = 'Contact player@example.com but never audit this body or MFA-SECRET-EXAMPLE.';
@@ -135,7 +135,7 @@ final class EditorialSupportLegalTest extends TestCase
     public function test_legal_versions_and_effective_dates_are_preserved_and_immutable_per_version(): void
     {
         $actor = $this->createIdentity('legal-editor@example.com');
-        $this->grantExactPermission($actor, AdminPermission::MANAGE_SUPPORT_CONTENT);
+        $this->assignExistingRole($actor, AdminRoleManager::CONTENT_EDITOR);
         $this->actingAsCurrent($actor);
 
         $route = route('admin.support-content.update', ['editorialPageKey' => EditorialPageKey::Terms->value]);
