@@ -30,6 +30,7 @@ final class TrustedProxySchemeTest extends TestCase
         $response = $this->requestLoginPage(
             remoteAddress: '10.201.3.10',
             forwardedHost: 'platform.oteryn.test',
+            forwardedProto: 'https',
         );
 
         $response->assertOk();
@@ -42,9 +43,13 @@ final class TrustedProxySchemeTest extends TestCase
 
     public function test_untrusted_client_cannot_spoof_forwarded_scheme_or_host(): void
     {
+        $configuredScheme = parse_url((string) config('app.url'), PHP_URL_SCHEME) ?: 'http';
+        $spoofedScheme = $configuredScheme === 'https' ? 'http' : 'https';
+
         $response = $this->requestLoginPage(
             remoteAddress: '203.0.113.10',
             forwardedHost: 'attacker.example.test',
+            forwardedProto: $spoofedScheme,
         );
 
         $response->assertOk()
@@ -52,7 +57,7 @@ final class TrustedProxySchemeTest extends TestCase
 
         $action = $this->loginFormAction($response);
 
-        self::assertSame('http', parse_url($action, PHP_URL_SCHEME));
+        self::assertSame($configuredScheme, parse_url($action, PHP_URL_SCHEME));
         self::assertNotSame('attacker.example.test', parse_url($action, PHP_URL_HOST));
     }
 
@@ -77,7 +82,7 @@ final class TrustedProxySchemeTest extends TestCase
     /**
      * @return TestResponse<Response>
      */
-    private function requestLoginPage(string $remoteAddress, string $forwardedHost): TestResponse
+    private function requestLoginPage(string $remoteAddress, string $forwardedHost, string $forwardedProto): TestResponse
     {
         return $this
             ->withServerVariables([
@@ -94,7 +99,7 @@ final class TrustedProxySchemeTest extends TestCase
                 'X-Forwarded-For' => '198.51.100.20',
                 'X-Forwarded-Host' => $forwardedHost,
                 'X-Forwarded-Port' => '443',
-                'X-Forwarded-Proto' => 'https',
+                'X-Forwarded-Proto' => $forwardedProto,
             ])
             ->get('/login');
     }
