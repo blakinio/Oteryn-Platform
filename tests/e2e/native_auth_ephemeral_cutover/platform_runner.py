@@ -91,6 +91,45 @@ def main() -> int:
         match = re.search(r"([0-9]{3})$", output)
         return (int(match.group(1)) if match else 0, output)
 
+    def validate_tls_with_expected_polarity(self: Any) -> None:
+        good_platform = self.curl_status("public", "https://platform.oteryn.test/health")[0]
+        good_gateway = self.curl_status("public", "https://gateway.oteryn.test/health")[0]
+        wrong_ca = self.curl_status("public", "https://platform.oteryn.test/health", ca=self.tls["wrong_ca"])[0]
+        mismatch = self.curl_status("public", "https://10.201.0.10/health")[0]
+        http_policy = harness.docker(
+            "run", "--rm", "--network", self.networks["gateway_private"],
+            "-e", "OTERYN_PLATFORM_BASE_URL=http://platform-internal.oteryn.test",
+            "-e", f"OTERYN_PLATFORM_SERVICE_TOKEN={self.platform_current}",
+            "-e", "GAME_SESSION_SERVICE_BASE_URL=https://canary-issuer.oteryn.test",
+            "-e", f"GAME_SESSION_SERVICE_TOKEN={self.canary_current}",
+            "-v", f"{self.gateway_bin}:/gateway:ro", "alpine:3.20", "/gateway", check=False,
+        )
+        private_from_public = self.curl_status("public", "https://canary-issuer.oteryn.test/internal/v1/game-sessions")[0]
+        self.tls_result.update({
+            "valid_ca_hostname_platform": good_platform == 200,
+            "valid_ca_hostname_gateway": good_gateway == 200,
+            "wrong_ca_fail_closed": wrong_ca == 0,
+            "hostname_mismatch_fail_closed": mismatch == 0,
+            "non_loopback_http_dependency_rejected": http_policy.returncode != 0,
+            "private_issuer_unreachable_from_client_segment": private_from_public == 0,
+        })
+        expected = {
+            "ephemeral_ca_generated": self.tls_result.get("ephemeral_ca_generated") is True,
+            "private_keys_not_retained": self.tls_result.get("private_keys_retained") is False,
+            "verification_bypass_not_used": self.tls_result.get("verification_bypass_used") is False,
+            "valid_ca_hostname_platform": self.tls_result.get("valid_ca_hostname_platform") is True,
+            "valid_ca_hostname_gateway": self.tls_result.get("valid_ca_hostname_gateway") is True,
+            "wrong_ca_fail_closed": self.tls_result.get("wrong_ca_fail_closed") is True,
+            "hostname_mismatch_fail_closed": self.tls_result.get("hostname_mismatch_fail_closed") is True,
+            "non_loopback_http_dependency_rejected": self.tls_result.get("non_loopback_http_dependency_rejected") is True,
+            "private_issuer_unreachable_from_client_segment": self.tls_result.get("private_issuer_unreachable_from_client_segment") is True,
+        }
+        self.tls_result["assertions"] = expected
+        self.tls_result["status"] = "PASS" if all(expected.values()) else "FAIL"
+        harness.write_json(self.evidence / "tls-validation.json", self.tls_result)
+        if self.tls_result["status"] != "PASS":
+            raise harness.RehearsalError("TLS validation failed")
+
     original_build_runtime_images = harness.Rehearsal.build_runtime_images
 
     def build_runtime_images_with_client_ca(self: Any) -> None:
@@ -213,12 +252,13 @@ FLUSH PRIVILEGES;
 
     # Canary PR #841 owns the production-like orchestration harness. The
     # Platform-hosted runner adapts harness-only execution details: MariaDB's
-    # supported MYSQL_PWD client environment, explicit Platform world mapping
-    # required by the exact Canary issuer, safe argv passing for curl probes,
-    # normal system trust installation of the ephemeral CA, deterministic data
+    # supported MYSQL_PWD client environment, explicit Platform world mapping,
+    # TLS negative-invariant polarity, safe argv passing for curl probes, normal
+    # system trust installation of the ephemeral CA, deterministic data
     # provisioning, and robust Redis ACL rejection detection. It never disables
     # TLS verification or alters product revisions.
     harness.Rehearsal.curl_status = safe_curl_status
+    harness.Rehearsal.validate_tls = validate_tls_with_expected_polarity
     harness.Rehearsal.build_runtime_images = build_runtime_images_with_client_ca
     harness.Rehearsal.start_data_services = start_data_services_deterministically
     return harness.main()
