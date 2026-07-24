@@ -2,11 +2,6 @@ name: Repair Synology Compose Container Names
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - .github/workflows/repair-synology-compose-orphans.yml
 
 permissions:
   contents: read
