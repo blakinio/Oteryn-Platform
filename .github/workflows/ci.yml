@@ -83,5 +83,23 @@ jobs:
         shell: bash
         run: exit "$(cat phpstan-exit-code.txt)"
 
-      - name: Run tests
-        run: composer test
+      - name: Capture test diagnostics
+        shell: bash
+        run: |
+          set +e
+          composer test > test-result.txt 2>&1
+          echo "$?" > test-exit-code.txt
+          exit 0
+
+      - name: Upload test diagnostics
+        uses: actions/upload-artifact@v6
+        with:
+          name: public-web-tests-${{ github.run_id }}
+          path: |
+            test-result.txt
+            test-exit-code.txt
+          retention-days: 1
+
+      - name: Enforce test result
+        shell: bash
+        run: exit "$(cat test-exit-code.txt)"
