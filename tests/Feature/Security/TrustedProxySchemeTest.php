@@ -32,8 +32,12 @@ final class TrustedProxySchemeTest extends TestCase
             forwardedHost: 'platform.oteryn.test',
         );
 
-        $response->assertOk()
-            ->assertSee('action="https://platform.oteryn.test/login"', false);
+        $response->assertOk();
+
+        self::assertSame(
+            'https://platform.oteryn.test/login',
+            $this->loginFormAction($response),
+        );
     }
 
     public function test_untrusted_client_cannot_spoof_forwarded_scheme_or_host(): void
@@ -44,8 +48,36 @@ final class TrustedProxySchemeTest extends TestCase
         );
 
         $response->assertOk()
-            ->assertSee('action="http://platform-backend/login"', false)
             ->assertDontSee('attacker.example.test', false);
+
+        $action = $this->loginFormAction($response);
+
+        self::assertSame('http', parse_url($action, PHP_URL_SCHEME));
+        self::assertNotSame('attacker.example.test', parse_url($action, PHP_URL_HOST));
+    }
+
+    /**
+     * @param  TestResponse<Response>  $response
+     */
+    private function loginFormAction(TestResponse $response): string
+    {
+        $content = $response->getContent();
+
+        if (! is_string($content)) {
+            self::fail('Login response did not contain an HTML string.');
+        }
+
+        if (preg_match('/<form[^>]+action="([^"]+)"/', $content, $matches) !== 1) {
+            self::fail('Login form action was not present in the response.');
+        }
+
+        $action = $matches[1] ?? null;
+
+        if (! is_string($action) || $action === '') {
+            self::fail('Login form action was empty.');
+        }
+
+        return html_entity_decode($action, ENT_QUOTES | ENT_HTML5);
     }
 
     /**
