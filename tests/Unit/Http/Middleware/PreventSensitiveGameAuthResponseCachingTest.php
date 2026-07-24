@@ -24,7 +24,7 @@ final class PreventSensitiveGameAuthResponseCachingTest extends TestCase
     public function test_sensitive_responses_receive_complete_cache_headers(string $path): void
     {
         $request = Request::create($path, 'POST');
-        $middleware = new PreventSensitiveGameAuthResponseCaching();
+        $middleware = new PreventSensitiveGameAuthResponseCaching;
 
         $response = $middleware->handle(
             $request,
@@ -42,7 +42,7 @@ final class PreventSensitiveGameAuthResponseCachingTest extends TestCase
     public function test_unrelated_response_is_not_modified(): void
     {
         $request = Request::create('/health', 'GET');
-        $middleware = new PreventSensitiveGameAuthResponseCaching();
+        $middleware = new PreventSensitiveGameAuthResponseCaching;
         $expected = new Response('ok', 200);
 
         $response = $middleware->handle(
