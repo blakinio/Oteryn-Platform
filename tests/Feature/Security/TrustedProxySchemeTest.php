@@ -4,6 +4,7 @@ namespace Tests\Feature\Security;
 
 use Illuminate\Http\Middleware\TrustProxies;
 use Illuminate\Testing\TestResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
 
 final class TrustedProxySchemeTest extends TestCase
@@ -47,6 +48,9 @@ final class TrustedProxySchemeTest extends TestCase
             ->assertDontSee('attacker.example.test', false);
     }
 
+    /**
+     * @return TestResponse<Response>
+     */
     private function requestLoginPage(string $remoteAddress, string $forwardedHost): TestResponse
     {
         return $this
