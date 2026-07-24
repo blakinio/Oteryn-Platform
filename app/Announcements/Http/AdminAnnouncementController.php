@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 use DomainException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class AdminAnnouncementController
 {
@@ -83,7 +84,7 @@ final class AdminAnnouncementController
                 $request->integer('lock_version'),
             );
         } catch (DomainException $exception) {
-            abort(409, $exception->getMessage());
+            throw new ConflictHttpException($exception->getMessage(), $exception);
         }
 
         return redirect()
