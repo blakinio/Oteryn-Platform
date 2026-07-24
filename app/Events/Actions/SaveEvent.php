@@ -135,7 +135,12 @@ final class SaveEvent
                 throw new InvalidArgumentException('Event translations must be complete.');
             }
 
-            $normalized[$locale] = compact('title', 'slug', 'summary', 'body');
+            $normalized[$locale] = [
+                'title' => $title,
+                'slug' => $slug,
+                'summary' => $summary,
+                'body' => $body,
+            ];
         }
 
         return $normalized;
