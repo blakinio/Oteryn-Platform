@@ -1,0 +1,40 @@
+name: Inspect Canary World ID Contract
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/inspect-canary-world-id-contract.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: oteryn-staging
+    steps:
+      - name: Read non-secret world ID contract from running image
+        run: |
+          set -euo pipefail
+          cid="$(docker ps -q \
+            --filter label=com.docker.compose.project=oteryn-staging \
+            --filter label=com.docker.compose.service=canary \
+            | head -n 1)"
+          if [[ -z "$cid" ]]; then
+            echo 'No running oteryn-staging Canary container exists.'
+            exit 1
+          fi
+          docker exec "$cid" sh -ec '
+            found=0
+            for root in /usr/local/bin /usr/bin /opt /app /canary; do
+              if [ -e "$root" ]; then
+                matches="$(grep -R -n -C 6 -F "CANARY_GAME_SESSION_ISSUER_WORLD_ID" "$root" 2>/dev/null | head -n 120 || true)"
+                if [ -n "$matches" ]; then
+                  printf "%s\n" "$matches"
+                  found=1
+                fi
+              fi
+            done
+            [ "$found" -eq 1 ]
+          '
