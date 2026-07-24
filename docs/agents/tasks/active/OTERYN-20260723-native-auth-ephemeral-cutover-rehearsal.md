@@ -56,8 +56,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T11:25:00+02:00
-head: 97217f7a78c87d95f84f9ae1f8e2cf68c82c9c82
+updated_at: 2026-07-24T11:35:00+02:00
+head: 0685c447d780a8d36724bab21bb56cb00af69178
 branch: test/OTERYN-20260723-native-auth-ephemeral-cutover-rehearsal
 pr: 126
 status: validating
@@ -80,26 +80,28 @@ proven:
   - MariaDB final-server readiness, MYSQL_PWD compatibility and deterministic schema imports are proven; Redis read-only ACL write rejection is proven.
   - Credential overlap and native issuer activation pass for current/previous Platform and Canary credentials.
   - TLS validation passes for trusted CA/hostnames, wrong CA, hostname mismatch, non-loopback HTTP dependency rejection, private issuer isolation, no verification bypass and no retained private keys.
-  - Rehearsal run 30080910260 passed the complete OAuth PKCE matrix, ticket HTTP 200 contract and sensitive cache headers before reaching the authorization-code expiry test.
-  - Passport authorization-code expiry is encoded in the authorization code itself; changing only oauth_auth_codes.expires_at does not create a genuinely expired code.
-  - Commit 97217f7a78c87d95f84f9ae1f8e2cf68c82c9c82 mounts host libfaketime read-only into only the ephemeral Platform container and advances only that process by two hours for the controlled expiry exchange, then restores normal time.
+  - Rehearsal run 30081998956 passed the complete OAuth PKCE matrix and the real authorization-code expiry check using isolated Platform fake time.
+  - The same run passed expired Game Login Ticket rejection, first use, replay rejection, wrong protocol, invalid Platform and Canary service credentials, wrong account and wrong world routing.
+  - Run 30081998956 failed only when the harness restarted Platform after an injected outage and immediately probed health while the new server was still starting.
+  - The restart bug was caused by a stale platform-bootstrap.json marker surviving between container stages; it was not a Platform product failure.
+  - Commit 0685c447d780a8d36724bab21bb56cb00af69178 removes the stale marker before every Platform start and requires a real internal HTTP 200 before returning.
   - Canary harness 9200c562e7e87dd098c1205c1df83c9d9ce95c1b accepts the documented Game Login Ticket HTTP 200 contract and has green required CI.
   - Platform b5dd6a7be5c704d5706241240e06f8bb8c4b5efe combines explicit trusted-proxy handling with complete OAuth token cache headers and passed Composer validation, audit, Pint, PHPStan and full PHPUnit in run 30079059960.
   - acceptance_extensions.py adds physical invalid-session rejection, unauthorized-character burn, restart invalidation/recovery, account-override rejection, malformed Canary-to-Gateway and Gateway-to-OTClient failures, complete cache-header checks, correlation IDs and JWT-like sensitive scanning.
 derived:
-  - The expiry assertion now evaluates Passport's real token clock semantics without changing product source, host time, database time or any other component process.
+  - Platform outage recovery will now be measured only after a fresh bootstrap and live HTTP readiness, eliminating the false 502 race.
 unknown:
-  - downstream ticket, Gateway, Game Session, physical OTClient, logout, replay, rotation, failure-injection and rollback results after the corrected expiry checkpoint
+  - downstream Canary outage/recovery, physical OTClient, logout, replay, rotation, malformed-response, correlation, cache, rollback and final smoke results after the corrected Platform restart checkpoint
 conflicts: []
 first_failure:
-  marker: oauth-code-expiry-simulation
-  evidence: run 30080910260 returned a successful exchange after only oauth_auth_codes.expires_at was changed; the encoded authorization-code expiry remained valid
+  marker: stale-platform-restart-readiness
+  evidence: run 30081998956 retained OAuth expiry PASS and failure-injection booleans through platform_redemption_unavailable_fail_closed, then failed because start_platform reused the previous bootstrap marker before the replacement server listened
 rejected_hypotheses:
-  - treat the successful exchange as a Passport product defect: rejected because the test changed only database metadata, not the expiry encoded in the code
-  - change the host or database clock: rejected because the rehearsal must isolate time manipulation to the Platform process under test
-  - sleep until natural expiration: rejected because it is slow and nondeterministic for CI
+  - classify the health race as a Platform availability defect: rejected because retained logs show the replacement process running migrations after the immediate failed probe
+  - add an arbitrary fixed sleep: rejected because readiness must be state-based and deterministic
+  - probe through the public proxy before it exists: rejected; the adapter uses the isolated platform_service network and backend alias
+  - change product source or product SHA: rejected because the defect belongs to rehearsal orchestration
   - disable TLS verification: rejected because TLS verification already passes and remains mandatory
-  - patch Canary binary during build without a source commit: rejected; exact source commit b15b7d54 is checked out and recorded by the artifact
 changed_paths:
   - .github/workflows/native-auth-canary-cache-build.yml
   - .github/workflows/native-auth-ephemeral-cutover-rehearsal.yml
@@ -108,15 +110,15 @@ changed_paths:
   - tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
   - tests/e2e/native_auth_ephemeral_cutover/platform_runner.py
 validation:
-  - command: Native Auth Ephemeral Cutover Rehearsal run 30080910260
+  - command: Native Auth Ephemeral Cutover Rehearsal run 30081998956
     result: FAIL
-    evidence: exact revisions, artifacts, provisioning, credential overlap, TLS, OAuth PKCE, ticket status and cache headers passed; first failure was the DB-only authorization-code expiry simulation
+    evidence: OAuth PKCE, real code expiry, tickets and the first failure-injection assertions passed; first failure was the stale-marker Platform restart readiness race
+  - command: Platform Agent Governance run 30081998951
+    result: PASS
+    evidence: active task checkpoint validation passed on the fake-time fix head
   - command: Platform CI run 30079059960
     result: PASS
     evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed for Platform b5dd6a7
-  - command: Canary harness CI run 30078674413
-    result: PASS
-    evidence: required harness CI passed for the ticket status correction
   - command: Canary source CI run 30080195391 and 30080469762
     result: PASS
     evidence: complete private issuer cache policy passed required Canary CI
@@ -125,5 +127,5 @@ validation:
     evidence: artifact 8591665710 built from b15b7d544f4795e3a2a65b88de35391b9fd0a20d and was uploaded with retained digest
 blockers:
   - none
-next_action: execute the exact-revision rehearsal with isolated Platform fake time and repair only the first concrete downstream failure.
+next_action: execute the exact-revision rehearsal with fresh Platform restart readiness and repair only the first concrete downstream failure.
 ```
