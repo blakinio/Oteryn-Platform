@@ -16,6 +16,12 @@ final class WikiContentRules
 
     private const MAX_DESCRIPTION_LENGTH = 10_000;
 
+    private const MAX_CONTENT_TYPE_LENGTH = 64;
+
+    private const MAX_CATEGORY_KEY_LENGTH = 96;
+
+    private const MAX_CHANGE_NOTE_LENGTH = 500;
+
     public static function assertSupportedLocale(string $locale): void
     {
         if (WikiLocale::tryFrom($locale) === null) {
@@ -69,19 +75,26 @@ final class WikiContentRules
 
     public static function assertContentType(string $contentType): void
     {
-        self::assertStableKey($contentType, 'Wiki content type');
+        self::assertStableKey($contentType, 'Wiki content type', self::MAX_CONTENT_TYPE_LENGTH);
     }
 
     public static function assertCategoryKey(string $key): void
     {
-        self::assertStableKey($key, 'Wiki category key');
+        self::assertStableKey($key, 'Wiki category key', self::MAX_CATEGORY_KEY_LENGTH);
     }
 
-    private static function assertStableKey(string $key, string $label): void
+    public static function assertChangeNote(?string $changeNote): void
+    {
+        if ($changeNote !== null) {
+            self::assertLength($changeNote, self::MAX_CHANGE_NOTE_LENGTH, 'Wiki change note');
+        }
+    }
+
+    private static function assertStableKey(string $key, string $label, int $maximumLength): void
     {
         if (
             $key === ''
-            || mb_strlen($key) > 96
+            || mb_strlen($key) > $maximumLength
             || preg_match('/\A[a-z0-9]+(?:[._-][a-z0-9]+)*\z/D', $key) !== 1
         ) {
             throw new InvalidArgumentException("{$label} must be a bounded lowercase stable key.");
