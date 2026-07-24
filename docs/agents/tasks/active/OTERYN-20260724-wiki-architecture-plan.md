@@ -57,11 +57,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T13:40:00Z
-head: dea5583fc98a7d877599e2920ae6b8c6eecb0890
+updated_at: 2026-07-24T16:15:00+02:00
+head: c385dec4df3eafd34329f2d3c91546807ae24c58
 branch: docs/OTERYN-20260724-wiki-architecture-plan
 pr: 142
-status: reviewing
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -82,7 +82,10 @@ proven:
   - administrator CMS mutations use bounded audit records
   - no active Wiki task or Wiki branch was found before this task began
   - PR 142 contains only four documentation and agent-governance paths
-derived:
+  - CI, production-like validation, database-outage validation and game-auth concurrency checks passed on checkpoint head c385dec4df3eafd34329f2d3c91546807ae24c58
+  - Agent Governance run 30097726167 failed only in active checkpoint validation because status reviewing is not allowed by governance contract version 1
+  - the checkpoint status is now changed to the allowed ready state
+ derived:
   - Wiki should reuse shared Identity, RBAC and Audit but own a dedicated content and revision model
   - the programme must be delivered as multiple small vertical slices rather than one large PR
 unknown:
@@ -91,11 +94,12 @@ unknown:
   - canonical editorial source language and translation freshness policy
 conflicts: []
 first_failure:
-  marker: duplicate branch creation request
-  evidence: the second create request returned Reference already exists after the branch had already been created successfully; no repository state was damaged
+  marker: Agent Governance run 30097726167 checkpoint-validation job 89495816875
+  evidence: Validate active task checkpoints failed because the task used unsupported status reviewing; the governance contract permits only investigating, implementing, validating, blocked or ready
 rejected_hypotheses:
   - extending generic managed pages alone is sufficient for Wiki categories, revisions, bilingual slugs, search and safe media
   - a separate external CMS is required for the first Wiki release
+  - the governance failure was an application or test-suite regression
 changed_paths:
   - docs/architecture/WIKI_IMPLEMENTATION_PLAN.md
   - docs/agents/prompts/OTERYN-WIKI-IMPLEMENTATION-AGENT-PROMPT.md
@@ -108,12 +112,18 @@ validation:
   - command: compare main...docs/OTERYN-20260724-wiki-architecture-plan
     result: PASS
     evidence: four documentation/governance paths changed; no application, route, migration, configuration or deployment file changed
+  - command: CI and production-like required checks on c385dec4df3eafd34329f2d3c91546807ae24c58
+    result: PASS
+    evidence: CI, Phase 7 Production-Like Validation, Platform DB Outage Validation and Game Auth Ticket Concurrency completed successfully
+  - command: Agent Governance run 30097726167
+    result: FAIL
+    evidence: checkpoint validation rejected unsupported status reviewing; this commit changes it to ready and requires a fresh exact-head run
   - command: application tests
     result: NOT_RUN
     evidence: documentation-only planning change; no application code or runtime behavior changed
 blockers:
   - none
-next_action: Review PR 142 and merge the documentation plan when governance checks pass, then start the implementation prompt in a new dedicated task branch.
+next_action: Verify the fresh Agent Governance run on the updated PR 142 head, then mark the PR ready and squash-merge it if every required check passes.
 ```
 
 ## Notes
