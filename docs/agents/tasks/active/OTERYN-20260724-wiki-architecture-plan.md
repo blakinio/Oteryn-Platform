@@ -85,7 +85,7 @@ proven:
   - CI, production-like validation, database-outage validation and game-auth concurrency checks passed on checkpoint head c385dec4df3eafd34329f2d3c91546807ae24c58
   - Agent Governance run 30097726167 failed only in active checkpoint validation because status reviewing is not allowed by governance contract version 1
   - the checkpoint status is now changed to the allowed ready state
- derived:
+derived:
   - Wiki should reuse shared Identity, RBAC and Audit but own a dedicated content and revision model
   - the programme must be delivered as multiple small vertical slices rather than one large PR
 unknown:
