@@ -22,7 +22,7 @@ env:
   GATEWAY_REF: 53158217a6c6017230301cf4daa783b04fcc13d5
   CANARY_REF: b15b7d544f4795e3a2a65b88de35391b9fd0a20d
   OTCLIENT_REF: bb87346f6c516a19d19497d82bb01fb389334ff5
-  CANARY_HARNESS_REF: 1046687e44aa2f9321cf7d71364dc076aedf08c5
+  CANARY_HARNESS_REF: f1434b2c299a07175a3c870168b7b6222b4677a7
   SOURCE_BUILD_RUN: "30047343772"
   CANARY_BUILD_RUN: "30080248772"
   GATEWAY_ARTIFACT_ID: "8579664843"
@@ -240,7 +240,7 @@ jobs:
           assert revisions["components"]["gateway"]["source_sha"] == "53158217a6c6017230301cf4daa783b04fcc13d5", revisions
           assert revisions["components"]["canary"]["source_sha"] == "b15b7d544f4795e3a2a65b88de35391b9fd0a20d", revisions
           assert revisions["components"]["otclient"]["source_sha"] == "bb87346f6c516a19d19497d82bb01fb389334ff5", revisions
-          assert revisions["components"]["canary_harness"]["source_sha"] == "1046687e44aa2f9321cf7d71364dc076aedf08c5", revisions
+          assert revisions["components"]["canary_harness"]["source_sha"] == "f1434b2c299a07175a3c870168b7b6222b4677a7", revisions
           assert digests["canary_source_build_artifact_id"] == 8591665710, digests
           assert digests["gateway_source_build_artifact_id"] == 8579664843, digests
           assert digests["otclient_source_build_artifact_id"] == 8580725327, digests
