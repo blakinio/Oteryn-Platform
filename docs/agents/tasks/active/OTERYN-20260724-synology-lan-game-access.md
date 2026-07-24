@@ -71,8 +71,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T12:08:00Z
-head: d0569423f504e02567bbcc48f0a665608fa9bc7b
+updated_at: 2026-07-24T12:12:00Z
+head: 4a5d3dc6ac9d696bcb99bff4e2154775a564e93c
 branch: feat/OTERYN-20260724-synology-lan-game-access
 pr: 138
 status: validating
@@ -150,7 +150,7 @@ validation:
     result: PASS
     evidence: deployment package validation and platform, game-gateway and deploy-runner image builds succeeded
   - command: PR 138 final exact-head validation
-    result: PENDING
+    result: NOT_RUN
     evidence: required after this checkpoint commit
 blockers: []
 next_action: Complete exact-head checks for PR 138, merge with the guarded marker, then inspect the one-shot and live Synology deployment before any cleanup.
