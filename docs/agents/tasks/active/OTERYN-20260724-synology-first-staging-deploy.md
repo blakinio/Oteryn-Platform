@@ -31,7 +31,9 @@ Perform the first guarded Oteryn staging deployment on the already registered Sy
 owned_paths:
   - .github/workflows/build-synology-staging-images.yml
   - .github/workflows/one-shot-synology-staging-deploy.yml
+  - deploy/synology/compose.yml
   - deploy/synology/scripts/deploy.sh
+  - deploy/synology/scripts/rollback.sh
   - docs/agents/tasks/active/OTERYN-20260724-synology-first-staging-deploy.md
   - docs/agents/tasks/archive/OTERYN-20260724-synology-first-staging-deploy.md
 modules:
@@ -41,7 +43,8 @@ dependencies:
   - PR 128 merged as 63a50beca857ef48e8aab04f2b4b5264684ae60f
   - online repository-scoped runner labeled oteryn-staging
   - configured synology-staging GitHub Environment variables and secrets
-blockers: []
+blockers:
+  - PR 136 must pass exact-head validation and merge before the corrected deployment can be rerun from trusted main
 cross_repository_tasks:
   - Canary image is consumed read-only from ghcr.io/blakinio/canary
 ```
@@ -50,11 +53,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T10:24:00Z
-head: 5aa66b3ef488f9bfc7dac71f8f79782e5f81cb70
-branch: fix/OTERYN-20260724-synology-deploy-runtime-evidence
-pr: 135
-status: ready
+updated_at: 2026-07-24T10:50:00Z
+head: 1112ade16c9ecf862520c926424efb8e51738dd0
+branch: fix/OTERYN-20260724-synology-canary-start
+pr: 136
+status: validating
 context_routes:
   - agent-governance
   - testing
@@ -63,7 +66,9 @@ context_routes:
 owned_paths:
   - .github/workflows/build-synology-staging-images.yml
   - .github/workflows/one-shot-synology-staging-deploy.yml
+  - deploy/synology/compose.yml
   - deploy/synology/scripts/deploy.sh
+  - deploy/synology/scripts/rollback.sh
   - docs/agents/tasks/active/OTERYN-20260724-synology-first-staging-deploy.md
   - docs/agents/tasks/archive/OTERYN-20260724-synology-first-staging-deploy.md
 proven:
@@ -72,61 +77,59 @@ proven:
   - One-shot Synology Staging Deploy run 30075876983 resolved both exact SHA-tagged images and Canary digest ghcr.io/blakinio/canary@sha256:784e5dbdcc64e311c48c51cd94aa206e2efa1e5eefb2f4ef40170d5aac55031f
   - one-shot job 89426365047 successfully dispatched Deploy Synology Staging run 30075926039 and failed only while monitoring that failed deployment
   - deploy jobs 89426521777 and 89444393576 ran on runner oteryn-synology-staging with label oteryn-staging and failed configuration validation because OTERYN_STAGING_APP_KEY was not a Laravel base64 application key
-  - after the second user correction, deploy job 89454820564 passed runner tools, GHCR login, deployment configuration validation and ephemeral environment creation
-  - deploy job 89454820564 failed in Deploy prebuilt images because MariaDB did not become ready within the script's existing 120-second polling window
-  - job 89454820564 completed ephemeral environment removal, GHCR logout and checkout cleanup successfully
-  - sanitized runner diagnostic job 89456309129 found the same MariaDB container running, healthy, exit code 0, restart count 0 and not OOM-killed after the deployment timeout
-  - MariaDB logs showed normal first initialization and eventual ready-for-connections state after the deployment polling window had already expired
-  - inspected logs masked injected secret values and sanitized evidence extraction did not reproduce secret values
-  - the temporary runtime inspection workflow was removed from PR 135 after evidence collection
-  - PR 135 exact-head Agent Governance run 30085827259 completed successfully
-  - PR 135 exact-head CI run 30085827279 completed successfully
-  - PR 135 exact-head Build Synology Staging Images run 30085827218 completed successfully, including shell syntax, Compose boundary and three local image validations
-  - PR 135 exact-head Platform DB Outage Validation run 30085827342 completed successfully
-  - PR 135 exact-head Game Auth Ticket Concurrency run 30085827216 completed successfully
-  - PR 135 exact-head Phase 7 Production-Like Validation run 30085827289 completed successfully
+  - after the second user correction, deploy job 89454820564 passed configuration and reached MariaDB startup but timed out before slow first initialization completed
+  - PR 135 merged the bounded MariaDB readiness fix to main as 7b67a0efcc519dec9d60c919c20266e90bddaf60 after exact-head validation succeeded
+  - deploy job 89459153834 checked out trusted main at 7b67a0efcc519dec9d60c919c20266e90bddaf60 and passed runner tools, GHCR login, configuration validation and ephemeral environment creation
+  - job 89459153834 passed MariaDB readiness, created all seven required Canary schema tables, provisioned Platform database access, started Platform, applied migrations and reached the health-check invocation
+  - job 89459153834 first terminated at deploy.sh line 249 because health-check.sh was invoked directly without execute permission, returning exit code 126
+  - job 89459153834 completed ephemeral environment removal, GHCR logout and checkout cleanup successfully
+  - sanitized Canary diagnostic job 89461725367 found Canary connected to MariaDB with all 59 schema tables and all seven required tables present
+  - diagnostic job 89461725367 found Canary restart count 5 and the exact runtime error that CANARY_GAME_SESSION_ISSUER_WORLD_ID must be a positive integer while the issuer is enabled
+  - the approved Canary image reference remained ghcr.io/blakinio/canary@sha256:784e5dbdcc64e311c48c51cd94aa206e2efa1e5eefb2f4ef40170d5aac55031f
+  - temporary Canary diagnostic workflows were removed from PR 136 after sanitized evidence collection
 derived:
-  - the APP_KEY configuration blocker is resolved
-  - image publication, runner connectivity, runner Docker tooling and MariaDB image viability are not the current blocker
-  - the 120-second MariaDB readiness loop is too short for first initialization on the Synology storage and produced a false deployment failure
-  - extending the bounded readiness timeout is sufficient; destructive volume reset or user action is not justified
+  - the APP_KEY and MariaDB readiness blockers are resolved
+  - the latest deployment progressed through database and Platform initialization; Synology connectivity, volumes and image availability are not the current blocker
+  - the single staging world requires an explicit positive Canary Game Session issuer world ID, for which the minimal deterministic value is 1
+  - deploy and rollback scripts must invoke health-check.sh through Bash because repository contents do not guarantee its executable bit on the runner
+  - no user action, secret rotation or destructive volume reset is required for the current fixes
 unknown:
-  - whether the full stack completes after the readiness timeout fix is merged
-  - Platform health result
-  - Gateway health readiness and version results
-  - Canary game-port probe result
+  - whether the full stack completes after PR 136 is merged
+  - Platform health endpoint result from the corrected health-check
+  - Gateway readiness and version results
+  - Canary login and game-port probe results after stable issuer startup
   - runtime host binding evidence after successful deployment
 conflicts: []
 first_failure:
-  marker: Deploy Synology Staging run 30075926039 latest attempt job 89454820564 step Deploy prebuilt images
-  evidence: MariaDB did not become ready; refusing to continue deployment
+  marker: Deploy Synology Staging run 30075926039 attempt job 89459153834 step Deploy prebuilt images
+  evidence: deploy/synology/scripts/deploy.sh line 249 could not execute health-check.sh due to permission denied and exited 126
 rejected_hypotheses:
-  - OTERYN_STAGING_APP_KEY remains malformed: configuration validation passed in job 89454820564
-  - MariaDB crashed or restart-looped: diagnostic state was running and healthy with restart count 0
-  - MariaDB was OOM-killed: diagnostic state reported oom_killed=false
-  - MariaDB data volume must be deleted: the existing container completed initialization and became healthy without destructive intervention
+  - Canary schema remained incomplete: diagnostic query returned 59 tables including all seven deployment-required tables
+  - MariaDB was still the blocker: job 89459153834 passed readiness and completed database provisioning
+  - Canary could not connect to MariaDB: Canary logs reported database connection established and migrations executed
+  - another user environment change is required: the remaining failures are both represented by repository-controlled Compose and shell invocation changes
 changed_paths:
+  - deploy/synology/compose.yml
   - deploy/synology/scripts/deploy.sh
+  - deploy/synology/scripts/rollback.sh
   - docs/agents/tasks/active/OTERYN-20260724-synology-first-staging-deploy.md
 validation:
-  - command: Deploy Synology Staging run 30075926039 latest attempt
+  - command: Deploy Synology Staging run 30075926039 attempt job 89459153834
     result: FAIL
-    evidence: job 89454820564 passed configuration and environment creation then timed out waiting for MariaDB; cleanup passed
-  - command: temporary read-only runtime evidence run 30085315640
+    evidence: deployment reached health-check invocation then failed with permission denied and exit code 126; cleanup passed
+  - command: temporary Canary diagnostic runs 30087022745 and 30087100260
     result: PASS
-    evidence: job 89456023848 extracted the exact sanitized MariaDB readiness failure
-  - command: temporary self-hosted runner diagnostic run 30085403003
-    result: PASS
-    evidence: job 89456309129 proved MariaDB eventually became healthy without restart or OOM
-  - command: PR 135 exact-head validation at 5aa66b3ef488f9bfc7dac71f8f79782e5f81cb70
-    result: PASS
-    evidence: runs 30085827259 30085827279 30085827218 30085827342 30085827216 and 30085827289 all succeeded
-blockers: []
-next_action: Merge PR 135, then rerun deploy job 89454820564 against trusted main and verify full stack health and cleanup.
+    evidence: self-hosted jobs 89461472287 and 89461725367 proved schema completeness and identified the missing positive WORLD_ID contract
+  - command: PR 136 exact-head validation
+    result: NOT_RUN
+    evidence: pending after removal of temporary diagnostic workflows and addition of Compose plus Bash invocation fixes
+blockers:
+  - validate and merge PR 136 before rerunning the trusted-main deployment
+next_action: Complete exact-head validation for PR 136, merge the Canary world ID and Bash health-check fixes, then rerun the failed deployment job and verify full health and cleanup.
 ```
 
 ## Notes
 
 The temporary dispatcher must not activate production, expose DSM or Docker remotely, change legacy authentication, or print environment secrets.
 
-The latest failed deployment created the MariaDB, Redis and TLS bootstrap services but stopped before Platform and Gateway startup. The workflow removed `deploy/synology/.env` and logged out of GHCR. No staging-health or port-exposure claim is made yet.
+The latest failed deployment left MariaDB, Redis, Canary, Platform and internal proxy or gateway containers created or running according to the reached step, while the workflow removed `deploy/synology/.env` and logged out of GHCR. No full staging-health or port-exposure claim is made yet.

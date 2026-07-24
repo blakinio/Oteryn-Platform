@@ -32,6 +32,6 @@ compose=(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE")
 "${compose[@]}" pull platform gateway canary
 "${compose[@]}" up -d canary platform internal-proxy gateway
 
-OTERYN_ENV_FILE="$ENV_FILE" "$SCRIPT_DIR/health-check.sh"
+OTERYN_ENV_FILE="$ENV_FILE" bash "$SCRIPT_DIR/health-check.sh"
 
 echo "Runtime image rollback completed. Database migrations were not reversed automatically."
