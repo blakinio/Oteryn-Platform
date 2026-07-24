@@ -21,16 +21,18 @@ env:
   PLATFORM_REF: b5dd6a7be5c704d5706241240e06f8bb8c4b5efe
   GATEWAY_REF: 53158217a6c6017230301cf4daa783b04fcc13d5
   CANARY_REF: b15b7d544f4795e3a2a65b88de35391b9fd0a20d
-  OTCLIENT_REF: bb87346f6c516a19d19497d82bb01fb389334ff5
+  OTCLIENT_REF: 9189d1063e968a0c2ffab11c5069db192e753397
   CANARY_HARNESS_REF: f1434b2c299a07175a3c870168b7b6222b4677a7
-  SOURCE_BUILD_RUN: "30047343772"
+  SOURCE_BUILD_RUN: "30087461815"
+  GATEWAY_BUILD_RUN: "30047343772"
   CANARY_BUILD_RUN: "30080248772"
   GATEWAY_ARTIFACT_ID: "8579664843"
   GATEWAY_ARTIFACT_DIGEST: sha256:56909f84aad1c7d58e8ccd52021aa6899fdcd19049c68e634e62384e76f4d142
   CANARY_ARTIFACT_ID: "8591665710"
   CANARY_ARTIFACT_DIGEST: sha256:6b0e13966047c571de2c7a3f948f0f9b54b1619800c4b591cd70adf5a7a860f1
-  OTCLIENT_ARTIFACT_ID: "8580725327"
-  OTCLIENT_ARTIFACT_DIGEST: sha256:dd0c063bd14973a4804e2a29023b7ec194fe4db4ef5ce91cf46cc4fd4456ef1e
+  OTCLIENT_ARTIFACT_ID: "8595332324"
+  OTCLIENT_ARTIFACT_DIGEST: sha256:396e0e1fed38c14f43c88cba4e578997ecbd56c2f211ee8b398c712a10c44850
+  OTCLIENT_BINARY_SHA256: 9c95ca6e3c26b387f61fcaeb99596d877c1db1bd85a8df1dac310f4a9af03c22
 
 jobs:
   rehearsal:
@@ -89,7 +91,7 @@ jobs:
           path: gateway-artifact
           github-token: ${{ github.token }}
           repository: blakinio/Oteryn-Platform
-          run-id: ${{ env.SOURCE_BUILD_RUN }}
+          run-id: ${{ env.GATEWAY_BUILD_RUN }}
 
       - name: Reuse exact Canary build artifact
         uses: actions/download-artifact@v4
@@ -100,16 +102,18 @@ jobs:
           repository: blakinio/Oteryn-Platform
           run-id: ${{ env.CANARY_BUILD_RUN }}
 
-      - name: Reuse exact OTClient build artifact
+      - name: Reuse exact fixed OTClient release artifact
         uses: actions/download-artifact@v4
         with:
-          name: native-auth-rehearsal-otclient
+          name: linux-linux-release
           path: otclient-artifact
           github-token: ${{ github.token }}
-          repository: blakinio/Oteryn-Platform
+          repository: blakinio/otclient
           run-id: ${{ env.SOURCE_BUILD_RUN }}
 
       - name: Verify all declared exact revisions and artifact payloads
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git -C platform-source rev-parse HEAD)" = "${PLATFORM_REF}"
@@ -118,14 +122,27 @@ jobs:
           test "$(git -C canary-harness rev-parse HEAD)" = "${CANARY_HARNESS_REF}"
           test "$(tr -d '\r\n' < gateway-artifact/gateway-commit.txt)" = "${GATEWAY_REF}"
           test "$(tr -d '\r\n' < canary-artifact/canary-commit.txt)" = "${CANARY_REF}"
-          test "$(tr -d '\r\n' < otclient-artifact/otclient-commit.txt)" = "${OTCLIENT_REF}"
           (cd gateway-artifact && sha256sum --check gateway-build-sha256.txt)
           (cd canary-artifact && sha256sum --check canary-build-sha256.txt)
-          (cd otclient-artifact && sha256sum --check otclient-build-sha256.txt)
+          test -f otclient-artifact/otclient
+          printf '%s  %s\n' "${OTCLIENT_BINARY_SHA256}" otclient-artifact/otclient | sha256sum --check -
+
+          metadata="$(curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/blakinio/otclient/actions/artifacts/${OTCLIENT_ARTIFACT_ID}")"
+          test "$(jq -r '.id' <<<"${metadata}")" = "${OTCLIENT_ARTIFACT_ID}"
+          test "$(jq -r '.name' <<<"${metadata}")" = "linux-linux-release"
+          test "$(jq -r '.digest' <<<"${metadata}")" = "${OTCLIENT_ARTIFACT_DIGEST}"
+          test "$(jq -r '.workflow_run.id' <<<"${metadata}")" = "${SOURCE_BUILD_RUN}"
+          test "$(jq -r '.workflow_run.head_sha' <<<"${metadata}")" = "${OTCLIENT_REF}"
+          test "$(jq -r '.expired' <<<"${metadata}")" = "false"
 
       - name: Resolve executable artifacts
         run: |
           set -euo pipefail
+          mv otclient-artifact/otclient otclient-artifact/otclient-rehearsal
           chmod +x gateway-artifact/game-gateway canary-artifact/canary-rehearsal otclient-artifact/otclient-rehearsal
           echo "REHEARSAL_GATEWAY_BIN=${GITHUB_WORKSPACE}/gateway-artifact/game-gateway" >> "${GITHUB_ENV}"
           echo "REHEARSAL_CANARY_BIN=${GITHUB_WORKSPACE}/canary-artifact/canary-rehearsal" >> "${GITHUB_ENV}"
@@ -169,6 +186,37 @@ jobs:
           set -euo pipefail
           mkdir -p "${REHEARSAL_EVIDENCE_DIR}"
           python3 tests/e2e/native_auth_ephemeral_cutover/exact_runner.py
+
+      - name: Normalize split Gateway and OTClient provenance
+        if: always()
+        env:
+          REHEARSAL_EVIDENCE_DIR: ${{ github.workspace }}/artifacts/native-auth-ephemeral-cutover
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["REHEARSAL_EVIDENCE_DIR"])
+          revisions_path = root / "runtime-revisions.json"
+          digests_path = root / "artifact-digests.json"
+
+          if revisions_path.exists():
+              revisions = json.loads(revisions_path.read_text(encoding="utf-8"))
+              build = revisions.setdefault("build", {})
+              build.pop("gateway_otclient_source_build_run", None)
+              build["gateway_source_build_run"] = os.environ["GATEWAY_BUILD_RUN"]
+              build["otclient_source_build_run"] = os.environ["SOURCE_BUILD_RUN"]
+              revisions_path.write_text(json.dumps(revisions, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+          if digests_path.exists():
+              digests = json.loads(digests_path.read_text(encoding="utf-8"))
+              digests.pop("gateway_otclient_source_build_run", None)
+              digests["gateway_source_build_run"] = int(os.environ["GATEWAY_BUILD_RUN"])
+              digests["otclient_source_build_run"] = int(os.environ["SOURCE_BUILD_RUN"])
+              digests_path.write_text(json.dumps(digests, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
 
       - name: Assert retained result classification and extended matrix
         if: success()
@@ -239,11 +287,15 @@ jobs:
           assert revisions["components"]["platform"]["source_sha"] == "b5dd6a7be5c704d5706241240e06f8bb8c4b5efe", revisions
           assert revisions["components"]["gateway"]["source_sha"] == "53158217a6c6017230301cf4daa783b04fcc13d5", revisions
           assert revisions["components"]["canary"]["source_sha"] == "b15b7d544f4795e3a2a65b88de35391b9fd0a20d", revisions
-          assert revisions["components"]["otclient"]["source_sha"] == "bb87346f6c516a19d19497d82bb01fb389334ff5", revisions
+          assert revisions["components"]["otclient"]["source_sha"] == "9189d1063e968a0c2ffab11c5069db192e753397", revisions
           assert revisions["components"]["canary_harness"]["source_sha"] == "f1434b2c299a07175a3c870168b7b6222b4677a7", revisions
+          assert revisions["build"]["gateway_source_build_run"] == "30047343772", revisions
+          assert revisions["build"]["otclient_source_build_run"] == "30087461815", revisions
           assert digests["canary_source_build_artifact_id"] == 8591665710, digests
           assert digests["gateway_source_build_artifact_id"] == 8579664843, digests
-          assert digests["otclient_source_build_artifact_id"] == 8580725327, digests
+          assert digests["otclient_source_build_artifact_id"] == 8595332324, digests
+          assert digests["gateway_source_build_run"] == 30047343772, digests
+          assert digests["otclient_source_build_run"] == 30087461815, digests
           PY
 
       - name: Upload sanitized rehearsal evidence
