@@ -18,9 +18,6 @@ use App\Http\Controllers\Identity\SessionController;
 use App\Http\Controllers\PublicGameData\PublicGameDataController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'home')->name('home');
-Route::view('/design/home-v2', 'home-preview')->name('design.home.v2');
-
 Route::get('/register', [RegistrationController::class, 'create'])
     ->middleware('guest')
     ->name('identity.register.create');
@@ -142,3 +139,13 @@ Route::get('/characters/{name}', [PublicGameDataController::class, 'character'])
 Route::get('/guilds/{name}', [PublicGameDataController::class, 'guild'])->name('game.guilds.show');
 Route::get('/online', [PublicGameDataController::class, 'online'])->name('game.online.index');
 Route::get('/servers', [PublicGameDataController::class, 'servers'])->name('game.servers.index');
+
+$moduleRouteFiles = glob(__DIR__.'/modules/*.php');
+
+if ($moduleRouteFiles !== false) {
+    sort($moduleRouteFiles, SORT_STRING);
+
+    foreach ($moduleRouteFiles as $moduleRouteFile) {
+        require $moduleRouteFile;
+    }
+}
