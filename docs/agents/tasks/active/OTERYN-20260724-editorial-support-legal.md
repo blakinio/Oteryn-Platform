@@ -24,25 +24,29 @@ Extend the existing CMS with typed editorial mappings, published-only public rou
 
 ## Acceptance criteria
 
-- [ ] All eight required public routes use stable typed keys and deterministic published, unpublished and missing behavior.
-- [ ] Draft and future-scheduled content is never exposed publicly.
-- [ ] Legal documents require and preserve version plus effective-date history.
-- [ ] Administrator mutations require `auth`, `mfa.confirmed` and exact `support.content.manage` authorization.
-- [ ] Privileged mutations create bounded audit records without page bodies, personal data or secrets.
-- [ ] Approved Discord, contact and support links are configuration-backed and reject unsafe or unapproved external URLs.
-- [ ] No stored ticket submission path, arbitrary HTML, executable upload or media upload is introduced.
+- [x] All eight required public routes use stable typed keys and deterministic published, unpublished and missing behavior.
+- [x] Draft and future-scheduled content is never exposed publicly.
+- [x] Legal documents require and preserve version plus effective-date history.
+- [x] Administrator mutations require `auth`, `mfa.confirmed` and exact `support.content.manage` authorization.
+- [x] Privileged mutations create bounded audit records without page bodies, personal data or secrets.
+- [x] Approved Discord, contact and support links are configuration-backed and reject unsafe or unapproved external URLs.
+- [x] No stored ticket submission path, arbitrary HTML, executable upload or media upload is introduced.
 - [ ] Focused tests and all required CI pass on the exact task head.
 
 ## Ownership
 
 ```yaml
 owned_paths:
+  - .env.example
   - app/Cms/Editorial/**
   - app/Cms/Models/ManagedPage.php
   - app/Cms/Models/ManagedPageLegalVersion.php
   - app/Cms/Actions/SaveManagedPage.php
   - app/Http/Controllers/Support/**
+  - app/Http/Controllers/Admin/AdminManagedPageController.php
   - app/Http/Controllers/Admin/AdminSupportContentController.php
+  - app/Http/Controllers/Cms/PublicPageController.php
+  - app/Http/Requests/Admin/AdminManagedPageRequest.php
   - app/Http/Requests/Admin/AdminSupportContentRequest.php
   - app/Support/**
   - config/support.php
@@ -72,11 +76,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T21:06:00Z
-head: UNKNOWN
+updated_at: 2026-07-24T21:26:00Z
+head: 196b4f4d56969f6f741bc876ee3a43383b8c8233
 branch: feat/OTERYN-20260724-editorial-support-legal
-pr: none
-status: implementing
+pr: 159
+status: validating
 context_routes:
   - agent-governance
   - architecture
@@ -86,12 +90,16 @@ context_routes:
   - security
   - testing
 owned_paths:
+  - .env.example
   - app/Cms/Editorial/**
   - app/Cms/Models/ManagedPage.php
   - app/Cms/Models/ManagedPageLegalVersion.php
   - app/Cms/Actions/SaveManagedPage.php
   - app/Http/Controllers/Support/**
+  - app/Http/Controllers/Admin/AdminManagedPageController.php
   - app/Http/Controllers/Admin/AdminSupportContentController.php
+  - app/Http/Controllers/Cms/PublicPageController.php
+  - app/Http/Requests/Admin/AdminManagedPageRequest.php
   - app/Http/Requests/Admin/AdminSupportContentRequest.php
   - app/Support/**
   - config/support.php
@@ -105,35 +113,69 @@ owned_paths:
 proven:
   - PR #143 is merged and provides the public website expansion plan.
   - PR #146 is merged and provides deterministic module-local route and navigation loading plus the reserved support.content.manage permission.
-  - Existing CMS managed pages provide plain-text persistence, published-only reads, confirmed-MFA administration and bounded transactional audit.
+  - Existing CMS managed pages remain the sole editorial persistence boundary; no second CMS was introduced.
   - No open PR or main-branch active task owns CMS managed-page persistence, typed editorial routes or support-content administration.
+  - Eight typed public routes resolve fixed managed-page keys and return distinct 404 missing or unpublished states without exposing draft content.
+  - Generic managed-page administration and /pages/{slug} reject all reserved editorial slugs.
+  - Published legal versions are preserved in additive immutable snapshots keyed by managed page and version.
+  - Support administration composes auth, confirmed MFA and exact support.content.manage middleware and writes bounded audit metadata.
+  - Support links are emitted only from validated configuration-backed email or HTTPS allowlisted hosts.
+  - No support POST route, ticket model, arbitrary HTML field, executable upload or media upload exists in this change.
 derived:
-  - Fixed typed mappings can reuse managed-page persistence without a second CMS or a generic public slug dependency.
-  - Legal history requires an additive Platform-owned snapshot table because mutating only current managed-page columns would lose prior published meaning.
+  - Fixed typed mappings reuse managed-page persistence while providing stable primary route contracts.
+  - Immutable legal snapshots preserve historical meaning without requiring a parallel legal CMS.
 unknown:
-  - Required CI outcome on the final task head.
+  - Required CI outcome on the complete pull-request head.
 conflicts: []
 first_failure:
   marker: local-checkout-unavailable
-  evidence: sandbox DNS could not resolve github.com; repository reads and writes continue through the GitHub connector
+  evidence: sandbox DNS could not resolve github.com; repository reads and writes continued through the GitHub connector
 rejected_hypotheses:
   - A second support CMS is necessary.
   - A stored support-ticket form is required for report-a-bug guidance.
   - Existing generic /pages/{slug} is sufficient as the launch route contract.
 changed_paths:
+  - .env.example
+  - app/Cms/Actions/SaveManagedPage.php
+  - app/Cms/Editorial/EditorialPageKey.php
+  - app/Cms/Editorial/EditorialPageQuery.php
+  - app/Cms/Editorial/EditorialPageResult.php
+  - app/Cms/Editorial/EditorialPageState.php
+  - app/Cms/Models/ManagedPage.php
+  - app/Cms/Models/ManagedPageLegalVersion.php
+  - app/Http/Controllers/Admin/AdminManagedPageController.php
+  - app/Http/Controllers/Admin/AdminSupportContentController.php
+  - app/Http/Controllers/Cms/PublicPageController.php
+  - app/Http/Controllers/Support/EditorialPageController.php
+  - app/Http/Controllers/Support/SupportPageController.php
+  - app/Http/Requests/Admin/AdminManagedPageRequest.php
+  - app/Http/Requests/Admin/AdminSupportContentRequest.php
+  - app/Support/ApprovedSupportLinks.php
+  - app/Support/PublicEditorialPage.php
+  - config/support.php
+  - database/migrations/2026_07_24_230000_add_editorial_support_legal_to_managed_pages.php
   - docs/agents/tasks/active/OTERYN-20260724-editorial-support-legal.md
+  - resources/navigation/public/support.php
+  - resources/views/admin/support-content/form.blade.php
+  - resources/views/admin/support-content/index.blade.php
+  - resources/views/support/editorial/show.blade.php
+  - routes/modules/support.php
+  - tests/Feature/Support/EditorialSupportLegalTest.php
 validation:
   - command: overlap and precondition review against main and open pull requests
     result: PASS
-    evidence: PR #143 and #146 merged; only unrelated draft PR #116 remains open
-  - command: local checkout
+    evidence: PR #143 and #146 merged; only unrelated draft PR #116 was open before task creation
+  - command: find /tmp/oteryn_impl -type f -name '*.php' -print0 | xargs -0 -n1 php -l
+    result: PASS
+    evidence: all 24 staged implementation, route, config, view and test PHP files reported no syntax errors
+  - command: local checkout and focused PHPUnit execution
     result: BLOCKED
-    evidence: sandbox DNS could not resolve github.com
+    evidence: sandbox DNS could not resolve github.com; required repository tests are delegated to exact-head GitHub CI
 blockers:
   - none
-next_action: Open the draft PR, then implement the typed CMS extension and focused regression tests.
+next_action: Reopen PR #159 and inspect required checks on the complete implementation head.
 ```
 
 ## Notes
 
-The public missing and unpublished states may differ in presentation but neither state may include draft title/body content. Legal snapshots are immutable per page/version; changing published legal meaning requires a new version.
+The public missing and unpublished states intentionally return HTTP 404 while rendering distinct safe guidance; neither state receives draft title or body data. Legal snapshots are immutable per page/version, so changing published legal meaning requires a new version. Authoritative rates, rules and legal wording are not fabricated or seeded; the administrator workflow identifies the required launch topics and publishes only reviewed content.
