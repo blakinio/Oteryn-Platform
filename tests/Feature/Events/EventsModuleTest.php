@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 use Tests\TestCase;
 
 final class EventsModuleTest extends TestCase
@@ -27,7 +28,7 @@ final class EventsModuleTest extends TestCase
     {
         Carbon::setTestNow();
         CarbonImmutable::setTestNow();
-        App::setLocale((string) config('app.locale'));
+        App::setLocale('en');
         parent::tearDown();
     }
 
@@ -311,11 +312,13 @@ final class EventsModuleTest extends TestCase
         ]);
 
         foreach ($permissions as $permission) {
-            $permissionId = DB::table('admin_permissions')->where('key', $permission)->value('id');
-            self::assertNotNull($permissionId);
+            $permissionId = $this->integerDatabaseValue(
+                DB::table('admin_permissions')->where('key', $permission)->value('id'),
+                "permission {$permission}",
+            );
             DB::table('admin_role_permissions')->insert([
                 'role_id' => $roleId,
-                'permission_id' => (int) $permissionId,
+                'permission_id' => $permissionId,
             ]);
         }
 
@@ -330,17 +333,34 @@ final class EventsModuleTest extends TestCase
      */
     private function grantPermissionsToExistingRole(Identity $identity, array $permissions): void
     {
-        $roleId = DB::table('identity_admin_roles')->where('identity_id', $identity->id)->value('role_id');
-        self::assertNotNull($roleId);
+        $roleId = $this->integerDatabaseValue(
+            DB::table('identity_admin_roles')->where('identity_id', $identity->id)->value('role_id'),
+            'administrator role',
+        );
 
         foreach ($permissions as $permission) {
-            $permissionId = DB::table('admin_permissions')->where('key', $permission)->value('id');
-            self::assertNotNull($permissionId);
+            $permissionId = $this->integerDatabaseValue(
+                DB::table('admin_permissions')->where('key', $permission)->value('id'),
+                "permission {$permission}",
+            );
             DB::table('admin_role_permissions')->insert([
-                'role_id' => (int) $roleId,
-                'permission_id' => (int) $permissionId,
+                'role_id' => $roleId,
+                'permission_id' => $permissionId,
             ]);
         }
+    }
+
+    private function integerDatabaseValue(mixed $value, string $description): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        throw new RuntimeException("Expected an integer-compatible {$description} id.");
     }
 
     private function actingAsCurrent(Identity $identity): void
