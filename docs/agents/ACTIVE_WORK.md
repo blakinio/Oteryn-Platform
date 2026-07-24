@@ -4,7 +4,7 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-None.
+- `OTERYN-20260721-e2e-scheduled-evidence` — issue #114; collect the first completed scheduled stability-repeat and public-soak runtime evidence without adding new E2E scenarios or thresholds.
 
 ## Closed acceptance and release-preparation follow-ups
 
@@ -43,9 +43,9 @@ No staging evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-No repository/staging E2E implementation task is currently active.
+Issue #114 is the active repository/staging E2E evidence task. It is intentionally blocked until the first completed scheduled public-soak run exists, after which the exact-SHA run/job/artifact metrics should be recorded without introducing thresholds.
 
-The merged stability and soak workflows should accumulate scheduled/manual evidence. Their first multi-iteration and soak baselines are intentionally pending and remain non-blocking until measured variance justifies any stronger gate.
+The first three-iteration zero-retry stability-repeat evidence should then be collected from its first completed scheduled run and classified without retry masking.
 
 Issue #91 remains the single production execution tracker. Resume it only when the exact final deployed production SHA, explicit production deployment/verification authorization and access to collect sanitized production evidence are available.
 
