@@ -107,10 +107,10 @@ jobs:
             sh -lc 'cd /var/www/html && php artisan game-auth:oauth-client:ensure --no-ansi' 2>&1)"
           oauth_client_id="$(printf '%s\n' "$oauth_output" \
             | tr -d '\r' \
-            | sed -nE 's/.*Oteryn native OAuth client id:[[:space:]]*([A-Za-z0-9._-]+).*/\1/p' \
+            | sed -nE 's/.*Oteryn native OAuth client id:[[:space:]]*([A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*).*/\1/p' \
             | tail -n 1)"
 
-          if [[ ! "$oauth_client_id" =~ ^[A-Za-z0-9._-]+$ ]]; then
+          if [[ ! "$oauth_client_id" =~ ^[A-Za-z0-9_-]+(\.[A-Za-z0-9_-]+)*$ ]]; then
             echo "Unable to read a bounded public native OAuth client id from the no-ANSI command output." >&2
             exit 1
           fi
