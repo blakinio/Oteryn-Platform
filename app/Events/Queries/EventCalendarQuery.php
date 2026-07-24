@@ -60,14 +60,23 @@ final class EventCalendarQuery
             /** @var EventRow $data */
             $data = (array) $row;
             $summary = $this->summary($data, $at);
-            $bucket = match ($summary['status']) {
-                Event::STATUS_ACTIVE => 'active',
-                Event::STATUS_SCHEDULED => 'upcoming',
-                Event::STATUS_COMPLETED => 'archived',
-                Event::STATUS_CANCELLED => 'cancelled',
-                default => throw new UnexpectedValueException('Unexpected public event state.'),
-            };
-            $calendar[$bucket][] = $summary;
+
+            switch ($summary['status']) {
+                case Event::STATUS_ACTIVE:
+                    $calendar['active'][] = $summary;
+                    break;
+                case Event::STATUS_SCHEDULED:
+                    $calendar['upcoming'][] = $summary;
+                    break;
+                case Event::STATUS_COMPLETED:
+                    $calendar['archived'][] = $summary;
+                    break;
+                case Event::STATUS_CANCELLED:
+                    $calendar['cancelled'][] = $summary;
+                    break;
+                default:
+                    throw new UnexpectedValueException('Unexpected public event state.');
+            }
         }
 
         usort($calendar['archived'], self::compareArchived(...));
