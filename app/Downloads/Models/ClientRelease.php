@@ -37,11 +37,6 @@ final class ClientRelease extends Model
         return $this->hasMany(ClientReleaseArtifact::class);
     }
 
-    public function isPublished(): bool
-    {
-        return $this->published_at !== null && $this->published_at->isPast();
-    }
-
     /**
      * @return array<string, string>
      */
