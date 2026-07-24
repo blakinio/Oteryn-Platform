@@ -46,8 +46,10 @@ def install_exact_harness_adapter() -> None:
         harness.OTCLIENT_BUILD_ARTIFACT_DIGEST = required("OTCLIENT_ARTIFACT_DIGEST")
 
         original_harness_docker = harness.docker
+        oauth_probe_ip_counter = 0
 
         def docker_with_platform_faketime_mount(*args: str, **kwargs: Any) -> Any:
+            nonlocal oauth_probe_ip_counter
             normalized = list(args)
             if normalized and normalized[0] == "create":
                 image_index = next(
@@ -59,11 +61,21 @@ def install_exact_harness_adapter() -> None:
                         "-v",
                         f"{faketime_library}:/usr/local/lib/libfaketime.so.1:ro",
                     ]
+            if normalized and normalized[0] == "run" and "/harness/oauth_probe.py" in normalized and "--ip" not in normalized:
+                oauth_probe_ip_counter += 1
+                if oauth_probe_ip_counter > 120:
+                    raise RuntimeError("OAuth probe IP allocation exceeded the reserved rehearsal range")
+                network_index = normalized.index("--network")
+                normalized[network_index + 2:network_index + 2] = [
+                    "--ip",
+                    f"10.201.0.{100 + oauth_probe_ip_counter}",
+                ]
             return original_harness_docker(*normalized, **kwargs)
 
         harness.docker = docker_with_platform_faketime_mount
         original_platform_env = harness.Rehearsal.platform_env
         original_start_platform = harness.Rehearsal.start_platform
+        original_write_nginx_config = harness.Rehearsal.write_nginx_config
 
         def platform_env_with_trusted_proxy(self: Any, previous: bool) -> list[str]:
             env = original_platform_env(self, previous)
@@ -81,6 +93,22 @@ def install_exact_harness_adapter() -> None:
                     ]
                 )
             return env
+
+        def write_nginx_config_with_forwarded_client(self: Any, name: str, upstream: str) -> Path:
+            path = original_write_nginx_config(self, name, upstream)
+            text = path.read_text(encoding="utf-8")
+            marker = "    proxy_set_header X-Forwarded-Proto https;\n"
+            if marker not in text:
+                raise harness.RehearsalError(f"proxy config {name} is missing the forwarded-proto marker")
+            path.write_text(
+                text.replace(
+                    marker,
+                    marker + "    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            return path
 
         def start_platform_with_fresh_readiness(self: Any, *, previous: bool) -> None:
             bootstrap_path = self.evidence / "platform-bootstrap.json"
@@ -136,6 +164,7 @@ def install_exact_harness_adapter() -> None:
                 secret_path.unlink(missing_ok=True)
 
         harness.Rehearsal.platform_env = platform_env_with_trusted_proxy
+        harness.Rehearsal.write_nginx_config = write_nginx_config_with_forwarded_client
         harness.Rehearsal.start_platform = start_platform_with_fresh_readiness
         harness.Rehearsal.validate_oauth_matrix = validate_oauth_matrix_with_real_expiry
         acceptance_extensions.install(harness)
