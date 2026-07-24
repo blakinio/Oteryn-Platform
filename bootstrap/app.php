@@ -28,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->replace(TrustProxies::class, TrustConfiguredProxies::class);
         $middleware->append(RequestCorrelation::class);
+        $middleware->append(PreventSensitiveGameAuthResponseCaching::class);
         $middleware->redirectGuestsTo('/login');
         $middleware->redirectUsersTo('/');
         $middleware->appendToGroup('web', EnsureIdentitySessionIsCurrent::class);
