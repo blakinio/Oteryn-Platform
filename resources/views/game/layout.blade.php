@@ -4,9 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title') · {{ config('app.name') }}</title>
+    @stack('head')
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
     <link rel="stylesheet" href="{{ asset('css/portal.css') }}">
     <link rel="stylesheet" href="{{ asset('css/brand-art.css') }}">
+    @stack('styles')
 </head>
 <body class="public-body">
 <a class="skip-link" href="#main-content">Skip to content</a>
