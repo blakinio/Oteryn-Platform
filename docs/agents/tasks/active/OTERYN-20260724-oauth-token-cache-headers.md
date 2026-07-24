@@ -22,7 +22,7 @@ Apply the complete sensitive-response cache contract to OAuth token success and 
 - [x] `/oauth/token` success and error responses are routed through the complete sensitive cache policy in implementation.
 - [x] Existing Game Login Ticket issue/redeem responses preserve the same headers in focused coverage.
 - [x] Unrelated endpoints do not inherit sensitive-response cache headers in focused coverage.
-- [ ] Focused tests and required Platform CI pass.
+- [x] Focused tests and required Platform CI pass.
 - [ ] The native-auth rehearsal verifies the headers over the real HTTPS boundary.
 
 ## Ownership
@@ -49,12 +49,12 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T10:30:00+02:00
-head: 5e31e501ebca13ef737d7b9d4de1e29700432152
+updated_at: 2026-07-24T10:40:00+02:00
+head: b5dd6a7be5c704d5706241240e06f8bb8c4b5efe
 branch: fix/OTERYN-20260724-oauth-token-cache-headers
 base_branch: main
 pr: 133
-status: validating
+status: review
 context_routes:
   - auth-identity
   - security
@@ -71,18 +71,19 @@ proven:
   - PreventSensitiveGameAuthResponseCaching centralizes the required header values for game ticket issue/redeem paths.
   - PR 133 makes that middleware conditional and global, adds /oauth/token, and preserves the exception response hook for 4xx responses.
   - Focused unit coverage checks OAuth token, ticket issue, ticket redeem and an unrelated health response.
+  - Standard CI run 30079059960 passed Composer validation, dependency audit, Pint, PHPStan and the complete PHPUnit suite on head b5dd6a7be5c704d5706241240e06f8bb8c4b5efe.
 derived:
   - OAuth token responses reuse the existing middleware contract rather than introducing a second header implementation.
 unknown:
-  - final focused and full CI result
+  - production-like runtime result over the real HTTPS OAuth boundary
 conflicts: []
 first_failure:
-  marker: checkpoint-pr-metadata
-  evidence: initial Agent Governance run 30078432409 evaluated the pre-publication checkpoint with pr none and the stacked base before PR 133 was retargeted to main
+  marker: none-in-product-ci
+  evidence: all required Platform CI stages passed after applying the retained Pint diff
 rejected_hypotheses:
   - OAuth PKCE exchange is broken: rejected because authorization_code_exchange is true and code reuse is rejected
   - ticket issuance failed: rejected because Platform log records POST /api/v1/game-auth/tickets status 200 and token-family reuse is rejected
-  - apply no-cache to every response: rejected because the middleware now checks an explicit sensitive path allowlist
+  - apply no-cache to every response: rejected because the middleware checks an explicit sensitive path allowlist
 changed_paths:
   - app/Http/Middleware/GameAuth/PreventSensitiveGameAuthResponseCaching.php
   - bootstrap/app.php
@@ -92,10 +93,10 @@ validation:
   - command: Native Auth Ephemeral Cutover Rehearsal run 30077854561
     result: FAIL
     evidence: OAuth behavior passed; cache-header assertions and obsolete ticket status expectation failed
-  - command: Agent Governance run 30078432409
-    result: FAIL
-    evidence: obsolete pre-publication task checkpoint; no product test executed
+  - command: CI run 30079059960 on b5dd6a7be5c704d5706241240e06f8bb8c4b5efe
+    result: PASS
+    evidence: Composer validation/audit, Pint, PHPStan and complete PHPUnit suite passed
 blockers:
   - none
-next_action: execute standard Platform CI for PR 133 and fix the first concrete formatter, static-analysis or test failure.
+next_action: pin the validated PR 133 revision into the full native-auth rehearsal and verify OAuth token headers over HTTPS.
 ```
