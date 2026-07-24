@@ -3,10 +3,8 @@
 namespace Tests\Feature\PublicGameData;
 
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use stdClass;
 use Tests\TestCase;
 
 class GuildIndexTest extends TestCase
@@ -94,24 +92,20 @@ class GuildIndexTest extends TestCase
         $connection->flushQueryLog();
         $connection->enableQueryLog();
 
-        $response = $this->get(route('game.guilds.index'))
+        $this->get(route('game.guilds.index'))
             ->assertOk()
-            ->assertSeeInOrder(['Guild 01', 'Guild 02'])
+            ->assertSeeInOrder([
+                'Guild 01',
+                '<td>1</td>',
+                'Guild 02',
+                '<td>0</td>',
+                'Guild 50',
+            ], false)
             ->assertDontSee('Guild 51')
             ->assertDontSee('PRIVATE-GUILD-MOTD')
             ->assertDontSee('987654321')
             ->assertDontSee('42424242')
             ->assertDontSee('Deleted Member');
-
-        $paginator = $response->viewData('guilds');
-        $this->assertInstanceOf(LengthAwarePaginator::class, $paginator);
-
-        /** @var LengthAwarePaginator<int, stdClass> $paginator */
-        $items = array_values($paginator->items());
-        $this->assertCount(50, $items);
-        $this->assertSame('Guild 01', $items[0]->name);
-        $this->assertSame(1, (int) $items[0]->active_member_count);
-        $this->assertSame('Guild 50', $items[49]->name);
 
         $this->assertLessThanOrEqual(2, count($connection->getQueryLog()));
 
