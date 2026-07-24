@@ -56,11 +56,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T15:20:00Z
-head: 4c56703f956c6212061d6f6eea3931fd2022b08a
+updated_at: 2026-07-24T15:30:00Z
+head: 5489b1967b38e543adfeaa0265738c602b3fce7c
 branch: feat/OTERYN-20260724-liquid20-synology-control
 pr: 147
-status: validating
+status: ready
 context_routes:
   - testing
   - security
@@ -76,9 +76,15 @@ proven:
   - Existing Oteryn deployment workflow uses runs-on oteryn-staging and validates Docker, Compose, curl, Python, sha256sum and timeout on the runner.
   - The user-provided Liquid20 smoke artifacts prove both exchange clocks synchronized, both collectors completed, and no trading credentials were present.
   - Freqtrade commit c00a091c5adc67cf75c46db5805e358ffc72fad7 contains the reviewed Liquid20 Dockerfile and data-only entrypoint.
-  - PR 147 contains separate bootstrap and observe jobs so only bootstrap receives packages write permission.
+  - PR 147 separates bootstrap from observation so only immutable image publication receives packages write permission.
   - The runtime script preserves any already running collector and never restarts or replaces it.
   - Upload markers are stored under data/github-uploaded rather than inside immutable run directories.
+  - Liquid20 Synology Control run 30105124681 passed exact-head workflow and shell-contract validation.
+  - CI run 30105124496 passed Composer validation, audit, formatting, static analysis and the complete test suite.
+  - Agent Governance run 30105124588 passed task checkpoint validation.
+  - Phase 7 Production-Like Validation run 30105124465 passed.
+  - Platform DB Outage Validation run 30105124555 passed.
+  - Game Auth Ticket Concurrency run 30105124564 passed.
 derived:
   - The Oteryn runner can control a sibling Liquid20 container through the host Docker daemon without granting the Liquid20 container Docker access.
   - A GHCR image plus runner workflow removes the fragile DSM inline-command deployment path.
@@ -90,25 +96,38 @@ unknown:
 conflicts: []
 first_failure:
   marker: none
-  evidence: self-hosted bootstrap has not executed because the change is still under PR validation
+  evidence: implementation merge gate passed; self-hosted bootstrap intentionally waits for merge to trusted main
 rejected_hypotheses:
   - Direct assistant access to DSM or the container: no such connection is available; visibility must be mediated through GitHub Actions.
   - Store upload marker inside the run directory: rejected because acceptance evidence must remain immutable.
+  - Give scheduled monitoring packages write permission: rejected because observation requires no package publication.
 changed_paths:
   - .github/workflows/liquid20-synology-control.yml
   - deploy/liquid20/synology-control.sh
   - deploy/liquid20/README.md
   - docs/agents/tasks/active/OTERYN-20260724-liquid20-synology-control.md
 validation:
-  - command: Liquid20 Synology Control PR workflow run 30104623644
-    result: NOT_RUN
-    evidence: queued/pending on current pre-checkpoint head
-  - command: repository required checks on PR 147
-    result: NOT_RUN
-    evidence: queued or in progress
+  - command: Liquid20 Synology Control run 30105124681
+    result: PASS
+    evidence: exact-head workflow and shell-contract validation succeeded
+  - command: CI run 30105124496
+    result: PASS
+    evidence: repository CI succeeded
+  - command: Agent Governance run 30105124588
+    result: PASS
+    evidence: active checkpoint validation succeeded
+  - command: Phase 7 Production-Like Validation run 30105124465
+    result: PASS
+    evidence: complete production-like validation succeeded
+  - command: Platform DB Outage Validation run 30105124555
+    result: PASS
+    evidence: outage and recovery validation succeeded
+  - command: Game Auth Ticket Concurrency run 30105124564
+    result: PASS
+    evidence: concurrency proof succeeded
 blockers:
   - none
-next_action: Wait for exact-head PR checks, fix any reported root cause, then merge so the path-scoped push trigger can bootstrap the Synology runner control path.
+next_action: Merge PR 147, then inspect the path-scoped bootstrap workflow on oteryn-staging and record the resulting GHCR and Synology container state.
 ```
 
 ## Notes
