@@ -1,9 +1,9 @@
 name: Wiki Pint Diagnostic
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/OTERYN-20260724-wiki-foundation
+      - main
 
 permissions:
   contents: read
