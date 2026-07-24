@@ -24,6 +24,7 @@ started_at="none"
 finished_at="none"
 runtime_image="none"
 latest_run="none"
+diagnostic_html="No failure diagnostic is available."
 
 if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
     state="$(docker container inspect --format '{{.State.Status}}' "$CONTAINER_NAME")"
@@ -31,6 +32,26 @@ if docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
     started_at="$(docker container inspect --format '{{.State.StartedAt}}' "$CONTAINER_NAME")"
     finished_at="$(docker container inspect --format '{{.State.FinishedAt}}' "$CONTAINER_NAME")"
     runtime_image="$(docker container inspect --format '{{.Config.Image}}' "$CONTAINER_NAME")"
+
+    if [[ "$state" != "running" ]]; then
+        raw_diagnostic="$(docker logs --tail 40 "$CONTAINER_NAME" 2>&1 || true)"
+        if [[ -n "$raw_diagnostic" ]]; then
+            diagnostic_html="$(
+                printf '%s' "$raw_diagnostic" | python3 -c '
+import html
+import re
+import sys
+
+pattern = re.compile(r"(?i)(authorization|api[_ -]?key|api[_ -]?secret|password|token)(\s*[:=]\s*)(\S+)")
+lines = []
+for line in sys.stdin.read().splitlines()[-40:]:
+    line = pattern.sub(r"\1\2[redacted]", line)
+    lines.append(line[:500])
+print(html.escape("\n".join(lines))[:6000])
+'
+            )"
+        fi
+    fi
 fi
 
 latest_run_value="$(
@@ -48,7 +69,7 @@ updated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 workflow_url="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID:-unknown}"
 
 body="$(cat <<EOF
-This issue is updated automatically by the trusted Synology runner. It contains no secrets and no raw liquidation event data.
+This issue is updated automatically by the trusted Synology runner. It contains no credentials and no raw liquidation event data.
 
 ## Current state
 
@@ -64,6 +85,15 @@ This issue is updated automatically by the trusted Synology runner. It contains 
 - Control step outcome: \`$CONTROL_OUTCOME\`
 - Updated at: \`$updated_at\`
 - Workflow run: $workflow_url
+
+## Bounded failure diagnostic
+
+<details><summary>Last container output (maximum 40 lines / 6000 characters)</summary>
+
+<pre>$diagnostic_html</pre>
+</details>
+
+The diagnostic is shown only when the container is not running. Recognized credential-shaped values are redacted before publication.
 
 The 24-hour acceptance result is authoritative only after the immutable run directory contains \`multi-source-acceptance-report.json\` and the report states \`"passed": true\`.
 EOF
