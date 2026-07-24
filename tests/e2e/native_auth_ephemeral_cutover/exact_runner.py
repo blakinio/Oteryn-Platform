@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,7 @@ def install_exact_harness_adapter() -> None:
 
         harness.docker = docker_with_platform_faketime_mount
         original_platform_env = harness.Rehearsal.platform_env
+        original_start_platform = harness.Rehearsal.start_platform
 
         def platform_env_with_trusted_proxy(self: Any, previous: bool) -> list[str]:
             env = original_platform_env(self, previous)
@@ -79,6 +81,27 @@ def install_exact_harness_adapter() -> None:
                     ]
                 )
             return env
+
+        def start_platform_with_fresh_readiness(self: Any, *, previous: bool) -> None:
+            bootstrap_path = self.evidence / "platform-bootstrap.json"
+            bootstrap_path.unlink(missing_ok=True)
+            original_start_platform(self, previous=previous)
+            for _ in range(90):
+                health = harness.docker(
+                    "run",
+                    "--rm",
+                    "--network",
+                    self.networks["platform_service"],
+                    "curlimages/curl:8.12.1",
+                    "curl",
+                    "-fsS",
+                    "http://platform-backend:8080/health",
+                    check=False,
+                )
+                if health.returncode == 0:
+                    return
+                time.sleep(1)
+            raise harness.RehearsalError("Platform did not become HTTP-ready after restart")
 
         def validate_oauth_matrix_with_real_expiry(self: Any) -> None:
             if self.run_oauth_probe(["matrix", "--output", "/evidence/oauth-pkce-result.json"]) != 0:
@@ -113,6 +136,7 @@ def install_exact_harness_adapter() -> None:
                 secret_path.unlink(missing_ok=True)
 
         harness.Rehearsal.platform_env = platform_env_with_trusted_proxy
+        harness.Rehearsal.start_platform = start_platform_with_fresh_readiness
         harness.Rehearsal.validate_oauth_matrix = validate_oauth_matrix_with_real_expiry
         acceptance_extensions.install(harness)
 
