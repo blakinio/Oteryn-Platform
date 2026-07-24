@@ -41,8 +41,7 @@ dependencies:
   - PR 128 merged as 63a50beca857ef48e8aab04f2b4b5264684ae60f
   - online repository-scoped runner labeled oteryn-staging
   - configured synology-staging GitHub Environment variables and secrets
-blockers:
-  - deploy script MariaDB readiness limit is shorter than the observed first initialization time on Synology; fix is pending PR 135 validation and merge
+blockers: []
 cross_repository_tasks:
   - Canary image is consumed read-only from ghcr.io/blakinio/canary
 ```
@@ -51,11 +50,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T10:20:00Z
-head: 1496f55fcb1fd1fe717c08994233fb3fe0adaf6b
+updated_at: 2026-07-24T10:24:00Z
+head: 5aa66b3ef488f9bfc7dac71f8f79782e5f81cb70
 branch: fix/OTERYN-20260724-synology-deploy-runtime-evidence
 pr: 135
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - testing
@@ -80,6 +79,12 @@ proven:
   - MariaDB logs showed normal first initialization and eventual ready-for-connections state after the deployment polling window had already expired
   - inspected logs masked injected secret values and sanitized evidence extraction did not reproduce secret values
   - the temporary runtime inspection workflow was removed from PR 135 after evidence collection
+  - PR 135 exact-head Agent Governance run 30085827259 completed successfully
+  - PR 135 exact-head CI run 30085827279 completed successfully
+  - PR 135 exact-head Build Synology Staging Images run 30085827218 completed successfully, including shell syntax, Compose boundary and three local image validations
+  - PR 135 exact-head Platform DB Outage Validation run 30085827342 completed successfully
+  - PR 135 exact-head Game Auth Ticket Concurrency run 30085827216 completed successfully
+  - PR 135 exact-head Phase 7 Production-Like Validation run 30085827289 completed successfully
 derived:
   - the APP_KEY configuration blocker is resolved
   - image publication, runner connectivity, runner Docker tooling and MariaDB image viability are not the current blocker
@@ -113,9 +118,11 @@ validation:
   - command: temporary self-hosted runner diagnostic run 30085403003
     result: PASS
     evidence: job 89456309129 proved MariaDB eventually became healthy without restart or OOM
-blockers:
-  - merge the validated readiness timeout fix from PR 135, then rerun deploy job 89454820564 against trusted main
-next_action: Complete exact-head validation for PR 135, merge the bounded MariaDB readiness fix, and rerun the failed deployment job.
+  - command: PR 135 exact-head validation at 5aa66b3ef488f9bfc7dac71f8f79782e5f81cb70
+    result: PASS
+    evidence: runs 30085827259 30085827279 30085827218 30085827342 30085827216 and 30085827289 all succeeded
+blockers: []
+next_action: Merge PR 135, then rerun deploy job 89454820564 against trusted main and verify full stack health and cleanup.
 ```
 
 ## Notes
