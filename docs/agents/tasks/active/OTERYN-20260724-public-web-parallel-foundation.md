@@ -47,8 +47,8 @@ Deliver Slice 1 from `docs/architecture/PUBLIC_WEBSITE_EXPANSION_PLAN.md`: promo
 - [x] Module route and public-navigation contributions no longer require edits to the central route/bootstrap or shared layout files.
 - [x] Planned exact permission keys are registered and persisted without role grants or wildcard authority.
 - [x] Parallel path ownership is documented in `docs/contracts/PUBLIC_PORTAL_EXTENSION_CONTRACT.md` and this checkpoint.
-- [ ] Focused tests, formatting, PHPStan, full required tests and exact-head CI pass.
-- [ ] Desktop, tablet, mobile and keyboard browser acceptance pass on the exact head.
+- [x] Focused tests, formatting, PHPStan, full required tests and exact-head CI pass.
+- [x] Desktop, tablet, mobile and keyboard browser acceptance pass on the exact head.
 
 ## Ownership
 
@@ -110,11 +110,11 @@ The following exact permission keys are reserved centrally with no role grants: 
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T15:04:30Z
-head: fcd8fd441f7624906626e28ebeb3f7e29b73caf0
+updated_at: 2026-07-24T18:08:25Z
+head: a5283593788943e0d27bc4491d09dc52922996da
 branch: feat/OTERYN-20260724-public-web-parallel-foundation
 pr: 146
-status: validating
+status: ready
 context_routes:
   - agent-governance
   - architecture
@@ -152,20 +152,19 @@ proven:
   - PR #139 supplied the approved responsive homepage visual foundation and passed its exact-head gate set before merge.
   - Existing CMS and PublicGameData boundaries provide published-only news, configured channels and TTL-bounded runtime status/counts.
   - The reservation migration creates no role-permission grants.
+  - Exact implementation head a5283593788943e0d27bc4491d09dc52922996da passed all seven required GitHub Actions workflows.
 derived:
   - Missing or expired runtime records cannot support an aggregate online count and are represented as STALE.
-  - Runtime transport/malformed-data failure cannot support offline or zero claims and is represented as UNAVAILABLE.
+  - Runtime transport or malformed-data failure cannot support offline or zero claims and is represented as UNAVAILABLE.
   - Future modules can add route and navigation files without editing the central route bootstrap or shared public layout.
-unknown:
-  - exact-head focused/full test and browser acceptance result
-  - exact-head required CI result
+unknown: []
 conflicts: []
 first_failure:
   marker: none
-  evidence: implementation complete; validation not yet inspected
+  evidence: none
 rejected_hypotheses:
   - Add placeholder Downloads, Events, Support or Wiki links before their routes exist: rejected because the shell must expose only delivered routes.
-  - Derive zero or offline from missing runtime data: rejected because PublicGameData failure semantics require explicit stale/unavailable states.
+  - Derive zero or offline from missing runtime data: rejected because PublicGameData failure semantics require explicit stale or unavailable states.
   - Grant reserved permissions to platform_admin automatically: rejected because future authority must be explicit and separately reviewed.
 changed_paths:
   - routes/web.php
@@ -199,13 +198,30 @@ changed_paths:
 validation:
   - command: implementation review against mandatory architecture, security, test and visual UX contracts
     result: PASS
-    evidence: bounded implementation uses existing CMS/PublicGameData reads, exact permission keys, route filtering and shared focus/responsive foundations
-  - command: focused and full automated validation
-    result: NOT_RUN
-    evidence: awaiting exact-head CI execution and inspection
-blockers:
-  - none
-next_action: inspect exact-head CI, fix first failures, then record final browser and gate evidence
+    evidence: bounded implementation uses existing CMS and PublicGameData reads, exact permission keys, route filtering and shared focus and responsive foundations
+  - command: CI
+    result: PASS
+    evidence: workflow run 30115488887 passed Composer validation and audit, Pint, PHPStan and the full test suite on a5283593788943e0d27bc4491d09dc52922996da
+  - command: Acceptance E2E and Visual UX
+    result: PASS
+    evidence: workflow run 30115488903 passed Chromium smoke, portability, desktop tablet mobile responsive, resilience and keyboard accessibility profiles on a5283593788943e0d27bc4491d09dc52922996da
+  - command: Phase 7 Production-Like Validation
+    result: PASS
+    evidence: workflow run 30115488683 passed production-like deployment, privilege, runtime, configuration, regression, health, restore and upgrade validation on a5283593788943e0d27bc4491d09dc52922996da
+  - command: Platform DB Outage Validation
+    result: PASS
+    evidence: workflow run 30115488708 passed on a5283593788943e0d27bc4491d09dc52922996da
+  - command: Agent Governance
+    result: PASS
+    evidence: workflow run 30115488884 passed on a5283593788943e0d27bc4491d09dc52922996da
+  - command: Game Auth Ticket Concurrency
+    result: PASS
+    evidence: workflow run 30115488842 passed on a5283593788943e0d27bc4491d09dc52922996da
+  - command: Build Synology Staging Images
+    result: PASS
+    evidence: workflow run 30115488815 passed on a5283593788943e0d27bc4491d09dc52922996da
+blockers: []
+next_action: Review and merge PR #146 after confirming its live head adds only this checkpoint after validated implementation head a5283593788943e0d27bc4491d09dc52922996da and all required checks remain green.
 ```
 
 ## Notes
