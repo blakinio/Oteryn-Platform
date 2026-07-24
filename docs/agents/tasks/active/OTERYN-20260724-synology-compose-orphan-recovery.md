@@ -94,7 +94,7 @@ validation:
     result: PASS
     evidence: user observed {"status":"ready"}
   - command: exact-head repository checks
-    result: PENDING
+    result: NOT_RUN
     evidence: PR 162 is open as draft and CI must validate the workflow/task head.
 blockers:
   - none
