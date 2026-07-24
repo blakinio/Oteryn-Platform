@@ -6,6 +6,7 @@ use App\Admin\AdminPermission;
 use App\Admin\AdminRoleManager;
 use App\Cms\Editorial\EditorialPageKey;
 use App\Cms\Models\ManagedPage;
+use App\Cms\Models\ManagedPageLegalVersion;
 use App\Identity\Models\Identity;
 use App\Identity\Sessions\WebSessionState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -162,19 +163,19 @@ final class EditorialSupportLegalTest extends TestCase
         ])->assertRedirect();
 
         $page = ManagedPage::query()->where('slug', EditorialPageKey::Terms->managedPageSlug())->firstOrFail();
+        $versionOne = ManagedPageLegalVersion::query()
+            ->where('managed_page_id', $page->id)
+            ->where('version', '1.0')
+            ->firstOrFail();
+        $versionTwo = ManagedPageLegalVersion::query()
+            ->where('managed_page_id', $page->id)
+            ->where('version', '2.0')
+            ->firstOrFail();
 
-        $this->assertDatabaseHas('managed_page_legal_versions', [
-            'managed_page_id' => $page->id,
-            'version' => '1.0',
-            'effective_date' => '2026-07-01',
-            'body' => 'Version one meaning',
-        ]);
-        $this->assertDatabaseHas('managed_page_legal_versions', [
-            'managed_page_id' => $page->id,
-            'version' => '2.0',
-            'effective_date' => '2026-08-01',
-            'body' => 'Version two meaning',
-        ]);
+        self::assertSame('2026-07-01', $versionOne->effective_date->format('Y-m-d'));
+        self::assertSame('Version one meaning', $versionOne->body);
+        self::assertSame('2026-08-01', $versionTwo->effective_date->format('Y-m-d'));
+        self::assertSame('Version two meaning', $versionTwo->body);
 
         $this->from(route('admin.support-content.edit', ['editorialPageKey' => EditorialPageKey::Terms->value]))
             ->put($route, [
