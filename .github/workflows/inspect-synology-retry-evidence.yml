@@ -1,0 +1,53 @@
+name: Inspect Synology Retry Evidence
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/inspect-synology-retry-evidence.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract sanitized retry failure
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          job_id=89444393576
+          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}" \
+            --jq '{id,name,status,conclusion,runner_name,runner_group_name,labels,steps:[.steps[]|{number,name,status,conclusion}]}'
+          gh api "repos/${GITHUB_REPOSITORY}/actions/jobs/${job_id}/logs" > /tmp/deploy-retry.log
+          python3 - <<'PY'
+          from pathlib import Path
+
+          markers = (
+              'Required synology-staging secret is missing:',
+              'must use generated hex/alphanumeric staging-safe characters.',
+              'must be a Laravel base64 application key.',
+              'must be a SHA-256 hex digest.',
+              'Optional previous service-token hashes must be empty or SHA-256 hex digests.',
+              'release_tag is not a valid bounded Docker tag.',
+              'canary_image is required for deploy and must be a bounded container image reference.',
+              'canary_image contains unsupported characters.',
+              'OTERYN_STAGING_BIND_ADDRESS must currently be an IPv4 address.',
+              'OTERYN_STAGING_STATE_DIR must be an absolute simple path.',
+              'OTERYN_STAGING_APP_URL must be a simple HTTP(S) origin.',
+          )
+          matches = []
+          for raw in Path('/tmp/deploy-retry.log').read_text(errors='replace').splitlines():
+              if '\x1b[36;1m' in raw or 'echo "' in raw:
+                  continue
+              if any(marker in raw for marker in markers):
+                  matches.append(raw)
+          if not matches:
+              raise SystemExit('No recognized sanitized configuration error found.')
+          for line in matches:
+              print(line)
+          PY
