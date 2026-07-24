@@ -54,6 +54,7 @@ final class WikiRevision extends Model
                 $revision->summary,
                 $revision->source_markdown,
             );
+            WikiContentRules::assertChangeNote($revision->change_note);
 
             $revision->created_at ??= now();
         });
