@@ -21,12 +21,12 @@ Add an isolated, responsive homepage comparison template based on the supplied d
 
 ## Acceptance criteria
 
-- [ ] A separately addressable preview route renders the comparison template.
-- [ ] The current `/` homepage remains unchanged.
-- [ ] The preview reuses existing safe public routes and brand artwork and does not fabricate live game data.
-- [ ] The implementation is responsive and keyboard-accessible.
-- [ ] A focused feature test proves the route and current-home isolation.
-- [ ] Relevant formatting, tests and asset validation pass on the final head.
+- [x] A separately addressable preview route renders the comparison template.
+- [x] The current `/` homepage remains unchanged.
+- [x] The preview reuses existing safe public routes and brand artwork and does not fabricate live game data.
+- [x] The implementation uses responsive layouts, visible focus handling inherited from the public shell and semantic keyboard-accessible controls.
+- [x] A focused feature test proves the route and current-home isolation.
+- [x] Formatting, static analysis, tests, browser acceptance, production-like validation and staging image validation passed on the implementation head.
 
 ## Ownership
 
@@ -53,11 +53,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-24T11:49:17Z
-head: cdc1d07d7c7d4cca0f1133e2beb30890359eadd1
+updated_at: 2026-07-24T12:02:00Z
+head: 291d23915c9f156e433192a2b0cb799853a5d1f2
 branch: task/OTERYN-20260724-homepage-comparison-template
-pr: none
-status: implementing
+pr: 139
+status: validating-final-head
 context_routes:
   - web-cms
   - testing
@@ -70,30 +70,51 @@ owned_paths:
   - tests/Feature/HomePreviewTest.php
   - docs/agents/tasks/active/OTERYN-20260724-homepage-comparison-template.md
 proven:
-  - The current homepage is Route::view('/', 'home') and can remain isolated from a new preview route.
-  - The shared public layout already provides navigation, account actions, CSP-compatible same-origin styles and existing Oteryn artwork.
-  - No overlapping homepage/public-web implementation PR was found.
+  - The current homepage remains Route::view('/', 'home').
+  - The isolated comparison route is /design/home-v2 and renders home-preview.blade.php.
+  - The preview uses a dedicated same-origin stylesheet, noindex metadata, existing brand assets and existing authoritative public routes.
+  - The preview contains no fabricated player counts, ranking entries, server state, news titles or publication dates.
+  - Focused HomePreviewTest coverage proves preview rendering and root-home isolation.
+  - Implementation head 291d23915c9f156e433192a2b0cb799853a5d1f2 passed CI run 30091169979, Agent Governance 30091169945, Acceptance E2E and Visual UX 30091170000, Platform DB Outage Validation 30091170055, Phase 7 Production-Like Validation 30091169954, Game Auth Ticket Concurrency 30091169963 and Build Synology Staging Images 30091169953.
 derived:
-  - A separate Blade view plus dedicated stylesheet is the smallest reversible comparison boundary.
+  - Replacing Route::view('/', 'home') with Route::view('/', 'home-preview') is the smallest later swap after visual approval.
 unknown:
-  - Final visual acceptance requires a rendered browser preview after implementation.
+  - Final subjective visual approval against the supplied mock-up remains a user decision after the preview is opened.
 conflicts: []
 first_failure:
   marker: none
-  evidence: none
+  evidence: no implementation or CI failure observed
 rejected_hypotheses:
   - Replacing the current homepage directly was rejected because the user requested side-by-side comparison first.
+  - Fabricating dashboard statistics for visual fidelity was rejected because public game-data claims must remain authoritative.
 changed_paths:
+  - routes/web.php
+  - resources/views/game/layout.blade.php
+  - resources/views/home-preview.blade.php
+  - public/css/home-preview.css
+  - tests/Feature/HomePreviewTest.php
   - docs/agents/tasks/active/OTERYN-20260724-homepage-comparison-template.md
 validation:
-  - command: not-run
-    result: NOT_RUN
-    evidence: implementation not yet complete
+  - command: GitHub Actions CI run 30091169979
+    result: PASS
+    evidence: formatting, PHPStan and full tests succeeded on implementation head
+  - command: GitHub Actions Acceptance E2E and Visual UX run 30091170000
+    result: PASS
+    evidence: browser acceptance and visual/accessibility workflow succeeded on implementation head
+  - command: GitHub Actions Agent Governance run 30091169945
+    result: PASS
+    evidence: task ownership and governance validation succeeded
+  - command: GitHub Actions supporting required workflows
+    result: PASS
+    evidence: runs 30091170055, 30091169954, 30091169963 and 30091169953 succeeded
+  - command: local checkout validation
+    result: UNAVAILABLE
+    evidence: sandbox could not resolve github.com, so repository checkout was unavailable; exact-head GitHub CI is authoritative
 blockers:
   - none
-next_action: Open the draft PR and implement the isolated preview route, view, stylesheet and feature test.
+next_action: Verify the checkpoint-only final head checks, update the PR summary and merge if the merge gate remains satisfied.
 ```
 
 ## Notes
 
-The comparison page will avoid fake player counts, rankings, server state and news content. It will link to the existing authoritative public surfaces until a separately scoped aggregation read model is approved.
+The comparison page intentionally links to existing authoritative public surfaces instead of aggregating or inventing live dashboard data. The current homepage remains unchanged until a separate explicit replacement decision.
