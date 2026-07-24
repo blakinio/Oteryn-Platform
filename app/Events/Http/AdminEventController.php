@@ -16,6 +16,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 final class AdminEventController
 {
@@ -79,7 +80,7 @@ final class AdminEventController
                 $request->integer('lock_version'),
             );
         } catch (DomainException $exception) {
-            abort(409, $exception->getMessage());
+            throw new ConflictHttpException($exception->getMessage(), $exception);
         }
 
         return redirect()
@@ -103,7 +104,7 @@ final class AdminEventController
                 $request->integer('lock_version'),
             );
         } catch (DomainException $exception) {
-            abort(409, $exception->getMessage());
+            throw new ConflictHttpException($exception->getMessage(), $exception);
         }
 
         return redirect()
