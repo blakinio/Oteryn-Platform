@@ -1,6 +1,11 @@
 name: Tibia Linux volume report
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/tibia-linux-volume-report.yml
   workflow_dispatch:
 
 permissions:
@@ -13,7 +18,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Print latest run id
+      - name: Print latest persisted report
         shell: bash
         run: |
           set -euo pipefail
@@ -21,4 +26,22 @@ jobs:
           docker run --rm \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
             alpine:3.22 \
-            sh -lc 'cat /analysis/latest-run-id'
+            sh -lc '
+              run_id="$(cat /analysis/latest-run-id)"
+              report_dir="/analysis/runs/${run_id}/report"
+              echo "run_id=${run_id}"
+              echo "===== CONTAINER EXIT ====="
+              cat "${report_dir}/container-exit-code.txt"
+              echo "===== ANALYSIS REPORT ====="
+              cat "${report_dir}/analysis-report.txt"
+              echo "===== LAUNCHER SUMMARY ====="
+              cat "${report_dir}/launcher-summary.txt"
+              echo "===== DOWNLOAD ERROR ====="
+              test ! -s "${report_dir}/download-error.log" || cat "${report_dir}/download-error.log"
+              echo "===== LAUNCHER STDERR ====="
+              test ! -f "${report_dir}/launcher-stderr.log" || tail -n 120 "${report_dir}/launcher-stderr.log"
+              echo "===== METADATA FILES ====="
+              cat "${report_dir}/metadata-files.txt"
+              echo "===== INSTALLED FILES, LARGEST ====="
+              tail -n 80 "${report_dir}/installed-files.tsv"
+            '
