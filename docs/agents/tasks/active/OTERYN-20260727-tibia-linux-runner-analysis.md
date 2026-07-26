@@ -20,12 +20,12 @@ Use the existing Synology self-hosted runner to install the official Tibia Linux
 
 ## Acceptance criteria
 
-- [ ] Workflow executes on runner label `oteryn-staging`.
+- [x] Workflow executes on runner label `oteryn-staging`.
 - [ ] Official Linux launcher is downloaded over HTTPS and run under Xvfb with an isolated HOME.
-- [ ] Downloaded and installed bytes remain only under `/var/lib/oteryn-staging-state/tibia-linux-analysis` on the Synology host.
+- [ ] Downloaded and installed bytes remain only in the dedicated Docker volume `oteryn-tibia-linux-analysis` on Synology.
 - [ ] Workflow reports whether a separate game-client ELF was installed and records hashes, ELF metadata, dynamic dependencies and selected authentication/BattlEye indicators.
-- [ ] No CipSoft binaries, archives, assets, credentials, cookies or session data are committed or uploaded as GitHub artifacts.
-- [ ] No existing Oteryn staging container, network port, database, volume or secret is touched.
+- [x] No CipSoft binaries, archives, assets, credentials, cookies or session data are committed or uploaded as GitHub artifacts.
+- [x] No existing Oteryn staging container, network port, database, volume or secret is touched.
 
 ## Ownership
 
@@ -49,11 +49,11 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-26T22:30:00Z
-head: UNKNOWN
+updated_at: 2026-07-26T22:42:00Z
+head: 2dbd537d3fc41b2d0d9bc86e7b0b89c48bb7804c
 branch: ci/OTERYN-20260727-tibia-linux-runner-analysis
-pr: none
-status: implementing
+pr: 218
+status: validating
 context_routes:
   - testing
 owned_paths:
@@ -62,30 +62,38 @@ owned_paths:
 proven:
   - The Synology runner is registered in blakinio/Oteryn-Platform.
   - Existing deployment workflow uses runs-on oteryn-staging.
-  - The runner has access to the host Docker daemon.
-  - The dedicated persistent state root is /var/lib/oteryn-staging-state/tibia-linux-analysis.
+  - Workflow run 30223479545 executed on runner oteryn-synology-staging with host Docker access.
+  - Docker reports Synology NAS on x86_64.
+  - Host path /var/lib/oteryn-staging-state does not exist on the Docker host.
+  - No proprietary binary is uploaded as a GitHub artifact by this workflow.
 derived:
-  - A Docker-isolated Xvfb run can install and inspect the Linux package without using staging application secrets.
+  - A dedicated Docker named volume avoids relying on an unknown Synology host path and remains isolated from existing staging volumes.
+  - Running the launcher from its extracted directory matches the expected relative-resource layout.
 unknown:
   - Whether the launcher automatically installs the current game client without UI interaction on Synology.
   - Exact location and filename of the installed Linux game-client ELF.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: none
+  marker: invalid mount config for type bind
+  evidence: workflow run 30223479545 job 89849940050; bind source /var/lib/oteryn-staging-state does not exist
 rejected_hypotheses:
   - The runner was initially targeted from blakinio/otclient; it is repository-scoped to blakinio/Oteryn-Platform.
+  - The deploy workflow default state path was assumed to exist physically on the Docker host; runtime evidence disproved it.
 changed_paths:
+  - .github/workflows/tibia-linux-runner-analysis.yml
   - docs/agents/tasks/active/OTERYN-20260727-tibia-linux-runner-analysis.md
 validation:
-  - command: repository and runner workflow inspection
-    result: PASS
-    evidence: .github/workflows/deploy-synology-staging.yml uses runs-on oteryn-staging
+  - command: workflow run 30223479545
+    result: FAIL
+    evidence: exact bind-source-path failure captured in job 89849940050
+  - command: workflow patched to Docker named volume
+    result: PENDING
+    evidence: head 2dbd537d3fc41b2d0d9bc86e7b0b89c48bb7804c
 blockers:
   - none
-next_action: Add and trigger the isolated one-off workflow on the Synology runner.
+next_action: Inspect the named-volume workflow run and analyze the installed Linux client or its exact launcher failure.
 ```
 
 ## Notes
 
-The workflow must remain operational-only and must not be merged with downloaded client data. Only concise text evidence may appear in GitHub logs.
+The workflow is operational-only and must not be merged with downloaded client data. Only concise text evidence may appear in GitHub logs.
