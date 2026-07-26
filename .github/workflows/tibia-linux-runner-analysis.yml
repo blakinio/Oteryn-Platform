@@ -1,12 +1,6 @@
 name: Tibia Linux package analysis
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/tibia-linux-runner-analysis.yml
-      - docs/agents/tasks/active/OTERYN-20260727-tibia-linux-runner-analysis.md
   workflow_dispatch:
 
 permissions:
