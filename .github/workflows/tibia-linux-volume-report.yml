@@ -1,19 +1,10 @@
 name: Tibia Linux volume report
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/tibia-linux-volume-report.yml
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: tibia-linux-runner-analysis
-  cancel-in-progress: true
 
 jobs:
   report:
@@ -22,35 +13,7 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Probe official download headers
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm alpine:3.22 sh -lc '
-            set -eu
-            apk add --no-cache curl >/dev/null
-            url="https://static.tibia.com/download/tibia.x64.tar.gz"
-            old_url="https://download.tibia.com/tibia.x64.tar.gz"
-            ua="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/138 Safari/537.36"
-
-            probe() {
-              label="$1"
-              shift
-              set +e
-              result="$(curl --silent --show-error --location --range 0-0 --max-filesize 1024 --max-time 30 --output /dev/null --write-out "http=%{http_code} remote=%{remote_ip} size=%{size_download}" "$@" 2>&1)"
-              rc=$?
-              set -e
-              printf "%s rc=%s %s\n" "${label}" "${rc}" "${result}"
-            }
-
-            probe plain "${url}"
-            probe browser_ua --user-agent "${ua}" "${url}"
-            probe self_referer --compressed --referer "${url}" "${url}"
-            probe website_referer --compressed --user-agent "${ua}" --referer "https://www.tibia.com/account/?subtopic=downloadclient" "${url}"
-            probe old_domain --compressed --user-agent "${ua}" --referer "https://www.tibia.com/account/?subtopic=downloadclient" "${old_url}"
-          '
-
-      - name: Print latest persisted report
+      - name: Print latest run id
         shell: bash
         run: |
           set -euo pipefail
@@ -58,19 +21,4 @@ jobs:
           docker run --rm \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
             alpine:3.22 \
-            sh -lc '
-              run_id="$(cat /analysis/latest-run-id 2>/dev/null || true)"
-              echo "run_id=${run_id}"
-              test -n "${run_id}"
-              report_dir="/analysis/runs/${run_id}/report"
-              echo "===== CONTAINER EXIT ====="
-              test ! -f "${report_dir}/container-exit-code.txt" || cat "${report_dir}/container-exit-code.txt"
-              echo "===== ANALYSIS REPORT ====="
-              test ! -f "${report_dir}/analysis-report.txt" || cat "${report_dir}/analysis-report.txt"
-              echo "===== LAUNCHER SUMMARY ====="
-              test ! -f "${report_dir}/launcher-summary.txt" || cat "${report_dir}/launcher-summary.txt"
-              echo "===== METADATA FILES ====="
-              test ! -f "${report_dir}/metadata-files.txt" || cat "${report_dir}/metadata-files.txt"
-              echo "===== DOWNLOAD ERROR ====="
-              test ! -s "${report_dir}/download-error.log" || cat "${report_dir}/download-error.log"
-            '
+            sh -lc 'cat /analysis/latest-run-id'
