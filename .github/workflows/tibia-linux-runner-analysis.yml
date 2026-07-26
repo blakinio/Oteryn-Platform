@@ -1,9 +1,6 @@
 name: Tibia Linux package analysis
 
 on:
-  push:
-    branches:
-      - ci/OTERYN-20260727-tibia-linux-runner-analysis
   pull_request:
     branches:
       - main
