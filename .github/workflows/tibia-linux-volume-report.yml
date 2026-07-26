@@ -1,11 +1,6 @@
 name: Tibia Linux volume report
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/tibia-linux-volume-report.yml
   workflow_dispatch:
 
 permissions:
@@ -18,20 +13,10 @@ jobs:
     timeout-minutes: 5
 
     steps:
-      - name: Print launcher application log
+      - name: Print latest run id
         shell: bash
         run: |
           set -euo pipefail
-          docker volume inspect oteryn-tibia-linux-analysis >/dev/null
           docker run --rm \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 \
-            sh -lc '
-              run_id="$(cat /analysis/latest-run-id)"
-              home_dir="/analysis/runs/${run_id}/home"
-              echo "run_id=${run_id}"
-              echo "===== HOME TREE ====="
-              find "${home_dir}" -maxdepth 8 -printf "%y %s %p\n" | sort
-              echo "===== TIBIA LAUNCHER LOG ====="
-              find "${home_dir}" -type f -name tibia-launcher.log -exec cat {} \;
-            '
+            alpine:3.22 cat /analysis/latest-run-id
