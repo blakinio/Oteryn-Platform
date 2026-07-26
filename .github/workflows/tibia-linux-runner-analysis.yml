@@ -33,12 +33,22 @@ jobs:
           docker version
           docker info --format 'Docker={{.ServerVersion}} Architecture={{.Architecture}} OS={{.OperatingSystem}}'
 
+      - name: Initialize dedicated NAS state path
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --mount 'type=bind,src=/var/lib/oteryn-staging-state,dst=/state' \
+            alpine:3.22 \
+            sh -lc 'mkdir -p /state/tibia-linux-analysis && chmod a+rX /state/tibia-linux-analysis'
+
       - name: Download, install and statically analyze Linux client
         shell: bash
         run: |
           set -euo pipefail
 
           readonly state_root='/var/lib/oteryn-staging-state/tibia-linux-analysis'
+          docker rm -f tibia-linux-runner-analysis >/dev/null 2>&1 || true
 
           docker run --rm \
             --name tibia-linux-runner-analysis \
@@ -199,6 +209,7 @@ jobs:
             '
 
       - name: Print text-only analysis report
+        if: always()
         shell: bash
         run: |
           set -euo pipefail
@@ -208,18 +219,21 @@ jobs:
             --mount "type=bind,src=${state_root},dst=/analysis,readonly" \
             alpine:3.22 \
             sh -lc '
+              echo "===== available report files ====="
+              find /analysis -maxdepth 4 -type f -printf "%s %p\n" 2>/dev/null | sort || true
+              echo
               echo "===== analysis-report.txt ====="
-              cat /analysis/current/report/analysis-report.txt
+              test ! -f /analysis/current/report/analysis-report.txt || cat /analysis/current/report/analysis-report.txt
               echo
               echo "===== launcher-summary.txt ====="
-              cat /analysis/current/report/launcher-summary.txt
+              test ! -f /analysis/current/report/launcher-summary.txt || cat /analysis/current/report/launcher-summary.txt
               echo
               echo "===== metadata-files.txt ====="
-              cat /analysis/current/report/metadata-files.txt || true
+              test ! -f /analysis/current/report/metadata-files.txt || cat /analysis/current/report/metadata-files.txt
               echo
               echo "===== launcher stderr tail ====="
-              tail -n 200 /analysis/current/report/launcher-stderr.log || true
+              test ! -f /analysis/current/report/launcher-stderr.log || tail -n 200 /analysis/current/report/launcher-stderr.log
               echo
               echo "===== launcher stdout tail ====="
-              tail -n 200 /analysis/current/report/launcher-stdout.log || true
+              test ! -f /analysis/current/report/launcher-stdout.log || tail -n 200 /analysis/current/report/launcher-stdout.log
             '
