@@ -1,18 +1,13 @@
 name: Tibia Linux volume report
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/tibia-linux-volume-report.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-runner-analysis
+  group: tibia-linux-volume-report
   cancel-in-progress: true
 
 jobs:
@@ -31,21 +26,9 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
             alpine:3.22 \
             sh -lc '
-              echo "===== TOP-LEVEL FILES ====="
-              find /analysis/current -maxdepth 5 -type f -printf "%s\t%p\n" 2>/dev/null | sort -n | tail -n 200 || true
+              echo "===== ANALYSIS RUNS ====="
+              find /analysis/runs -mindepth 1 -maxdepth 1 -type d -printf "%f\n" 2>/dev/null | sort || true
               echo
-              echo "===== ANALYSIS REPORT ====="
-              test ! -f /analysis/current/report/analysis-report.txt || cat /analysis/current/report/analysis-report.txt
-              echo
-              echo "===== METADATA FILES ====="
-              test ! -f /analysis/current/report/metadata-files.txt || cat /analysis/current/report/metadata-files.txt
-              echo
-              echo "===== LAUNCHER STDERR ====="
-              test ! -f /analysis/current/report/launcher-stderr.log || tail -n 300 /analysis/current/report/launcher-stderr.log
-              echo
-              echo "===== LAUNCHER STDOUT ====="
-              test ! -f /analysis/current/report/launcher-stdout.log || tail -n 300 /analysis/current/report/launcher-stdout.log
-              echo
-              echo "===== INSTALLED FILES, LARGEST ====="
-              test ! -f /analysis/current/report/installed-files.tsv || tail -n 200 /analysis/current/report/installed-files.tsv
+              echo "===== LATEST RUN ID ====="
+              test ! -f /analysis/latest-run-id || cat /analysis/latest-run-id
             '
