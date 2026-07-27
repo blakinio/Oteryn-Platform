@@ -1,4 +1,4 @@
-name: Tibia Linux anti-cheat code xrefs
+name: Tibia Linux native anti-cheat xrefs
 
 on:
   pull_request:
@@ -17,36 +17,33 @@ concurrency:
 
 jobs:
   xrefs:
-    name: Trace loader and protected-route code references
+    name: Trace route and loader references with objdump
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
-      - name: Analyze RIP-relative references
+      - name: Generate native disassembly and xrefs
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
             python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 capstone==5.0.6 >/dev/null
+          apk add --no-cache binutils coreutils grep >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
 
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          report="/analysis/client-analysis/${run_id}/report/code-xrefs.txt"
+          targets=/tmp/targets.tsv
+          disasm=/tmp/client.disasm
 
-          python3 - "${client}" > "${report}" <<'PY'
-          import collections
+          python3 - "${client}" > "${targets}" <<'PY'
           import sys
-
-          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
-          from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
           from elftools.elf.elffile import ELFFile
 
           path = sys.argv[1]
-          target_names = [
+          names = [
               "useProtectedNetworkRoute",
               "ProtectedWorldAddress",
               "UnprotectedWorldAddress",
@@ -62,100 +59,44 @@ jobs:
               "BEClient",
               "BattlEye",
           ]
-
           with open(path, "rb") as f:
               blob = f.read()
               f.seek(0)
               elf = ELFFile(f)
               sections = list(elf.iter_sections())
-              text = elf.get_section_by_name(".text")
-              if text is None:
-                  raise SystemExit("missing .text")
-              text_data = text.data()
-              text_addr = int(text["sh_addr"])
-
-              def offset_to_va(offset: int):
-                  for section in sections:
-                      start = int(section["sh_offset"])
-                      size = int(section["sh_size"])
-                      if start <= offset < start + size:
-                          return int(section["sh_addr"]) + offset - start, section.name
+              def offset_to_va(off):
+                  for sec in sections:
+                      start = int(sec["sh_offset"])
+                      size = int(sec["sh_size"])
+                      if start <= off < start + size:
+                          return int(sec["sh_addr"]) + off - start, sec.name
                   return None, None
-
-              targets = {}
-              print("===== TARGET LOCATIONS =====")
-              for name in target_names:
+              for name in names:
                   needle = name.encode() + b"\0"
-                  start = 0
-                  entries = []
+                  pos = 0
                   while True:
-                      off = blob.find(needle, start)
+                      off = blob.find(needle, pos)
                       if off < 0:
                           break
                       va, section = offset_to_va(off)
-                      entries.append((off, va, section))
                       if va is not None:
-                          targets.setdefault(va, []).append(name)
-                      start = off + 1
-                  print(f"target={name} occurrences={len(entries)}")
-                  for off, va, section in entries:
-                      print(f"  file_offset=0x{off:x} va={None if va is None else hex(va)} section={section}")
-
-              md = Cs(CS_ARCH_X86, CS_MODE_64)
-              md.detail = True
-              history = collections.deque(maxlen=10)
-              active = []
-              xref_counts = collections.Counter()
-              contexts = []
-
-              for insn in md.disasm(text_data, text_addr):
-                  rendered = f"0x{insn.address:x}: {insn.mnemonic} {insn.op_str}".rstrip()
-                  for ctx in list(active):
-                      ctx["lines"].append(rendered)
-                      ctx["remaining"] -= 1
-                      if ctx["remaining"] <= 0:
-                          contexts.append(ctx)
-                          active.remove(ctx)
-
-                  hit_names = set()
-                  for op in insn.operands:
-                      if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
-                          target = insn.address + insn.size + op.mem.disp
-                          hit_names.update(targets.get(target, []))
-                      elif op.type == X86_OP_IMM:
-                          hit_names.update(targets.get(op.imm, []))
-
-                  for name in sorted(hit_names):
-                      xref_counts[name] += 1
-                      if xref_counts[name] <= 12:
-                          active.append({
-                              "name": name,
-                              "address": insn.address,
-                              "lines": list(history) + [rendered],
-                              "remaining": 12,
-                          })
-                  history.append(rendered)
-
-              contexts.extend(active)
-              print("===== XREF COUNTS =====")
-              for name in target_names:
-                  print(f"target={name} xrefs={xref_counts[name]}")
-              print("===== XREF CONTEXTS =====")
-              for ctx in contexts:
-                  print(f"--- target={ctx['name']} xref=0x{ctx['address']:x} ---")
-                  for line in ctx["lines"]:
-                      print(line)
+                          print(f"{name}\t{va:x}\t{off:x}\t{section}")
+                      pos = off + 1
           PY
 
-          {
-            echo '===== DLOPEN / DLSYM CALL CONTEXTS ====='
-            objdump -d -M intel --no-show-raw-insn "${client}" \
-              | grep -B 16 -A 24 -E 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' \
-              | head -n 800 || true
-          } >> "${report}"
+          objdump -d -M intel --no-show-raw-insn "${client}" > "${disasm}"
+          regex="$(cut -f2 "${targets}" | paste -sd'|' -)"
 
-          echo '===== XREF SUMMARY ====='
-          sed -n '/===== XREF COUNTS =====/,/===== XREF CONTEXTS =====/p' "${report}"
-          echo '===== FIRST CONTEXTS ====='
-          sed -n '/===== XREF CONTEXTS =====/,$p' "${report}" | head -n 320
+          echo '===== TARGET ADDRESSES ====='
+          cat "${targets}"
+          echo '===== DIRECT STRING XREF CONTEXTS ====='
+          if [ -n "${regex}" ]; then
+            grep -B 14 -A 22 -E "#[[:space:]]*(${regex})([^0-9a-f]|$)" "${disasm}" | head -n 1200 || true
+          fi
+          echo '===== DLOPEN / DLSYM / DLCLOSE CALL CONTEXTS ====='
+          grep -B 16 -A 24 -E 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' "${disasm}" | head -n 1200 || true
+          echo '===== COUNTS ====='
+          printf 'target_count=%s\n' "$(wc -l < "${targets}")"
+          printf 'direct_xref_lines=%s\n' "$([ -n "${regex}" ] && grep -Ec "#[[:space:]]*(${regex})([^0-9a-f]|$)" "${disasm}" || echo 0)"
+          printf 'loader_call_count=%s\n' "$(grep -Ec 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' "${disasm}" || true)"
           SCRIPT
