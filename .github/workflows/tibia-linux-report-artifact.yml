@@ -1,4 +1,4 @@
-name: Tibia Linux persisted anti-cheat xrefs
+name: Tibia Linux focused anti-cheat xrefs
 
 on:
   pull_request:
@@ -11,50 +11,31 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-anticheat-xrefs
-  cancel-in-progress: true
-
 jobs:
-  xrefs:
-    name: Persist route and loader references
+  report:
+    name: Print focused route and loader summary
     runs-on: oteryn-staging
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
-      - name: Generate compact xref report in volume
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            alpine:3.22 sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils grep >/dev/null
-          run_id="$(cat /analysis/latest-client-analysis-run-id)"
-          client="/analysis/client-analysis/${run_id}/download/client"
-          report="/analysis/client-analysis/${run_id}/report/compact-xrefs.txt"
-          disasm=/tmp/client.disasm
-          regex='289ce17|28a1e25|28a1e3b|2887668|2887681|288762d|2887643|1d3cba3|1d3cb87|1d2f7be|1d3cbbb|28876a5|1c689bb|1d78fc0'
-          objdump -d -M intel --no-show-raw-insn "${client}" > "${disasm}"
-          {
-            echo '===== DIRECT XREF INSTRUCTIONS ====='
-            grep -E "#[[:space:]]*(${regex})([^0-9a-f]|$)" "${disasm}" || true
-            echo '===== LOADER CALL INSTRUCTIONS ====='
-            grep -E 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' "${disasm}" || true
-            echo '===== COUNTS ====='
-            printf 'direct_xref_count='
-            grep -Ec "#[[:space:]]*(${regex})([^0-9a-f]|$)" "${disasm}" || true
-            printf 'loader_call_count='
-            grep -Ec 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' "${disasm}" || true
-          } > "${report}"
-          chmod a+r "${report}"
-          SCRIPT
-
-      - name: Print persisted compact report
+      - name: Filter persisted xref report
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c 'r=$(cat /analysis/latest-client-analysis-run-id); cat "/analysis/client-analysis/$r/report/compact-xrefs.txt"'
+            alpine:3.22 sh -c '
+              r=$(cat /analysis/latest-client-analysis-run-id)
+              f="/analysis/client-analysis/$r/report/compact-xrefs.txt"
+              echo "===== ROUTE AND SERVER-FIELD XREFS ====="
+              sed -n "/===== DIRECT XREF INSTRUCTIONS =====/,/===== LOADER CALL INSTRUCTIONS =====/p" "$f" \
+                | grep -Ev "1d78fc0|^=====" || true
+              echo "===== LOADER CALLS ====="
+              sed -n "/===== LOADER CALL INSTRUCTIONS =====/,/===== COUNTS =====/p" "$f" \
+                | grep -v "^=====" || true
+              echo "===== FOCUSED COUNTS ====="
+              printf "route_server_xrefs="
+              sed -n "/===== DIRECT XREF INSTRUCTIONS =====/,/===== LOADER CALL INSTRUCTIONS =====/p" "$f" \
+                | grep -Ev "1d78fc0|^=====" | grep -c . || true
+              sed -n "/===== COUNTS =====/,$p" "$f"
+            '
