@@ -1,4 +1,4 @@
-name: Tibia Linux BattlEye loader function
+name: Tibia Linux focused loader artifact
 
 on:
   pull_request:
@@ -11,78 +11,73 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-loader-function
-  cancel-in-progress: true
-
 jobs:
-  inspect:
-    name: Disassemble and annotate BE module loader
+  export:
+    name: Export focused BE loader disassembly
     runs-on: oteryn-staging
     timeout-minutes: 7
 
     steps:
-      - name: Print loader disassembly and referenced strings
+      - name: Generate focused loader report
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
           apk add --no-cache binutils >/dev/null
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
-
-          run_id="$(cat /analysis/latest-client-analysis-run-id)"
-          client="/analysis/client-analysis/${run_id}/download/client"
-          disasm=/tmp/loader.txt
-          objdump -d -M intel --no-show-raw-insn \
-            --start-address=0x19f1700 --stop-address=0x19f1a80 \
-            "${client}" > "${disasm}"
-
-          echo '===== LOADER DISASSEMBLY ====='
-          cat "${disasm}"
-          echo '===== REFERENCED DATA / STRINGS ====='
-          python3 - "${client}" "${disasm}" <<'PY'
-          import re
-          import sys
+          r="$(cat /analysis/latest-client-analysis-run-id)"
+          c="/analysis/client-analysis/${r}/download/client"
+          o="/analysis/client-analysis/${r}/report/loader-focused.txt"
+          d=/tmp/loader.txt
+          objdump -d -M intel --no-show-raw-insn --start-address=0x19f17c0 --stop-address=0x19f1950 "$c" > "$d"
+          {
+            echo '===== DISASSEMBLY ====='
+            cat "$d"
+            echo '===== REFERENCED STRINGS ====='
+            python3 - "$c" "$d" <<'PY'
+          import re, sys
           from elftools.elf.elffile import ELFFile
-
-          binary, disasm_path = sys.argv[1:]
-          text = open(disasm_path, encoding="utf-8", errors="replace").read()
-          addresses = sorted({int(x, 16) for x in re.findall(r"#\s*([0-9a-fA-F]+)", text)})
-
-          with open(binary, "rb") as f:
-              blob = f.read()
-              f.seek(0)
-              elf = ELFFile(f)
-              sections = list(elf.iter_sections())
-
-          def va_to_offset(va):
-              for sec in sections:
-                  start = int(sec["sh_addr"])
-                  size = int(sec["sh_size"])
-                  if start <= va < start + size:
-                      return int(sec["sh_offset"]) + va - start, sec.name
+          binary, disasm = sys.argv[1:]
+          text = open(disasm, errors='replace').read()
+          vas = sorted({int(x, 16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text)})
+          with open(binary, 'rb') as f:
+              blob = f.read(); f.seek(0); elf = ELFFile(f); secs = list(elf.iter_sections())
+          def off_for(va):
+              for s in secs:
+                  a, z = int(s['sh_addr']), int(s['sh_size'])
+                  if a <= va < a + z: return int(s['sh_offset']) + va - a, s.name
               return None, None
-
-          def c_string(off, limit=256):
-              if off is None or off >= len(blob):
-                  return None
-              end = blob.find(b"\0", off, min(len(blob), off + limit))
-              if end < 0:
-                  return None
-              raw = blob[off:end]
-              if len(raw) < 2:
-                  return None
-              printable = sum(32 <= b < 127 or b in (9, 10, 13) for b in raw)
-              if printable / len(raw) < 0.85:
-                  return None
-              return raw.decode("utf-8", errors="replace")
-
-          for va in addresses:
-              off, section = va_to_offset(va)
-              value = c_string(off)
-              print(f"va=0x{va:x} section={section} file_offset={None if off is None else hex(off)} string={value!r}")
+          for va in vas:
+              off, sec = off_for(va)
+              value = None
+              if off is not None:
+                  end = blob.find(b'\0', off, min(len(blob), off + 300))
+                  if end > off:
+                      raw = blob[off:end]
+                      if raw and sum(32 <= b < 127 or b in (9,10,13) for b in raw) / len(raw) >= .85:
+                          value = raw.decode(errors='replace')
+              print(f'va=0x{va:x} section={sec} string={value!r}')
           PY
+          } > "$o"
+          chmod a+r "$o"
           SCRIPT
+
+      - name: Copy focused report
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/loader-focused.txt"
+          r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/analysis/client-analysis/$r/report/loader-focused.txt" "$out"
+
+      - name: Upload focused text report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tibia-linux-loader-focused
+          path: ${{ runner.temp }}/loader-focused.txt
+          retention-days: 1
