@@ -1,4 +1,4 @@
-name: Tibia Linux QLibrary callers
+name: Tibia Linux focused QLibrary slices
 
 on:
   pull_request:
@@ -11,51 +11,82 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-qlibrary-callers
-  cancel-in-progress: true
-
 jobs:
-  callers:
-    name: Find QLibrary method callers and BEClient xrefs
+  export:
+    name: Export focused QLibrary anti-cheat slices
     runs-on: oteryn-staging
-    timeout-minutes: 10
+    timeout-minutes: 7
 
     steps:
-      - name: Persist QLibrary caller report
+      - name: Generate annotated QLibrary slices
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            alpine:3.22 sh -s <<'SCRIPT'
+            python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils grep >/dev/null
+          apk add --no-cache binutils >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          o="/analysis/client-analysis/${r}/report/qlibrary-callers.txt"
-          d=/tmp/client.disasm
-          objdump -d -M intel --no-show-raw-insn "$c" > "$d"
-          {
-            echo '===== QLIBRARY CALLS ====='
-            grep -E 'call[[:space:]].*<(_ZN8QLibrary11setFileNameERK7QString|_ZN8QLibrary4loadEv|_ZN8QLibrary7resolveEPKc|_ZNK8QLibrary8isLoadedEv|_ZN8QLibrary6unloadEv)@plt>' "$d" || true
-            echo '===== BECLIENT DIRECT XREFS ====='
-            grep -E '#[[:space:]]*1d67997([^0-9a-f]|$)' "$d" || true
-            echo '===== BATTLEYE DIRECT XREFS ====='
-            grep -E '#[[:space:]]*(1c689bb|1d78fc0)([^0-9a-f]|$)' "$d" || true
-            echo '===== COUNTS ====='
-            printf 'qlibrary_calls='
-            grep -Ec 'call[[:space:]].*<(_ZN8QLibrary11setFileNameERK7QString|_ZN8QLibrary4loadEv|_ZN8QLibrary7resolveEPKc|_ZNK8QLibrary8isLoadedEv|_ZN8QLibrary6unloadEv)@plt>' "$d" || true
-            printf 'beclient_xrefs='
-            grep -Ec '#[[:space:]]*1d67997([^0-9a-f]|$)' "$d" || true
-          } > "$o"
-          chmod a+r "$o"
+          o="/analysis/client-analysis/${r}/report/qlibrary-slices"
+          rm -rf "$o" && mkdir -p "$o"
+
+          make_slice() {
+            name="$1"; start="$2"; stop="$3"
+            d="/tmp/${name}.txt"
+            objdump -d -M intel --no-show-raw-insn --start-address="$start" --stop-address="$stop" "$c" > "$d"
+            {
+              echo '===== DISASSEMBLY ====='
+              cat "$d"
+              echo '===== REFERENCED STRINGS ====='
+              python3 - "$c" "$d" <<'PY'
+          import re,sys
+          from elftools.elf.elffile import ELFFile
+          binary,disasm=sys.argv[1:]
+          text=open(disasm,errors='replace').read()
+          vas=sorted({int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)',text)})
+          with open(binary,'rb') as f:
+              blob=f.read();f.seek(0);elf=ELFFile(f);secs=list(elf.iter_sections())
+          def off(va):
+              for s in secs:
+                  a,z=int(s['sh_addr']),int(s['sh_size'])
+                  if a<=va<a+z:return int(s['sh_offset'])+va-a,s.name
+              return None,None
+          for va in vas:
+              p,sec=off(va);value=None
+              if p is not None:
+                  e=blob.find(b'\0',p,min(len(blob),p+300))
+                  if e>p:
+                      raw=blob[p:e]
+                      if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>=.85:
+                          value=raw.decode(errors='replace')
+              if value is not None: print(f'va=0x{va:x} section={sec} string={value!r}')
+          PY
+            } > "$o/${name}.txt"
+          }
+
+          make_slice qlibrary-resolve 0x6fb250 0x6fb3c0
+          make_slice qlibrary-load 0x6fb740 0x6fb900
+          make_slice beclient-xref 0xc946b0 0xc94880
+          chmod -R a+rX "$o"
           SCRIPT
 
-      - name: Print QLibrary caller report
+      - name: Copy focused slices
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c 'r=$(cat /analysis/latest-client-analysis-run-id); cat "/analysis/client-analysis/$r/report/qlibrary-callers.txt"'
+          out="${RUNNER_TEMP}/tibia-qlibrary-slices"
+          rm -rf "$out" && mkdir -p "$out"
+          r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/analysis/client-analysis/$r/report/qlibrary-slices/." "$out/"
+
+      - name: Upload QLibrary slices
+        uses: actions/upload-artifact@v4
+        with:
+          name: tibia-linux-qlibrary-slices
+          path: ${{ runner.temp }}/tibia-qlibrary-slices
+          retention-days: 1
