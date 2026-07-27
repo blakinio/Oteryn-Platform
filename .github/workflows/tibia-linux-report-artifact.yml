@@ -1,4 +1,4 @@
-name: Tibia Linux BattlEye loader trace
+name: Tibia Linux exact BattlEye loader strings
 
 on:
   pull_request:
@@ -12,13 +12,13 @@ permissions:
   contents: read
 
 jobs:
-  trace:
-    name: Trace BEClient loading and route selectors
+  inspect:
+    name: Print exact loader and route selectors
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 5
 
     steps:
-      - name: Inspect imports and string locations
+      - name: Read exact symbols and strings
         shell: bash
         run: |
           set -euo pipefail
@@ -26,19 +26,16 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
             alpine:3.22 sh -s <<'SCRIPT'
           set -eu
-          apk add --no-cache binutils coreutils >/dev/null
+          apk add --no-cache binutils >/dev/null
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
 
-          echo '===== UNDEFINED DYNAMIC SYMBOLS ====='
-          readelf -Ws "${client}" | grep -Ei 'UND.*(dlopen|dlsym|dlclose|dlerror|pthread|socket|connect|send|recv)' || true
-          echo '===== EXACT BE MODULE PATH STRINGS ====='
-          strings -a -t x -n 4 "${client}" | grep -Ei 'BEClient(_x64)?\.so|BattlEye/|BECLIENT_1\.0|GetVer|(^|[^A-Za-z])Init([^A-Za-z]|$)' | head -n 200 || true
-          echo '===== ROUTE / ACTIVATION STRINGS WITH OFFSETS ====='
-          strings -a -t x -n 4 "${client}" | grep -Ei 'useProtectedNetworkRoute|ProtectedWorldAddress|UnprotectedWorldAddress|externaladdressprotected|externaladdressunprotected|externalportprotected|externalportunprotected|BattlEyeInitiallyActive|BattlEyeActivationTimestamp|availableBattlEyeTypes|initially_protected|anticheatprotection' | head -n 200 || true
-          echo '===== DYNAMIC SECTION ====='
-          readelf -d "${client}" | grep -E 'NEEDED|RPATH|RUNPATH' || true
-          echo '===== FILE IDENTITY ====='
-          stat -c 'size=%s' "${client}"
-          sha256sum "${client}"
+          echo '===== LOADER IMPORTS ====='
+          readelf -Ws "${client}" | grep -E 'UND (dlopen|dlsym|dlclose)@' || true
+          echo '===== MODULE PATH / ABI STRINGS ====='
+          strings -a -t x -n 4 "${client}" | grep -Ei 'BEClient(_x64)?\.so|BattlEye/BEClient|BECLIENT_1\.0|GetVer|BEClient\.cfg' || true
+          echo '===== ROUTE SELECTORS ====='
+          strings -a -t x -n 4 "${client}" | grep -Ei 'useProtectedNetworkRoute|ProtectedWorldAddress|UnprotectedWorldAddress|externaladdressprotected|externaladdressunprotected|externalportprotected|externalportunprotected' || true
+          echo '===== ACTIVATION / SERVER FIELDS ====='
+          strings -a -t x -n 4 "${client}" | grep -Ei 'BattlEyeInitiallyActive|BattlEyeActivationTimestamp|availableBattlEyeTypes|initially_protected|anticheatprotection|battleye|clienttype|sessionkey' | head -n 120 || true
           SCRIPT
