@@ -1,4 +1,4 @@
-name: Tibia Linux gameserver login function trace
+name: Tibia Linux route branch type trace
 
 on:
   pull_request:
@@ -10,16 +10,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-gameserver-login-functions
+  group: tibia-linux-route-branch-types
   cancel-in-progress: true
 
 jobs:
   trace:
-    name: Trace gameserver login state and connection functions
+    name: Identify route branch helpers and object types
     runs-on: oteryn-staging
     timeout-minutes: 12
     steps:
-      - name: Generate focused function reports
+      - name: Generate focused helper and RTTI report
         shell: bash
         run: |
           set -euo pipefail
@@ -29,42 +29,133 @@ jobs:
           set -euo pipefail
           apk add --no-cache binutils coreutils grep >/dev/null
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
+
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/gameserver-login-functions"
+          out="/analysis/client-analysis/${run_id}/report/route-branch-types"
           rm -rf "${out}" && mkdir -p "${out}/functions"
 
           python3 - "${client}" "${out}" <<'PY'
-          import pathlib,sys
+          import pathlib, struct, sys
           from elftools.elf.elffile import ELFFile
           from elftools.dwarf.callframe import FDE
-          targets=[
-              ('onStartGameServerLoginStateEntered',0x769290),
-              ('connectClientToGameserverWithExistingCredentials',0x6edef0),
-              ('onConnectClientToGameserver',0x6fd210),
+
+          binary, out_dir = sys.argv[1:]
+          helper_targets = [
+              ('selectOrNormalizeGameserverRecord', 0x6fadb0),
+              ('sessionMetaPopulateA', 0x6b8c80),
+              ('sessionMetaPopulateB', 0x7525c0),
+              ('protectedBranchPopulate', 0x6b8cd0),
           ]
-          binary,out_dir=sys.argv[1:]
-          with open(binary,'rb') as f:
-              elf=ELFFile(f); ranges=[]
+          vptrs = [
+              0x2f609e0, 0x2f609b8, 0x30762d0,
+              0x2f60d28, 0x2f60cd8, 0x2f60d00,
+              0x2f5ef20, 0x2f60d60,
+          ]
+
+          with open(binary, 'rb') as f:
+              blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
+
+              def va_to_offset(va):
+                  for sec in sections:
+                      start = int(sec['sh_addr']); size = int(sec['sh_size'])
+                      if start <= va < start + size:
+                          return int(sec['sh_offset']) + va - start, sec.name
+                  return None, None
+
+              resolved = {}
+              for sec in sections:
+                  if sec['sh_type'] != 'SHT_RELA':
+                      continue
+                  linked = elf.get_section(sec['sh_link']) if sec['sh_link'] else None
+                  for rel in sec.iter_relocations():
+                      slot = int(rel['r_offset']); typ = int(rel['r_info_type'])
+                      addend = int(rel['r_addend']) if rel.is_RELA() else 0
+                      value = None
+                      if typ == 8:
+                          value = addend
+                      elif linked is not None and int(rel['r_info_sym']):
+                          sym = linked.get_symbol(int(rel['r_info_sym']))
+                          sym_value = int(sym['st_value'])
+                          if sym_value:
+                              value = sym_value + addend
+                      if value is not None:
+                          resolved[slot] = value
+
+              def raw_qword(va):
+                  off, _ = va_to_offset(va)
+                  if off is None or off + 8 > len(blob): return None
+                  return struct.unpack_from('<Q', blob, off)[0]
+
+              def qword(va):
+                  return resolved.get(va, raw_qword(va))
+
+              def section_of(va):
+                  return va_to_offset(va)[1]
+
+              def cstring(va, limit=500):
+                  off, sec = va_to_offset(va)
+                  if off is None: return None, sec
+                  end = blob.find(b'\0', off, min(len(blob), off + limit))
+                  if end <= off: return None, sec
+                  raw = blob[off:end]
+                  try:
+                      text = raw.decode('utf-8')
+                  except UnicodeDecodeError:
+                      return None, sec
+                  if text and sum(32 <= ord(ch) < 127 for ch in text) / len(text) < 0.9:
+                      return None, sec
+                  return text, sec
+
+              fdes = []
               try:
-                  dwarf=elf.get_dwarf_info()
-                  for e in dwarf.EH_CFI_entries():
-                      if isinstance(e,FDE):
-                          s=int(e['initial_location']); ranges.append((s,s+int(e['address_range'])))
-              except Exception: pass
-          lines=[]
-          for name,addr in targets:
-              found=None
-              for s,e in ranges:
-                  if s<=addr<e: found=(s,e); break
-              if found is None: found=(addr,addr+0x6000)
-              lines.append(f'{name}\t{addr:x}\t{found[0]:x}\t{found[1]:x}')
-          pathlib.Path(out_dir,'ranges.tsv').write_text('\n'.join(lines)+'\n')
+                  dwarf = elf.get_dwarf_info()
+                  for entry in dwarf.EH_CFI_entries():
+                      if isinstance(entry, FDE):
+                          start = int(entry['initial_location'])
+                          fdes.append((start, start + int(entry['address_range'])))
+              except Exception:
+                  pass
+
+              def function_range(address):
+                  for start, end in fdes:
+                      if start <= address < end:
+                          return start, end
+                  return address, address + 0x5000
+
+              ranges = []
+              for name, address in helper_targets:
+                  start, end = function_range(address)
+                  ranges.append((name, address, start, end))
+              pathlib.Path(out_dir, 'ranges.tsv').write_text(
+                  ''.join(f'{name}\t{address:x}\t{start:x}\t{end:x}\n' for name, address, start, end in ranges)
+              )
+
+              lines = []
+              for vptr in vptrs:
+                  lines.append(f'===== VPTR 0x{vptr:x} =====')
+                  lines.append(f'vptr_section={section_of(vptr)}')
+                  offset_to_top = qword(vptr - 16)
+                  typeinfo = qword(vptr - 8)
+                  lines.append(f'offset_to_top_raw={None if offset_to_top is None else hex(offset_to_top)}')
+                  lines.append(f'typeinfo={None if typeinfo is None else hex(typeinfo)} section={None if typeinfo is None else section_of(typeinfo)}')
+                  if typeinfo:
+                      typeinfo_vptr = qword(typeinfo)
+                      name_ptr = qword(typeinfo + 8)
+                      name, name_sec = cstring(name_ptr) if name_ptr else (None, None)
+                      lines.append(f'typeinfo_vptr={None if typeinfo_vptr is None else hex(typeinfo_vptr)} section={None if typeinfo_vptr is None else section_of(typeinfo_vptr)}')
+                      lines.append(f'typeinfo_name_ptr={None if name_ptr is None else hex(name_ptr)} section={name_sec} name={name!r}')
+                  for index in range(16):
+                      target = qword(vptr + index * 8)
+                      lines.append(f'slot={index} slot_va=0x{vptr + index*8:x} target={None if target is None else hex(target)} section={None if target is None else section_of(target)}')
+                  lines.append('')
+              pathlib.Path(out_dir, 'rtti-vtables.txt').write_text('\n'.join(lines) + '\n')
           PY
 
-          while IFS="$(printf '\t')" read -r name target start end; do
-            [ -n "${target}" ] || continue
-            max_end=$((0x${start}+0x12000)); actual_end=$((0x${end}))
+          while IFS="$(printf '\t')" read -r name address start end; do
+            [ -n "${address}" ] || continue
+            max_end=$((0x${start} + 0xc000))
+            actual_end=$((0x${end}))
             if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
             stop_hex="$(printf '0x%x' "${actual_end}")"
             objdump -d -M intel --no-show-raw-insn \
@@ -72,59 +163,67 @@ jobs:
               > "${out}/functions/${name}.txt"
           done < "${out}/ranges.tsv"
 
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0x6fdbd0 --stop-address=0x6fea20 "${client}" \
+            > "${out}/route-branch.txt"
+
           {
-            echo '===== RANGES ====='
+            echo '===== FUNCTION RANGES ====='
             cat "${out}/ranges.tsv"
+            echo '===== HELPER CALLS AND BYTE TESTS ====='
             for f in "${out}"/functions/*.txt; do
-              echo "===== $(basename "$f") CALLS ====="
-              grep -E '^[[:space:]]*[0-9a-f]+:.*(call|jmp)[[:space:]]+' "$f" || true
-              echo "===== $(basename "$f") IMPORTANT OFFSETS ====="
-              grep -E '\[[^]]+\+(0x20|0x38|0x40|0x48|0x50|0x54|0x58|0x60|0x68|0x70|0x74|0x78|0x80|0x90|0x98|0xa0|0xa8|0xb0|0xb8|0xc0|0xd0|0xe0|0xec|0x110|0x158|0x348|0x418|0x8d0|0x990|0x9a0)\]' "$f" || true
-              echo "===== $(basename "$f") KNOWN TARGET REFERENCES ====="
-              grep -E '(7e6a40|196e3d0|3075008|3076d20|3082b38|2f60120|3071aa0|3195d00|3195d80|3195d60|3195dc0|3195da0)' "$f" || true
+              echo "--- $(basename "$f") ---"
+              grep -E '(call|cmp|test|cmov|sete|setne|movzx).*' "$f" | head -n 1200 || true
             done
+            echo '===== ROUTE BRANCH KEY LINES ====='
+            grep -n -B 14 -A 30 -E '(6fe4fb|6fe7e1|rsp\+0x348|rsp\+0x349|rsp\+0x34a|r12\+0x1e8|r12\+0x1ea|2f609e0|2f609b8|2f60d28|2f60cd8|2f60d00)' "${out}/route-branch.txt" || true
           } > "${out}/focus.txt"
 
-          python3 - "${client}" "${out}"/functions/*.txt > "${out}/referenced-data.txt" <<'PY'
-          import re,sys
+          python3 - "${client}" "${out}/route-branch.txt" "${out}"/functions/*.txt > "${out}/referenced-data.txt" <<'PY'
+          import re, sys
           from elftools.elf.elffile import ELFFile
-          binary,*files=sys.argv[1:]
-          addrs=set()
-          for p in files:
-              text=open(p,encoding='utf-8',errors='replace').read()
-              addrs.update(int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)',text))
-          with open(binary,'rb') as f:
-              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
-          def v2o(v):
-              for s in secs:
-                  a=int(s['sh_addr']); z=int(s['sh_size'])
-                  if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
-              return None,None
-          for v in sorted(addrs):
-              o,s=v2o(v)
-              if o is None: continue
-              e=blob.find(b'\0',o,min(len(blob),o+500)); val=None
-              if e>o:
-                  raw=blob[o:e]
-                  if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>.9:
-                      val=raw.decode('utf-8',errors='replace')
-              print(f'va=0x{v:x} section={s} string={val!r}')
+          binary, *inputs = sys.argv[1:]
+          addresses = set()
+          for path in inputs:
+              text = open(path, encoding='utf-8', errors='replace').read()
+              addresses.update(int(x, 16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text))
+          with open(binary, 'rb') as f:
+              blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
+          def va_to_offset(va):
+              for sec in sections:
+                  start = int(sec['sh_addr']); size = int(sec['sh_size'])
+                  if start <= va < start + size:
+                      return int(sec['sh_offset']) + va - start, sec.name
+              return None, None
+          for va in sorted(addresses):
+              off, sec = va_to_offset(va)
+              if off is None: continue
+              end = blob.find(b'\0', off, min(len(blob), off + 700))
+              value = None
+              if end > off:
+                  raw = blob[off:end]
+                  if raw and sum(32 <= b < 127 or b in (9,10,13) for b in raw) / len(raw) > 0.9:
+                      value = raw.decode('utf-8', errors='replace')
+              print(f'va=0x{va:x} section={sec} string={value!r}')
           PY
+
           chmod -R a+rX "${out}"
           SCRIPT
-      - name: Copy function report
+
+      - name: Copy route branch report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-gameserver-login-functions"
+          out="${RUNNER_TEMP}/tibia-route-branch-types"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/gameserver-login-functions/." "${out}/"
-      - name: Upload function report
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/route-branch-types/." "${out}/"
+
+      - name: Upload route branch report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-gameserver-login-functions
-          path: ${{ runner.temp }}/tibia-gameserver-login-functions
+          name: tibia-linux-route-branch-types
+          path: ${{ runner.temp }}/tibia-route-branch-types
           retention-days: 1
