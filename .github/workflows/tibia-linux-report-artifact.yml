@@ -1,4 +1,4 @@
-name: Tibia Linux protected route selection
+name: Tibia Linux persisted route-selection export
 
 on:
   pull_request:
@@ -11,135 +11,28 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-protected-route-selection
-  cancel-in-progress: true
-
 jobs:
-  trace:
-    name: Trace protected route into gameserver session metadata
+  export:
+    name: Export persisted protected-route report
     runs-on: oteryn-staging
-    timeout-minutes: 12
+    timeout-minutes: 7
 
     steps:
-      - name: Generate route-selection report
+      - name: Inspect persisted report
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            python:3.12-alpine sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils coreutils grep >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
+          docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -c '
+              r=$(cat /analysis/latest-client-analysis-run-id)
+              p="/analysis/client-analysis/$r/report/protected-route-selection"
+              test -d "$p"
+              echo "run_id=$r"
+              find "$p" -maxdepth 1 -type f -printf "%f\t%s bytes\n" | sort
+            '
 
-          r="$(cat /analysis/latest-client-analysis-run-id)"
-          c="/analysis/client-analysis/${r}/download/client"
-          out="/analysis/client-analysis/${r}/report/protected-route-selection"
-          rm -rf "$out" && mkdir -p "$out"
-          d=/tmp/client.disasm
-          objdump -d -M intel --no-show-raw-insn "$c" > "$d"
-
-          python3 - "$c" > "$out/function-range.txt" <<'PY'
-          import sys
-          from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-          target=0x6fdd5e
-          with open(sys.argv[1],'rb') as f:
-              elf=ELFFile(f); dwarf=elf.get_dwarf_info(); found=False
-              for e in dwarf.EH_CFI_entries():
-                  if isinstance(e,FDE):
-                      s=int(e['initial_location']); end=s+int(e['address_range'])
-                      if s<=target<end:
-                          print(f'start=0x{s:x}\nend=0x{end:x}\nsize=0x{end-s:x}')
-                          found=True; break
-              if not found: print('start=0x6fd000\nend=0x700000\nsize=unknown')
-          PY
-
-          start="$(sed -n 's/^start=//p' "$out/function-range.txt")"
-          end="$(sed -n 's/^end=//p' "$out/function-range.txt")"
-          objdump -d -M intel --no-show-raw-insn --start-address="$start" --stop-address="$end" "$c" > "$out/session-meta-builder.txt"
-
-          {
-            echo '===== FUNCTION RANGE ====='
-            cat "$out/function-range.txt"
-            echo '===== DIRECT CALLERS ====='
-            s_no="${start#0x}"
-            grep -B 30 -A 50 -E "call[[:space:]]+${s_no}([[:space:]]|<)" "$d" || true
-            echo '===== ROUTE GLOBAL REFERENCES ====='
-            for a in 31e87c0 318d3d0 318d3f0 3195d00 3195d80 3195d60 3195dc0 3195da0; do
-              echo "--- 0x${a} ---"
-              grep -E "#[[:space:]]*${a}([^0-9a-f]|$)" "$out/session-meta-builder.txt" || true
-            done
-            echo '===== WORLD-RECORD OFFSET ACCESSES ====='
-            grep -E '\[[^]]+\+(0x20|0x28|0x30|0x38|0x40|0x48|0x50|0x54|0x58|0x60|0x68|0x70|0x74|0x78|0x80|0x98|0xb0)\]' "$out/session-meta-builder.txt" || true
-            echo '===== CONTROL FLOW AROUND BOOL/BYTE TESTS ====='
-            grep -B 12 -A 18 -E '(cmp|test)[[:space:]].*(BYTE PTR|0x74|0x110|0x6a)' "$out/session-meta-builder.txt" | head -n 3000 || true
-          } > "$out/route-selection-index.txt"
-
-          python3 - "$c" "$out/session-meta-builder.txt" > "$out/session-meta-referenced-data.txt" <<'PY'
-          import re,sys
-          from elftools.elf.elffile import ELFFile
-          binary,disasm=sys.argv[1:]
-          text=open(disasm,encoding='utf-8',errors='replace').read()
-          addrs=sorted({int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)',text)})
-          with open(binary,'rb') as f:
-              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
-          def v2o(v):
-              for s in secs:
-                  a=int(s['sh_addr']); z=int(s['sh_size'])
-                  if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
-              return None,None
-          for v in addrs:
-              o,s=v2o(v)
-              if o is None:continue
-              end=blob.find(b'\0',o,min(len(blob),o+400)); val=None
-              if end>o:
-                  raw=blob[o:end]
-                  if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>0.9:
-                      val=raw.decode('utf-8',errors='replace')
-              print(f'va=0x{v:x} section={s} string={val!r}')
-          PY
-
-          # Locate Qt staticMetaObjects by pointers to the binary metadata blocks
-          # immediately preceding the printable string tables.
-          python3 - "$c" > "$out/qt-metaobject-candidates.txt" <<'PY'
-          import struct,sys
-          from elftools.elf.elffile import ELFFile
-          ranges=[(0x1c89200,0x1c89960,'TAuthenticationProcessController'),(0x1c91700,0x1c91f4c,'TGameClient')]
-          with open(sys.argv[1],'rb') as f:
-              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
-          def o2v(o):
-              for s in secs:
-                  a=int(s['sh_offset']);z=int(s['sh_size'])
-                  if a<=o<a+z:return int(s['sh_addr'])+o-a,s.name
-              return None,None
-          def v2o(v):
-              for s in secs:
-                  a=int(s['sh_addr']);z=int(s['sh_size'])
-                  if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
-              return None,None
-          for lo,hi,label in ranges:
-              print(f'===== {label} pointer candidates =====')
-              for sec in secs:
-                  if sec.name not in ('.data.rel.ro','.data'):continue
-                  data=sec.data(); base=int(sec['sh_addr'])
-                  for i in range(0,len(data)-8,8):
-                      val=struct.unpack_from('<Q',data,i)[0]
-                      if lo<=val<hi:
-                          slot=base+i
-                          print(f'slot=0x{slot:x} value=0x{val:x} section={sec.name}')
-                          for delta in range(-16,49,8):
-                              va=slot+delta; off,sn=v2o(va)
-                              if off is None:continue
-                              q=struct.unpack_from('<Q',blob,off)[0]; _,qs=v2o(q)
-                              print(f'  at{delta:+#x}=0x{q:x} target_section={qs}')
-          PY
-
-          chmod -R a+rX "$out"
-          SCRIPT
-
-      - name: Copy route-selection report
+      - name: Copy persisted report
         shell: bash
         run: |
           set -euo pipefail
@@ -150,7 +43,7 @@ jobs:
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
           docker cp "$cid:/analysis/client-analysis/$r/report/protected-route-selection/." "$out/"
 
-      - name: Upload route-selection report
+      - name: Upload persisted report
         uses: actions/upload-artifact@v4
         with:
           name: tibia-linux-protected-route-selection
