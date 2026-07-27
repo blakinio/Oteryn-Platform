@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
           apk add --no-cache binutils >/dev/null
