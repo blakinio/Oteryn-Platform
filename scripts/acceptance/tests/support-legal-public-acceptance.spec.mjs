@@ -46,12 +46,12 @@ test('@portal-support-legal every typed route proves missing, unpublished, publi
 
   let response = await page.goto('/en/support');
   expect(response?.status()).toBe(200);
-  await expect(page.getByText('This content has not been created yet.')).toBeVisible();
+  await expect(page.getByText('This editorial page has not been configured.')).toBeVisible();
 
   supportFixture('seed-page', 'support', 'unpublished');
   response = await page.goto('/en/support');
   expect(response?.status()).toBe(200);
-  await expect(page.getByText('This content is not published.')).toBeVisible();
+  await expect(page.getByText('This editorial page is not currently published.')).toBeVisible();
   await expect(page.getByText('Acceptance Support')).toHaveCount(0);
 
   const fixture = supportFixture('seed-public');
@@ -80,13 +80,17 @@ test('@portal-support-legal every typed route proves missing, unpublished, publi
 
   await page.goto('/en/support');
   await expect(page.getByRole('heading', { name: 'Approved support channels' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open' }).filter({ has: page.locator('xpath=ancestor::article[.//h3[contains(., "Join the official Discord")]]') })).toHaveAttribute('href', 'https://discord.gg/oteryn-acceptance');
-  await expect(page.getByRole('link', { name: 'Open' }).filter({ has: page.locator('xpath=ancestor::article[.//h3[contains(., "Contact support")]]') })).toHaveAttribute('href', 'mailto:support@example.test');
-  await expect(page.getByRole('link', { name: 'Open' }).filter({ has: page.locator('xpath=ancestor::article[.//h3[contains(., "Open the approved support service")]]') })).toHaveAttribute('href', 'https://support.example.test/help');
+  const discordCard = page.locator('article.card').filter({ hasText: 'Join the official Discord' });
+  const emailCard = page.locator('article.card').filter({ hasText: 'Contact support' });
+  const serviceCard = page.locator('article.card').filter({ hasText: 'Open the approved support service' });
+  await expect(discordCard.getByRole('link', { name: 'Open' })).toHaveAttribute('href', 'https://discord.gg/oteryn-acceptance');
+  await expect(emailCard.getByRole('link', { name: 'Open' })).toHaveAttribute('href', 'mailto:support@example.test');
+  await expect(serviceCard.getByRole('link', { name: 'Open' })).toHaveAttribute('href', 'https://support.example.test/help');
 
   await page.goto('/en/support/report-a-bug');
   await expect(page.locator('form')).toHaveCount(0);
-  await expect(page.locator('main')).toContainText('Do not include passwords, recovery codes, MFA secrets or other credentials');
+  await expect(page.locator('main')).toContainText('Do not submit passwords, MFA secrets, recovery codes, payment details or other unnecessary personal data.');
+  await expect(page.locator('main')).toContainText('Oteryn Platform does not store a support ticket submission here.');
 
   await assertAccessibilitySmoke(page);
   await assertNoPageOverflow(page);
