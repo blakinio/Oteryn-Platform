@@ -1,4 +1,4 @@
-name: Tibia Linux playdata to gameserver flow
+name: Tibia Linux Qt gameserver login mapping
 
 on:
   pull_request:
@@ -12,17 +12,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-playdata-gameserver-flow
+  group: tibia-linux-qt-gameserver-login
   cancel-in-progress: true
 
 jobs:
   trace:
-    name: Trace playdata model into gameserver connection
+    name: Map Qt login slots and gameserver session metadata
     runs-on: oteryn-staging
     timeout-minutes: 12
 
     steps:
-      - name: Generate playdata and gameserver report
+      - name: Generate Qt and session metadata report
         shell: bash
         run: |
           set -euo pipefail
@@ -35,148 +35,174 @@ jobs:
 
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          out="/analysis/client-analysis/${r}/report/playdata-gameserver-flow"
+          out="/analysis/client-analysis/${r}/report/qt-gameserver-login"
           rm -rf "$out" && mkdir -p "$out"
           d=/tmp/client.disasm
           objdump -d -M intel --no-show-raw-insn "$c" > "$d"
 
-          objdump -d -M intel --no-show-raw-insn \
-            --start-address=0xabff80 --stop-address=0xac0c80 "$c" \
-            > "$out/auth-caller-ac0000.txt"
-          objdump -d -M intel --no-show-raw-insn \
-            --start-address=0x196e200 --stop-address=0x196e980 "$c" \
-            > "$out/tcp-constructors-196e.txt"
-
-          {
-            echo '===== PLAYDATA KEY GLOBAL XREFS ====='
-            for a in 3195aa0 3195ac0 3195ae0; do
-              echo "--- global 0x${a} ---"
-              grep -B 12 -A 18 -E "#[[:space:]]*${a}([^0-9a-f]|$)" "$d" || true
-            done
-            echo '===== AUTH CALLER DIRECT CALLEES ====='
-            grep -E 'call[[:space:]]+[0-9a-f]+([[:space:]]|<)' "$out/auth-caller-ac0000.txt" || true
-            echo '===== AUTH CALLER MODEL OFFSETS ====='
-            grep -E '\[[^]]+\+(0x70|0x78|0x80|0x88|0x90|0x98|0xa0|0xa8|0xb0|0xb8|0xc0|0xc8|0xd0|0x178)\]' "$out/auth-caller-ac0000.txt" || true
-          } > "$out/playdata-index.txt"
-
-          python3 - "$c" "$out/auth-caller-ac0000.txt" "$out/tcp-constructors-196e.txt" > "$out/annotated-referenced-data.txt" <<'PY'
-          import re, sys
+          python3 - "$c" "$out" <<'PY'
+          import pathlib, struct, sys
           from elftools.elf.elffile import ELFFile
-          binary, *inputs = sys.argv[1:]
-          addresses = set()
-          for p in inputs:
-              text = open(p, encoding='utf-8', errors='replace').read()
-              addresses.update(int(x, 16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text))
-          with open(binary, 'rb') as f:
-              blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
-          def va_to_offset(va):
-              for sec in sections:
-                  start=int(sec['sh_addr']); size=int(sec['sh_size'])
-                  if start <= va < start+size:
-                      return int(sec['sh_offset'])+va-start, sec.name
-              return None, None
-          for va in sorted(addresses):
-              off, sec = va_to_offset(va)
-              if off is None: continue
-              end=blob.find(b'\0', off, min(len(blob), off+320)); value=None
-              if end>off:
-                  raw=blob[off:end]
-                  if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>0.88:
-                      value=raw.decode('utf-8', errors='replace')
-              print(f'va=0x{va:x} section={sec} string={value!r}')
-          PY
 
-          cat > /tmp/named-strings.tsv <<'EOF'
-          1c89a30 requestCharacterGameserverLogin
-          1c89d7a onStartGameServerLoginStateEntered
-          1c9211b connectClientToGameserverWithExistingCredentials
-          1c9229f onConnectClientToGameserver
-          1c922bb onAbortConnectClientToGameserver
-          1ca9fa0 TGameserverTCPConnection_RTTI_name
-          1ca9fe0 TGameserverNetworkPacketConnection_RTTI_name
-          1c98b80 TGameserverGameSession_RTTI_name
-          EOF
-          {
-            echo '===== NAMED STRING XREFS ====='
-            while read -r a n; do
-              echo "--- ${n} @ 0x${a} ---"
-              grep -B 20 -A 30 -E "#[[:space:]]*${a}([^0-9a-f]|$)" "$d" || true
-            done < /tmp/named-strings.tsv
-          } > "$out/gameserver-name-xrefs.txt"
-
-          python3 - "$c" > "$out/gameserver-rtti-vtables.txt" <<'PY'
-          import struct, sys
-          from elftools.elf.elffile import ELFFile
-          names = {
-              'N5tibia7network24TGameserverTCPConnectionE',
-              'N5tibia7network34TGameserverNetworkPacketConnectionE',
-              'N5tibia4game22TGameserverGameSessionE',
-          }
-          path=sys.argv[1]
-          with open(path,'rb') as f:
+          path, out_dir = sys.argv[1:]
+          with open(path, 'rb') as f:
               blob=f.read(); f.seek(0); elf=ELFFile(f); sections=list(elf.iter_sections())
-          def off_to_va(off):
-              for sec in sections:
-                  s=int(sec['sh_offset']); z=int(sec['sh_size'])
-                  if s<=off<s+z: return int(sec['sh_addr'])+off-s, sec.name
-              return None,None
+
           def va_to_off(va):
               for sec in sections:
                   s=int(sec['sh_addr']); z=int(sec['sh_size'])
-                  if s<=va<s+z: return int(sec['sh_offset'])+va-s, sec.name
-              return None,None
-          for name in sorted(names):
-              needle=name.encode()+b'\0'; pos=blob.find(needle)
-              print(f'===== {name} =====')
-              if pos<0: print('name_not_found'); continue
-              name_va,_=off_to_va(pos); print(f'name_va=0x{name_va:x}')
-              ptr=struct.pack('<Q',name_va)
-              ti_positions=[]; p=0
-              while True:
-                  p=blob.find(ptr,p)
-                  if p<0: break
-                  va,sec=off_to_va(p); ti_positions.append((p,va,sec)); p+=1
-              for p,ti_name_slot,sec in ti_positions:
-                  typeinfo_va=ti_name_slot-8
-                  print(f'typeinfo_candidate=0x{typeinfo_va:x} section={sec}')
-                  tiptr=struct.pack('<Q',typeinfo_va); q=0
+                  if s <= va < s+z: return int(sec['sh_offset'])+va-s, sec.name
+              return None, None
+          def off_to_va(off):
+              for sec in sections:
+                  s=int(sec['sh_offset']); z=int(sec['sh_size'])
+                  if s <= off < s+z: return int(sec['sh_addr'])+off-s, sec.name
+              return None, None
+          def cstring_at_va(va, limit=600):
+              off,sec=va_to_off(va)
+              if off is None: return None,sec
+              end=blob.find(b'\0',off,min(len(blob),off+limit))
+              if end<0:return None,sec
+              raw=blob[off:end]
+              if not raw:return '',sec
+              if sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)<0.9:return None,sec
+              return raw.decode('utf-8',errors='replace'),sec
+          def classify(va):
+              off,sec=va_to_off(va)
+              if off is None:return 'unmapped'
+              val,_=cstring_at_va(va,200)
+              if val is not None and val!='':return f'{sec} string={val!r}'
+              return sec
+
+          # Exact JSON key literals used to initialize the three QString globals.
+          key_vas=[0x2887624,0x1d94e4c,0x28876d1]
+          lines=['===== PLAYDATA KEY LITERALS =====']
+          for va in key_vas:
+              val,sec=cstring_at_va(va)
+              lines.append(f'va=0x{va:x} section={sec} value={val!r}')
+          pathlib.Path(out_dir,'playdata-key-literals.txt').write_text('\n'.join(lines)+'\n')
+
+          # Dump and group Qt string-data ranges around the relevant slot names.
+          ranges=[(0x1c88e00,0x1c8a600,'character-login'),(0x1c91800,0x1c92800,'gameserver-connect')]
+          metacalls=[]
+          for start,end,label in ranges:
+              strings=[]; va=start
+              while va<end:
+                  off,sec=va_to_off(va)
+                  if off is None: va+=1; continue
+                  b=blob[off]
+                  if 32<=b<127:
+                      prev=blob[off-1] if off>0 else 0
+                      if prev==0:
+                          z=blob.find(b'\0',off,min(len(blob),off+500))
+                          if z>off:
+                              raw=blob[off:z]
+                              if sum(32<=x<127 for x in raw)/len(raw)>0.95:
+                                  strings.append((va,raw.decode('utf-8',errors='replace')))
+                                  va += len(raw)+1; continue
+                  va+=1
+              report=[f'===== STRINGS {label} =====']+[f'0x{va:x}\t{s}' for va,s in strings]
+              # Build contiguous groups. Qt string tables are packed NUL-separated.
+              groups=[]
+              for va,s in strings:
+                  if not groups or va-(groups[-1][-1][0]+len(groups[-1][-1][1])+1)>16:
+                      groups.append([])
+                  groups[-1].append((va,s))
+              report.append(f'===== GROUPS {label} =====')
+              for gi,g in enumerate(groups):
+                  report.append(f'group={gi} start=0x{g[0][0]:x} end=0x{g[-1][0]+len(g[-1][1])+1:x} count={len(g)} first={g[0][1]!r}')
+                  target_names={'requestCharacterGameserverLogin','onStartGameServerLoginStateEntered','connectClientToGameserverWithExistingCredentials','onConnectClientToGameserver','onAbortConnectClientToGameserver'}
+                  if not any(s in target_names for _,s in g):
+                      continue
+                  base=g[0][0]
+                  report.append(f'  selected_stringdata_base=0x{base:x}')
+                  packed=struct.pack('<Q',base); pos=0
                   while True:
-                      q=blob.find(tiptr,q)
-                      if q<0: break
-                      slot_va,slot_sec=off_to_va(q)
-                      print(f'  typeinfo_xref_slot=0x{slot_va:x} section={slot_sec}')
-                      if slot_sec=='.data.rel.ro':
-                          base=slot_va-8; vptr=slot_va+8
-                          print(f'  vtable_base=0x{base:x} vptr=0x{vptr:x}')
-                          for i in range(24):
-                              off,_=va_to_off(vptr+i*8)
-                              if off is None: break
-                              val=struct.unpack_from('<Q',blob,off)[0]
-                              _,vsec=va_to_off(val)
-                              print(f'    slot={i} va=0x{vptr+i*8:x} value=0x{val:x} target_section={vsec}')
+                      pos=blob.find(packed,pos)
+                      if pos<0:break
+                      slot_va,slot_sec=off_to_va(pos)
+                      report.append(f'  base_pointer_slot=0x{slot_va:x} section={slot_sec}')
+                      if slot_sec in ('.data.rel.ro','.data'):
+                          mo=slot_va-8
+                          words=[]
+                          for i in range(7):
+                              o,_=va_to_off(mo+i*8)
+                              if o is None:break
+                              v=struct.unpack_from('<Q',blob,o)[0]
+                              words.append(v)
+                          report.append(f'    metaobject_candidate=0x{mo:x}')
+                          for i,v in enumerate(words): report.append(f'      qword+0x{i*8:x}=0x{v:x} {classify(v)}')
+                          if len(words)>3 and va_to_off(words[3])[1]=='.text':
+                              metacalls.append(words[3])
+                              report.append(f'    static_metacall=0x{words[3]:x}')
+                      pos+=1
+              pathlib.Path(out_dir,f'qt-stringdata-{label}.txt').write_text('\n'.join(report)+'\n')
+
+          pathlib.Path(out_dir,'metacall-addresses.txt').write_text('\n'.join(f'{x:x}' for x in sorted(set(metacalls)))+('\n' if metacalls else ''))
+
+          # RTTI and possible vtable for gameserver session metadata.
+          names=['N5tibia4game30TGameserverGameSessionMetaInfoE','N5tibia4game22TGameserverGameSessionE']
+          report=[]; vptrs=[]
+          for name in names:
+              report.append(f'===== {name} =====')
+              pos=blob.find(name.encode()+b'\0')
+              if pos<0: report.append('name_not_found'); continue
+              name_va,_=off_to_va(pos); report.append(f'name_va=0x{name_va:x}')
+              p=0; packed=struct.pack('<Q',name_va)
+              while True:
+                  p=blob.find(packed,p)
+                  if p<0:break
+                  slot_va,sec=off_to_va(p); ti=slot_va-8
+                  report.append(f'typeinfo_candidate=0x{ti:x} name_slot_section={sec}')
+                  q=0; tip=struct.pack('<Q',ti)
+                  while True:
+                      q=blob.find(tip,q)
+                      if q<0:break
+                      xv,xs=off_to_va(q); report.append(f'  typeinfo_xref=0x{xv:x} section={xs}')
+                      if xs=='.data.rel.ro':
+                          vp=xv+8; vptrs.append(vp); report.append(f'  possible_vptr=0x{vp:x}')
                       q+=1
+                  p+=1
+          pathlib.Path(out_dir,'session-meta-rtti.txt').write_text('\n'.join(report)+'\n')
+          pathlib.Path(out_dir,'session-meta-vptrs.txt').write_text('\n'.join(f'{v:x}' for v in sorted(set(vptrs)))+('\n' if vptrs else ''))
           PY
 
-          grep -B 30 -A 50 -E 'call[[:space:]]+196e[0-9a-f]{3}([[:space:]]|<)' "$d" \
-            | head -n 3000 > "$out/tcp-constructor-callers.txt" || true
+          : > "$out/metacall-disassembly.txt"
+          while read -r a; do
+            [ -n "$a" ] || continue
+            start=$((0x$a)); stop=$((0x$a+0x1400))
+            printf -v sh '0x%x' "$start"; printf -v eh '0x%x' "$stop"
+            echo "===== STATIC METACALL 0x${a} =====" >> "$out/metacall-disassembly.txt"
+            objdump -d -M intel --no-show-raw-insn --start-address="$sh" --stop-address="$eh" "$c" >> "$out/metacall-disassembly.txt"
+          done < "$out/metacall-addresses.txt"
+
+          : > "$out/session-meta-vptr-xrefs.txt"
+          while read -r v; do
+            [ -n "$v" ] || continue
+            echo "===== VPTR 0x${v} =====" >> "$out/session-meta-vptr-xrefs.txt"
+            grep -B 45 -A 90 -E "#[[:space:]]*${v}([^0-9a-f]|$)" "$d" >> "$out/session-meta-vptr-xrefs.txt" || true
+          done < "$out/session-meta-vptrs.txt"
+
+          objdump -d -M intel --no-show-raw-insn --start-address=0x7e6a00 --stop-address=0x7e8350 "$c" > "$out/gamesession-initialize-7e6a.txt"
+          grep -E '(call|cmp|test|cmov|\[[^]]+\+(0x20|0x38|0x50|0x54|0x70|0x74|0x78|0x80|0x98|0xb0)\])' "$out/gamesession-initialize-7e6a.txt" > "$out/gamesession-initialize-focus.txt" || true
 
           chmod -R a+rX "$out"
           SCRIPT
 
-      - name: Copy playdata gameserver report
+      - name: Copy Qt gameserver report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-playdata-gameserver-flow"
+          out="${RUNNER_TEMP}/tibia-qt-gameserver-login"
           rm -rf "$out" && mkdir -p "$out"
           r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/playdata-gameserver-flow/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/$r/report/qt-gameserver-login/." "$out/"
 
-      - name: Upload playdata gameserver report
+      - name: Upload Qt gameserver report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-playdata-gameserver-flow
-          path: ${{ runner.temp }}/tibia-playdata-gameserver-flow
+          name: tibia-linux-qt-gameserver-login
+          path: ${{ runner.temp }}/tibia-qt-gameserver-login
           retention-days: 1
