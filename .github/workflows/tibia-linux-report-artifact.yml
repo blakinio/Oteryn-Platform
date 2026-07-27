@@ -1,4 +1,4 @@
-name: Tibia Linux mapped login functions
+name: Tibia Linux gameserver login function trace
 
 on:
   pull_request:
@@ -9,55 +9,122 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-gameserver-login-functions
+  cancel-in-progress: true
+
 jobs:
-  export:
-    name: Export mapped login target functions
+  trace:
+    name: Trace gameserver login state and connection functions
     runs-on: oteryn-staging
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
-      - name: Generate target disassembly from persisted map
+      - name: Generate focused function reports
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            alpine:3.22 sh -s <<'SCRIPT'
+            python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils >/dev/null
+          apk add --no-cache binutils coreutils grep >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/qt-jump-targets"
-          test -s "${out}/selected.tsv"
-          mkdir -p "${out}/functions"
-          cat "${out}/jump-targets.txt"
-          echo '===== SELECTED ====='
-          cat "${out}/selected.tsv"
-          while IFS="$(printf '\t')" read -r class_name index method target start end; do
+          out="/analysis/client-analysis/${run_id}/report/gameserver-login-functions"
+          rm -rf "${out}" && mkdir -p "${out}/functions"
+
+          python3 - "${client}" "${out}" <<'PY'
+          import pathlib,sys
+          from elftools.elf.elffile import ELFFile
+          from elftools.dwarf.callframe import FDE
+          targets=[
+              ('onStartGameServerLoginStateEntered',0x769290),
+              ('connectClientToGameserverWithExistingCredentials',0x6edef0),
+              ('onConnectClientToGameserver',0x6fd210),
+          ]
+          binary,out_dir=sys.argv[1:]
+          with open(binary,'rb') as f:
+              elf=ELFFile(f); ranges=[]
+              try:
+                  dwarf=elf.get_dwarf_info()
+                  for e in dwarf.EH_CFI_entries():
+                      if isinstance(e,FDE):
+                          s=int(e['initial_location']); ranges.append((s,s+int(e['address_range'])))
+              except Exception: pass
+          lines=[]
+          for name,addr in targets:
+              found=None
+              for s,e in ranges:
+                  if s<=addr<e: found=(s,e); break
+              if found is None: found=(addr,addr+0x6000)
+              lines.append(f'{name}\t{addr:x}\t{found[0]:x}\t{found[1]:x}')
+          pathlib.Path(out_dir,'ranges.tsv').write_text('\n'.join(lines)+'\n')
+          PY
+
+          while IFS="$(printf '\t')" read -r name target start end; do
             [ -n "${target}" ] || continue
-            max_end=$((0x${start}+0x9000))
-            actual_end=$((0x${end}))
+            max_end=$((0x${start}+0x12000)); actual_end=$((0x${end}))
             if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
             stop_hex="$(printf '0x%x' "${actual_end}")"
-            safe="${class_name}-${index}-${method}"
             objdump -d -M intel --no-show-raw-insn \
               --start-address="0x${start}" --stop-address="${stop_hex}" "${client}" \
-              > "${out}/functions/${safe}.txt"
-          done < "${out}/selected.tsv"
+              > "${out}/functions/${name}.txt"
+          done < "${out}/ranges.tsv"
+
+          {
+            echo '===== RANGES ====='
+            cat "${out}/ranges.tsv"
+            for f in "${out}"/functions/*.txt; do
+              echo "===== $(basename "$f") CALLS ====="
+              grep -E '^[[:space:]]*[0-9a-f]+:.*(call|jmp)[[:space:]]+' "$f" || true
+              echo "===== $(basename "$f") IMPORTANT OFFSETS ====="
+              grep -E '\[[^]]+\+(0x20|0x38|0x40|0x48|0x50|0x54|0x58|0x60|0x68|0x70|0x74|0x78|0x80|0x90|0x98|0xa0|0xa8|0xb0|0xb8|0xc0|0xd0|0xe0|0xec|0x110|0x158|0x348|0x418|0x8d0|0x990|0x9a0)\]' "$f" || true
+              echo "===== $(basename "$f") KNOWN TARGET REFERENCES ====="
+              grep -E '(7e6a40|196e3d0|3075008|3076d20|3082b38|2f60120|3071aa0|3195d00|3195d80|3195d60|3195dc0|3195da0)' "$f" || true
+            done
+          } > "${out}/focus.txt"
+
+          python3 - "${client}" "${out}"/functions/*.txt > "${out}/referenced-data.txt" <<'PY'
+          import re,sys
+          from elftools.elf.elffile import ELFFile
+          binary,*files=sys.argv[1:]
+          addrs=set()
+          for p in files:
+              text=open(p,encoding='utf-8',errors='replace').read()
+              addrs.update(int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)',text))
+          with open(binary,'rb') as f:
+              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
+          def v2o(v):
+              for s in secs:
+                  a=int(s['sh_addr']); z=int(s['sh_size'])
+                  if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
+              return None,None
+          for v in sorted(addrs):
+              o,s=v2o(v)
+              if o is None: continue
+              e=blob.find(b'\0',o,min(len(blob),o+500)); val=None
+              if e>o:
+                  raw=blob[o:e]
+                  if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>.9:
+                      val=raw.decode('utf-8',errors='replace')
+              print(f'va=0x{v:x} section={s} string={val!r}')
+          PY
           chmod -R a+rX "${out}"
           SCRIPT
-      - name: Copy mapped report
+      - name: Copy function report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-qt-jump-targets"
+          out="${RUNNER_TEMP}/tibia-gameserver-login-functions"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/qt-jump-targets/." "${out}/"
-      - name: Upload mapped report
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/gameserver-login-functions/." "${out}/"
+      - name: Upload function report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-qt-jump-targets
-          path: ${{ runner.temp }}/tibia-qt-jump-targets
+          name: tibia-linux-gameserver-login-functions
+          path: ${{ runner.temp }}/tibia-gameserver-login-functions
           retention-days: 1
