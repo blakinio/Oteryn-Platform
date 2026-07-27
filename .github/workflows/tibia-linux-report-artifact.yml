@@ -1,4 +1,4 @@
-name: Tibia Linux Go LZMA decode
+name: Tibia Linux compression identification
 
 on:
   pull_request:
@@ -12,17 +12,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-go-lzma-decode
+  group: tibia-linux-compression-identification
   cancel-in-progress: true
 
 jobs:
-  decode:
-    name: Decode and inspect verified Linux client
+  identify:
+    name: Identify and decode packed Linux client
     runs-on: oteryn-staging
     timeout-minutes: 15
 
     steps:
-      - name: Decode with exact packer library
+      - name: Inspect header and try supported decoders
         shell: bash
         run: |
           set -euo pipefail
@@ -31,23 +31,30 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             golang:1.24-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils file findutils grep jq sed >/dev/null
+          apk add --no-cache coreutils file jq xz zstd gzip bzip2 >/dev/null
 
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           root="/analysis/client-analysis/${run_id}"
           packed="${root}/download/client.lzma"
-          client="${root}/download/client"
           report="${root}/report"
           manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
           manifest="/analysis/package-manifests/${manifest_run}/package.json"
           record="$(jq -c '.files[] | select(.localfile == "bin/client")' "${manifest}")"
           expected_hash="$(printf '%s' "${record}" | jq -r '.unpackedhash')"
           expected_size="$(printf '%s' "${record}" | jq -r '.unpackedsize')"
+          mkdir -p "${report}" /tmp/tibia-format
 
-          mkdir -p "${report}" /tmp/tibia-lzma
-          cd /tmp/tibia-lzma
+          {
+            echo "packed_size=$(stat -c %s "${packed}")"
+            echo "packed_sha256=$(sha256sum "${packed}" | awk '{print $1}')"
+            echo "file=$(file -b "${packed}")"
+            echo "first_128_hex=$(od -An -tx1 -N128 "${packed}" | tr -s ' ' | tr '\n' ' ' | sed 's/^ //;s/ $//')"
+            echo "first_64_ascii=$(od -An -tc -N64 "${packed}" | tr -s ' ' | tr '\n' ' ' | sed 's/^ //;s/ $//')"
+          } | tee "${report}/packed-header.txt"
+
+          cd /tmp/tibia-format
           cat > go.mod <<'EOF'
-          module tibia-lzma-decoder
+          module tibia-format-probe
 
           go 1.24
 
@@ -57,91 +64,106 @@ jobs:
           package main
 
           import (
+            "crypto/sha256"
             "fmt"
             "io"
             "os"
 
+            "github.com/ulikunitz/xz"
             "github.com/ulikunitz/xz/lzma"
           )
 
-          func main() {
-            if len(os.Args) != 3 {
-              fmt.Fprintln(os.Stderr, "usage: decoder input output")
-              os.Exit(2)
-            }
-            in, err := os.Open(os.Args[1])
-            if err != nil {
-              panic(err)
-            }
-            defer in.Close()
+          type opener struct {
+            name string
+            open func(io.Reader) (io.Reader, error)
+          }
 
-            reader, err := lzma.NewReader(in)
+          func attempt(inPath, outDir string, op opener) {
+            in, err := os.Open(inPath)
             if err != nil {
-              panic(err)
+              fmt.Printf("decoder=%s open_input_error=%q\n", op.name, err)
+              return
             }
-            out, err := os.Create(os.Args[2])
+            r, err := op.open(in)
             if err != nil {
-              panic(err)
+              in.Close()
+              fmt.Printf("decoder=%s init_error=%q\n", op.name, err)
+              return
             }
-            n, copyErr := io.Copy(out, reader)
+            outPath := outDir + "/decoded-" + op.name
+            out, err := os.Create(outPath)
+            if err != nil {
+              in.Close()
+              fmt.Printf("decoder=%s create_output_error=%q\n", op.name, err)
+              return
+            }
+            h := sha256.New()
+            n, copyErr := io.Copy(io.MultiWriter(out, h), r)
             closeErr := out.Close()
+            in.Close()
             if copyErr != nil {
-              panic(copyErr)
+              fmt.Printf("decoder=%s copy_error=%q bytes=%d\n", op.name, copyErr, n)
+              return
             }
             if closeErr != nil {
-              panic(closeErr)
+              fmt.Printf("decoder=%s close_error=%q bytes=%d\n", op.name, closeErr, n)
+              return
             }
-            fmt.Printf("decoded_bytes=%d\n", n)
+            fmt.Printf("decoder=%s success=true bytes=%d sha256=%x output=%s\n", op.name, n, h.Sum(nil), outPath)
+          }
+
+          func main() {
+            if len(os.Args) != 3 {
+              fmt.Fprintln(os.Stderr, "usage: probe input output-dir")
+              os.Exit(2)
+            }
+            attempts := []opener{
+              {"lzma", func(r io.Reader) (io.Reader, error) { return lzma.NewReader(r) }},
+              {"lzma2-8m", func(r io.Reader) (io.Reader, error) { return lzma.NewReader2(r) }},
+              {"lzma2-64m", func(r io.Reader) (io.Reader, error) {
+                return (lzma.Reader2Config{DictCap: 64 << 20}).NewReader2(r)
+              }},
+              {"xz", func(r io.Reader) (io.Reader, error) { return xz.NewReader(r) }},
+            }
+            for _, op := range attempts {
+              attempt(os.Args[1], os.Args[2], op)
+            }
           }
           EOF
 
           go mod download
-          go run . "${packed}" "${client}" | tee "${report}/go-lzma-decode.txt"
-          chmod +x "${client}"
-
-          actual_size="$(stat -c %s "${client}")"
-          actual_hash="$(sha256sum "${client}" | awk '{print $1}')"
-          test "${actual_size}" = "${expected_size}"
-          test "${actual_hash}" = "${expected_hash}"
+          go run . "${packed}" "${root}/download" 2>&1 | tee "${report}/go-format-probe.txt"
 
           {
-            echo "packed_first_64_bytes=$(od -An -tx1 -N64 "${packed}" | tr -s ' ' | tr '\n' ' ' | sed 's/^ //;s/ $//')"
-            echo "expected_size=${expected_size}"
-            echo "actual_size=${actual_size}"
-            echo "expected_sha256=${expected_hash}"
-            echo "actual_sha256=${actual_hash}"
-            printf 'file='
-            file -b "${client}"
-          } > "${report}/decode-verification.txt"
+            echo '===== command probes ====='
+            for probe in \
+              'xz --format=lzma --test' \
+              'xz --format=xz --test' \
+              'zstd --test' \
+              'gzip --test' \
+              'bzip2 --test'; do
+              set +e
+              output="$(sh -c "${probe} \"${packed}\"" 2>&1)"
+              rc=$?
+              set -e
+              printf 'probe=%s rc=%s output=%s\n' "${probe}" "${rc}" "${output}"
+            done
+          } | tee "${report}/command-format-probes.txt"
 
-          readelf -h "${client}" > "${report}/elf-header.txt"
-          readelf -d "${client}" > "${report}/dynamic.txt"
-          readelf -n "${client}" > "${report}/notes.txt" 2>/dev/null || true
-          strings -a -n 5 "${client}" > "${report}/strings.txt"
-
-          grep -E 'NEEDED|RPATH|RUNPATH' "${report}/dynamic.txt" > "${report}/dependencies.txt" || true
-          grep -Ei 'battleye|beclient|beservice|--battleye|protected|unprotected|anticheat|anti-cheat|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' \
-            "${report}/strings.txt" | sort -u | head -n 1000 > "${report}/security-auth-indicators.txt" || true
-          grep -Eo 'https?://[^[:space:]"<>]+' "${report}/strings.txt" | sed 's/[),;]$//' | sort -u | head -n 1000 > "${report}/urls.txt" || true
-
-          {
-            printf 'battleye_matches='
-            grep -Eic 'battleye|beclient|beservice|--battleye' "${report}/strings.txt" || true
-            printf 'protected_unprotected_matches='
-            grep -Eic 'protected|unprotected|anticheat|anti-cheat' "${report}/strings.txt" || true
-            printf 'auth_field_matches='
-            grep -Eic 'loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' "${report}/strings.txt" || true
-            printf 'url_count='
-            wc -l < "${report}/urls.txt"
-            printf 'dependency_count='
-            wc -l < "${report}/dependencies.txt"
-          } > "${report}/counts.txt"
-
-          echo 0 > "${report}/exit-code.txt"
-          chmod -R a+rX "${root}"
+          echo '===== decoded candidates =====' | tee "${report}/decoded-candidates.txt"
+          find "${root}/download" -maxdepth 1 -type f -name 'decoded-*' -print | sort | while IFS= read -r candidate; do
+            size="$(stat -c %s "${candidate}")"
+            hash="$(sha256sum "${candidate}" | awk '{print $1}')"
+            kind="$(file -b "${candidate}")"
+            printf 'candidate=%s size=%s sha256=%s file=%s expected_size_match=%s expected_hash_match=%s\n' \
+              "${candidate}" "${size}" "${hash}" "${kind}" \
+              "$([ "${size}" = "${expected_size}" ] && echo yes || echo no)" \
+              "$([ "${hash}" = "${expected_hash}" ] && echo yes || echo no)" \
+              | tee -a "${report}/decoded-candidates.txt"
+          done
           SCRIPT
 
-      - name: Print concise verified result
+      - name: Print format probe result
         shell: bash
         run: |
           set -euo pipefail
@@ -151,16 +173,12 @@ jobs:
           set -eu
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           report="/analysis/client-analysis/${run_id}/report"
-          echo '===== DECODE VERIFICATION ====='
-          cat "${report}/decode-verification.txt"
-          echo '===== COUNTS ====='
-          cat "${report}/counts.txt"
-          echo '===== ELF HEADER ====='
-          cat "${report}/elf-header.txt"
-          echo '===== DEPENDENCIES ====='
-          cat "${report}/dependencies.txt"
-          echo '===== SECURITY / AUTH INDICATORS ====='
-          cat "${report}/security-auth-indicators.txt"
-          echo '===== URLS ====='
-          cat "${report}/urls.txt"
+          echo '===== PACKED HEADER ====='
+          cat "${report}/packed-header.txt"
+          echo '===== GO PROBES ====='
+          cat "${report}/go-format-probe.txt"
+          echo '===== COMMAND PROBES ====='
+          cat "${report}/command-format-probes.txt"
+          echo '===== DECODED CANDIDATES ====='
+          cat "${report}/decoded-candidates.txt"
           SCRIPT
