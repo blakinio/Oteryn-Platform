@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 7
 
     steps:
-      - name: Print verified client report
+      - name: Discover and print verified client report
         shell: bash
         run: |
           set -euo pipefail
@@ -27,14 +27,26 @@ jobs:
             alpine:3.22 \
             sh -lc '
               set -eu
-              apk add --no-cache binutils coreutils file grep >/dev/null
+              apk add --no-cache binutils coreutils file findutils grep >/dev/null
 
-              run_id="$(cat /analysis/latest-client-analysis-run-id)"
-              root="/analysis/client-analysis/${run_id}"
+              echo "===== ANALYSIS VOLUME ROOT ====="
+              find /analysis -maxdepth 3 -type f -o -type d | sort | head -n 500
+              echo
+
+              client="$(find /analysis -type f -path "*/client-analysis/*/download/client" -print | sort | tail -n 1)"
+              if test -z "${client}"; then
+                echo "client_not_found"
+                echo "===== ALL CLIENT-NAMED FILES ====="
+                find /analysis -type f -name client -print | sort || true
+                exit 2
+              fi
+
+              root="$(dirname "$(dirname "${client}")")"
               report="${root}/report"
-              client="${root}/download/client"
 
-              echo "run_id=${run_id}"
+              echo "client=${client}"
+              echo "root=${root}"
+              echo
               echo "===== FILES ====="
               find "${root}" -maxdepth 3 -type f -exec stat -c "%s %n" {} \; | sort -n
               echo
@@ -68,7 +80,7 @@ jobs:
               if test -f "${report}/strings.txt"; then
                 grep -Ei "battleye|beclient|beservice|--battleye|protected|unprotected|anticheat|anti-cheat|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin" "${report}/strings.txt" \
                   | sort -u \
-                  | head -n 400 || true
+                  | head -n 500 || true
               fi
               echo
               echo "===== URLS ====="
