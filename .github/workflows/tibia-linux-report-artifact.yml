@@ -1,4 +1,4 @@
-name: Tibia Linux concise anti-cheat xrefs
+name: Tibia Linux persisted anti-cheat xrefs
 
 on:
   pull_request:
@@ -17,92 +17,44 @@ concurrency:
 
 jobs:
   xrefs:
-    name: Print concise route and loader references
+    name: Persist route and loader references
     runs-on: oteryn-staging
     timeout-minutes: 10
 
     steps:
-      - name: Generate concise native xref report
+      - name: Generate compact xref report in volume
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            python:3.12-alpine sh -s <<'SCRIPT'
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            alpine:3.22 sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils grep >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
-
+          apk add --no-cache binutils grep >/dev/null
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          targets=/tmp/targets.tsv
+          report="/analysis/client-analysis/${run_id}/report/compact-xrefs.txt"
           disasm=/tmp/client.disasm
-          direct=/tmp/direct-xrefs.txt
-          loader=/tmp/loader-calls.txt
-
-          python3 - "${client}" > "${targets}" <<'PY'
-          import sys
-          from elftools.elf.elffile import ELFFile
-
-          path = sys.argv[1]
-          names = [
-              "useProtectedNetworkRoute",
-              "ProtectedWorldAddress",
-              "UnprotectedWorldAddress",
-              "externaladdressprotected",
-              "externaladdressunprotected",
-              "externalportprotected",
-              "externalportunprotected",
-              "BattlEyeInitiallyActive",
-              "BattlEyeActivationTimestamp",
-              "availableBattlEyeTypes",
-              "initially_protected",
-              "anticheatprotection",
-              "BEClient",
-              "BattlEye",
-          ]
-          with open(path, "rb") as f:
-              blob = f.read()
-              f.seek(0)
-              elf = ELFFile(f)
-              sections = list(elf.iter_sections())
-              def offset_to_va(off):
-                  for sec in sections:
-                      start = int(sec["sh_offset"])
-                      size = int(sec["sh_size"])
-                      if start <= off < start + size:
-                          return int(sec["sh_addr"]) + off - start
-                  return None
-              for name in names:
-                  needle = name.encode() + b"\0"
-                  pos = 0
-                  while True:
-                      off = blob.find(needle, pos)
-                      if off < 0:
-                          break
-                      va = offset_to_va(off)
-                      if va is not None:
-                          print(f"{name}\t{va:x}")
-                      pos = off + 1
-          PY
-
+          regex='289ce17|28a1e25|28a1e3b|2887668|2887681|288762d|2887643|1d3cba3|1d3cb87|1d2f7be|1d3cbbb|28876a5|1c689bb|1d78fc0'
           objdump -d -M intel --no-show-raw-insn "${client}" > "${disasm}"
-          regex="$(cut -f2 "${targets}" | paste -sd'|' -)"
-          if [ -n "${regex}" ]; then
-            grep -E "#[[:space:]]*(${regex})([^0-9a-f]|$)" "${disasm}" > "${direct}" || true
-          else
-            : > "${direct}"
-          fi
-          grep -E 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' "${disasm}" > "${loader}" || true
-
-          echo '===== TARGETS ====='
-          cat "${targets}"
-          echo '===== DIRECT XREF INSTRUCTIONS ====='
-          cat "${direct}"
-          echo '===== LOADER CALL INSTRUCTIONS ====='
-          cat "${loader}"
-          echo '===== COUNTS ====='
-          echo "target_count=$(wc -l < "${targets}")"
-          echo "direct_xref_count=$(wc -l < "${direct}")"
-          echo "loader_call_count=$(wc -l < "${loader}")"
+          {
+            echo '===== DIRECT XREF INSTRUCTIONS ====='
+            grep -E "#[[:space:]]*(${regex})([^0-9a-f]|$)" "${disasm}" || true
+            echo '===== LOADER CALL INSTRUCTIONS ====='
+            grep -E 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' "${disasm}" || true
+            echo '===== COUNTS ====='
+            printf 'direct_xref_count='
+            grep -Ec "#[[:space:]]*(${regex})([^0-9a-f]|$)" "${disasm}" || true
+            printf 'loader_call_count='
+            grep -Ec 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' "${disasm}" || true
+          } > "${report}"
+          chmod a+r "${report}"
           SCRIPT
+
+      - name: Print persisted compact report
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -c 'r=$(cat /analysis/latest-client-analysis-run-id); cat "/analysis/client-analysis/$r/report/compact-xrefs.txt"'
