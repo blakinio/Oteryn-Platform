@@ -1,4 +1,4 @@
-name: Tibia Linux parser vtable and transport trace
+name: Tibia Linux authentication helper flow
 
 on:
   pull_request:
@@ -12,17 +12,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-parser-vtable-transport
+  group: tibia-linux-auth-helper-flow
   cancel-in-progress: true
 
 jobs:
   trace:
-    name: Identify parser class and low-level transport
+    name: Trace authentication JSON helper and world parser calls
     runs-on: oteryn-staging
-    timeout-minutes: 12
+    timeout-minutes: 10
 
     steps:
-      - name: Generate vtable and transport report
+      - name: Generate helper flow report
         shell: bash
         run: |
           set -euo pipefail
@@ -35,147 +35,80 @@ jobs:
 
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          out="/analysis/client-analysis/${r}/report/parser-vtable-transport"
+          out="/analysis/client-analysis/${r}/report/auth-helper-flow"
           rm -rf "$out" && mkdir -p "$out"
           d=/tmp/client.disasm
           objdump -d -M intel --no-show-raw-insn "$c" > "$d"
 
-          python3 - "$c" "$out" <<'PY'
-          import pathlib, struct, sys
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0xe1a810 --stop-address=0xe1afdc "$c" \
+            > "$out/helper-e1a810.txt"
+
+          {
+            echo '===== DIRECT CALLERS OF e1a810 ====='
+            grep -E 'call[[:space:]]+e1a810([[:space:]]|<)' "$d" || true
+            echo '===== DIRECT CALLERS OF WORLD PARSER e0fcf0 ====='
+            grep -E 'call[[:space:]]+e0fcf0([[:space:]]|<)' "$d" || true
+            echo '===== INDIRECT CALLS INSIDE HELPER ====='
+            grep -E 'call[[:space:]]+.*\*|call[[:space:]]+(QWORD|DWORD) PTR' "$out/helper-e1a810.txt" || true
+            echo '===== FIELD-SIZED MEMORY OPERATIONS INSIDE HELPER ====='
+            grep -E '(0x80|0x78|0x74|0x70|0x54|0x50|0x48|0x38|0x30|0x20)' "$out/helper-e1a810.txt" || true
+          } > "$out/helper-index.txt"
+
+          python3 - "$c" "$out/helper-e1a810.txt" > "$out/helper-referenced-data.txt" <<'PY'
+          import re, sys
           from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
 
-          path, out_dir = sys.argv[1:]
-          target_slot_va = 0x2F70188
-          window_start = target_slot_va - 0xC0
-          window_end = target_slot_va + 0x100
-
-          with open(path, 'rb') as f:
+          binary, disasm = sys.argv[1:]
+          text = open(disasm, encoding='utf-8', errors='replace').read()
+          addresses = sorted({int(x, 16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text)})
+          with open(binary, 'rb') as f:
               blob = f.read()
               f.seek(0)
               elf = ELFFile(f)
               sections = list(elf.iter_sections())
-              dwarf = elf.get_dwarf_info()
-              fdes = []
-              try:
-                  for entry in dwarf.EH_CFI_entries():
-                      if isinstance(entry, FDE):
-                          start = int(entry['initial_location'])
-                          end = start + int(entry['address_range'])
-                          fdes.append((start, end))
-              except Exception:
-                  pass
 
-              def va_to_offset(va):
-                  for sec in sections:
-                      start = int(sec['sh_addr'])
-                      size = int(sec['sh_size'])
-                      if start <= va < start + size:
-                          return int(sec['sh_offset']) + va - start, sec.name
-                  return None, None
+          def va_to_offset(va):
+              for sec in sections:
+                  start = int(sec['sh_addr'])
+                  size = int(sec['sh_size'])
+                  if start <= va < start + size:
+                      return int(sec['sh_offset']) + va - start, sec.name
+              return None, None
 
-              def classify(value):
-                  if value == 0:
-                      return 'null'
-                  off, sec = va_to_offset(value)
-                  if off is None:
-                      return 'unmapped'
-                  if sec == '.text':
-                      for start, end in fdes:
-                          if start <= value < end:
-                              return f'text function=0x{start:x}-0x{end:x}'
-                      return 'text'
-                  if sec in ('.rodata', '.data.rel.ro'):
-                      end = blob.find(b'\0', off, min(len(blob), off + 240))
-                      if end > off:
-                          raw = blob[off:end]
-                          if raw and sum(32 <= b < 127 for b in raw) / len(raw) > 0.9:
-                              return f'{sec} string={raw.decode("utf-8", errors="replace")!r}'
-                  return sec
-
-              slots = []
-              for va in range(window_start, window_end, 8):
-                  off, sec = va_to_offset(va)
-                  if off is None:
-                      continue
-                  value = struct.unpack_from('<Q', blob, off)[0]
-                  slots.append((va, value, classify(value)))
-
-              report = []
-              report.append('===== SLOT WINDOW =====')
-              for va, value, desc in slots:
-                  marker = ' <== parser slot' if va == target_slot_va else ''
-                  report.append(f'slot_va=0x{va:x} value=0x{value:x} {desc}{marker}')
-
-              candidates = []
-              for i in range(len(slots) - 3):
-                  va0, val0, _ = slots[i]
-                  _, val1, desc1 = slots[i + 1]
-                  _, val2, desc2 = slots[i + 2]
-                  if val0 == 0 and '.data.rel.ro' in desc1 and desc2.startswith('text'):
-                      candidates.append((va0, val1, slots[i + 2][0]))
-
-              report.append('===== VTABLE CANDIDATES =====')
-              for base, typeinfo, vptr in candidates:
-                  report.append(f'vtable_base=0x{base:x} typeinfo=0x{typeinfo:x} vptr=0x{vptr:x}')
-                  ti_off, _ = va_to_offset(typeinfo)
-                  if ti_off is not None and ti_off + 16 <= len(blob):
-                      name_ptr = struct.unpack_from('<Q', blob, ti_off + 8)[0]
-                      name_off, name_sec = va_to_offset(name_ptr)
-                      name = None
-                      if name_off is not None:
-                          end = blob.find(b'\0', name_off, min(len(blob), name_off + 300))
-                          if end > name_off:
-                              name = blob[name_off:end].decode('utf-8', errors='replace')
-                      report.append(f'  typeinfo_name_ptr=0x{name_ptr:x} section={name_sec} name={name!r}')
-
-              pathlib.Path(out_dir, 'vtable-layout.txt').write_text('\n'.join(report) + '\n')
-              pathlib.Path(out_dir, 'candidate-vptrs.txt').write_text('\n'.join(f'{vptr:x}' for _, _, vptr in candidates) + ('\n' if candidates else ''))
+          for va in addresses:
+              off, sec = va_to_offset(va)
+              if off is None:
+                  continue
+              end = blob.find(b'\0', off, min(len(blob), off + 260))
+              value = None
+              if end > off:
+                  raw = blob[off:end]
+                  if raw and sum(32 <= b < 127 or b in (9,10,13) for b in raw) / len(raw) > 0.88:
+                      value = raw.decode('utf-8', errors='replace')
+              print(f'va=0x{va:x} section={sec} string={value!r}')
           PY
 
-          {
-            echo '===== RELOCATIONS AROUND PARSER SLOT ====='
-            readelf -rW "$c" | awk '$1 >= "0000000002f700c0" && $1 <= "0000000002f70288" {print}' || true
-            echo '===== PARSER SLOT RELOCATION ====='
-            readelf -rW "$c" | grep -Ei '2f70188|e0fcf0' || true
-          } > "$out/vtable-relocations.txt"
-
-          : > "$out/vtable-constructor-xrefs.txt"
-          while read -r vptr; do
-            [ -n "$vptr" ] || continue
-            echo "===== VPTR 0x${vptr} =====" >> "$out/vtable-constructor-xrefs.txt"
-            grep -B 40 -A 70 -E "#[[:space:]]*${vptr}([^0-9a-f]|$)" "$d" >> "$out/vtable-constructor-xrefs.txt" || true
-          done < "$out/candidate-vptrs.txt"
-
-          {
-            echo '===== LOW-LEVEL TRANSPORT IMPORTS ====='
-            readelf -Ws "$c" | grep -Ei 'UND.*(syscall|socket|connect|bind|listen|accept|send|recv|read|write|getaddrinfo|getnameinfo|getsockopt|setsockopt|fcntl|ioctl|poll|epoll|select|QAbstractSocket|QTcpSocket|QIODevice)' || true
-            echo '===== LOW-LEVEL TRANSPORT CALL SITES ====='
-            grep -E 'call[[:space:]].*<(syscall|socket|connect|bind|listen|accept|send|recv|read|write|getaddrinfo|getnameinfo|getsockopt|setsockopt|fcntl|ioctl|poll|epoll|select|.*QAbstractSocket.*|.*QTcpSocket.*|.*QIODevice.*)@plt>' "$d" || true
-            echo '===== NETWORK TYPE STRINGS ====='
-            strings -a -t x -n 5 "$c" | grep -Ei '(boost::asio|asio::|tibia::.*(Socket|Connection|Transport|Protocol|Network)|T(Socket|Connection|Transport|Protocol|Network)|connectToHost|waitForConnected|GameServer)' | head -n 2000 || true
-          } > "$out/transport-index.txt"
-
-          grep -B 30 -A 45 -E 'call[[:space:]].*<(syscall|socket|connect|getaddrinfo|poll|epoll|.*QAbstractSocket.*|.*QTcpSocket.*|.*QIODevice.*)@plt>' "$d" \
-            | head -n 5000 > "$out/transport-call-contexts.txt" || true
+          grep -B 50 -A 90 -E 'call[[:space:]]+e1a810([[:space:]]|<)' "$d" \
+            | head -n 2500 > "$out/helper-caller-contexts.txt" || true
 
           chmod -R a+rX "$out"
           SCRIPT
 
-      - name: Copy vtable and transport report
+      - name: Copy helper flow report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-parser-vtable-transport"
+          out="${RUNNER_TEMP}/tibia-auth-helper-flow"
           rm -rf "$out" && mkdir -p "$out"
           r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/parser-vtable-transport/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/$r/report/auth-helper-flow/." "$out/"
 
-      - name: Upload vtable and transport report
+      - name: Upload helper flow report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-parser-vtable-transport
-          path: ${{ runner.temp }}/tibia-parser-vtable-transport
+          name: tibia-linux-auth-helper-flow
+          path: ${{ runner.temp }}/tibia-auth-helper-flow
           retention-days: 1
