@@ -1,4 +1,4 @@
-name: Tibia Linux persisted report export
+name: Tibia Linux verification diagnostics
 
 on:
   pull_request:
@@ -12,52 +12,53 @@ permissions:
   contents: read
 
 jobs:
-  export:
-    name: Export latest persisted text report
+  diagnose:
+    name: Diagnose downloaded Linux client files
     runs-on: oteryn-staging
     timeout-minutes: 7
 
     steps:
-      - name: Copy entire latest report directory
+      - name: Compare persisted files with manifest
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-linux-report"
-          rm -rf "${out}"
-          mkdir -p "${out}"
-
-          run_id="$(docker run --rm \
+          docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+            alpine:3.22 sh -s <<'SCRIPT'
+          set -eu
+          apk add --no-cache coreutils file findutils jq xz >/dev/null
 
-          docker run --rm \
-            --env "RUN_ID=${run_id}" \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c \
-            'tar -C "/analysis/client-analysis/${RUN_ID}/report" -cf - .' \
-            | tar -C "${out}" -xf -
+          run_id="$(cat /analysis/latest-client-analysis-run-id)"
+          root="/analysis/client-analysis/${run_id}"
+          packed="${root}/download/client.lzma"
+          client="${root}/download/client"
+          report="${root}/report"
+          manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
+          manifest="/analysis/package-manifests/${manifest_run}/package.json"
+          record="$(jq -c '.files[] | select(.localfile == "bin/client")' "${manifest}")"
 
-          {
-            echo "analysis_run_id=${run_id}"
-            echo "exported_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "binary_included=no"
-            echo "source_volume=oteryn-tibia-linux-analysis"
-          } > "${out}/artifact-metadata.txt"
-
-          echo '===== EXPORTED FILES ====='
-          find "${out}" -maxdepth 2 -type f -printf '%s %p\n' | sort -n
-          echo '===== AVAILABLE CONTENT ====='
-          for name in exit-code.txt summary.txt counts.txt dependencies.txt security-auth-indicators.txt urls.txt; do
-            if test -f "${out}/${name}"; then
-              echo "--- ${name} ---"
-              cat "${out}/${name}"
-            fi
-          done
-
-      - name: Upload text-only report
-        uses: actions/upload-artifact@v4
-        with:
-          name: tibia-linux-client-text-report
-          path: ${{ runner.temp }}/tibia-linux-report
-          if-no-files-found: error
-          retention-days: 1
+          echo "run_id=${run_id}"
+          echo "manifest_run=${manifest_run}"
+          echo "record=${record}"
+          echo '===== ROOT TREE ====='
+          find "${root}" -maxdepth 4 -type f -exec stat -c '%s %n' {} \; | sort -n
+          echo '===== EXIT CODE ====='
+          test ! -f "${report}/exit-code.txt" || cat "${report}/exit-code.txt"
+          echo '===== PACKED ====='
+          if test -f "${packed}"; then
+            stat -c 'size=%s' "${packed}"
+            sha256sum "${packed}"
+            file "${packed}"
+            xz --format=lzma --test "${packed}" && echo 'lzma_test=ok' || echo 'lzma_test=failed'
+          else
+            echo 'missing'
+          fi
+          echo '===== UNPACKED ====='
+          if test -f "${client}"; then
+            stat -c 'size=%s' "${client}"
+            sha256sum "${client}"
+            file "${client}"
+          else
+            echo 'missing'
+          fi
+          SCRIPT
