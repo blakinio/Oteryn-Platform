@@ -1,4 +1,4 @@
-name: Tibia Linux auth-controller metacall export
+name: Tibia Linux exact login metacalls
 
 on:
   pull_request:
@@ -11,40 +11,113 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-exact-login-metacalls
+  cancel-in-progress: true
+
 jobs:
-  export:
-    name: Export persisted auth-controller report
+  decode:
+    name: Decode exact auth-controller and gameclient metacalls
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 10
 
     steps:
-      - name: Inspect persisted report
+      - name: Decode metadata tables and disassemble metacalls
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c '
-              r=$(cat /analysis/latest-client-analysis-run-id)
-              p="/analysis/client-analysis/$r/report/auth-controller-metacalls"
-              test -d "$p"
-              find "$p" -maxdepth 2 -type f -printf "%P\t%s bytes\n" | sort
-            '
+          docker run --rm -i \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            python:3.12-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils coreutils grep >/dev/null
 
-      - name: Copy persisted report
+          run_id="$(cat /analysis/latest-client-analysis-run-id)"
+          client="/analysis/client-analysis/${run_id}/download/client"
+          out="/analysis/client-analysis/${run_id}/report/exact-login-metacalls"
+          rm -rf "${out}" && mkdir -p "${out}"
+
+          python3 - "${client}" > "${out}/decoded-methods.txt" <<'PY'
+          import struct, sys
+
+          path=sys.argv[1]
+          classes=[
+              ('AuthenticationController',0x1c89760,0x1c89140,0xcf9710),
+              ('TGameClient',0x1c91cf4,0x1c91740,0xd04dc0),
+          ]
+          targets={
+              'requestCharacterGameserverLogin',
+              'onStartGameServerLoginStateEntered',
+              'connectClientToGameserverWithExistingCredentials',
+              'onConnectClientToGameserver',
+              'onAbortConnectClientToGameserver',
+          }
+          blob=open(path,'rb').read()
+
+          def u32(va):
+              return struct.unpack_from('<I',blob,va)[0]
+
+          for label,stringdata,metadata,metacall in classes:
+              print(f'===== {label} =====')
+              first=u32(stringdata)
+              print(f'stringdata=0x{stringdata:x} metadata=0x{metadata:x} metacall=0x{metacall:x} first=0x{first:x}')
+              if first==0 or first%8:
+                  print('invalid_stringdata')
+                  continue
+              count=first//8
+              strings=[]
+              valid=True
+              for i in range(count):
+                  rel=u32(stringdata+i*8); ln=u32(stringdata+i*8+4)
+                  raw=blob[stringdata+rel:stringdata+rel+ln]
+                  try: strings.append(raw.decode('utf-8'))
+                  except UnicodeDecodeError:
+                      valid=False; break
+              print(f'string_count={count} valid={valid} class_name={strings[0]!r if strings else None}')
+              header=[u32(metadata+i*4) for i in range(14)]
+              print('metadata_header='+' '.join(hex(x) for x in header))
+              method_count,method_offset,signal_count=header[4],header[5],header[13]
+              print(f'method_count={method_count} method_offset={method_offset} signal_count={signal_count}')
+              for i in range(method_count):
+                  row=[u32(metadata+(method_offset+i*6+j)*4) for j in range(6)]
+                  ni,argc,params,tag,flags,mtypes=row
+                  name=strings[ni] if ni<len(strings) else f'<string#{ni}>'
+                  marker=' <== TARGET' if name in targets else ''
+                  print(f'method index={i} kind={"signal" if i<signal_count else "method"} name={name!r} argc={argc} flags=0x{flags:x} params={params} meta_types={mtypes}{marker}')
+              print()
+          PY
+
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0xcf9710 --stop-address=0xcf9e80 "${client}" \
+            > "${out}/AuthenticationController-metacall.txt"
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0xd04dc0 --stop-address=0xd05472 "${client}" \
+            > "${out}/TGameClient-metacall.txt"
+
+          {
+            echo '===== AUTH METACALL CONTROL FLOW ====='
+            grep -n -E '(cmp|test|je|jne|ja|jmp|call)' "${out}/AuthenticationController-metacall.txt" || true
+            echo '===== GAMECLIENT METACALL CONTROL FLOW ====='
+            grep -n -E '(cmp|test|je|jne|ja|jmp|call)' "${out}/TGameClient-metacall.txt" || true
+          } > "${out}/metacall-control-flow.txt"
+
+          chmod -R a+rX "${out}"
+          SCRIPT
+
+      - name: Copy exact login metacalls
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-auth-controller-metacalls"
+          out="${RUNNER_TEMP}/tibia-exact-login-metacalls"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/auth-controller-metacalls/." "${out}/"
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/exact-login-metacalls/." "${out}/"
 
-      - name: Upload persisted report
+      - name: Upload exact login metacalls
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-auth-controller-metacalls
-          path: ${{ runner.temp }}/tibia-auth-controller-metacalls
+          name: tibia-linux-exact-login-metacalls
+          path: ${{ runner.temp }}/tibia-exact-login-metacalls
           retention-days: 1
