@@ -1,0 +1,67 @@
+name: Tibia Linux text report artifact
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/tibia-linux-report-artifact.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Export verified text report
+    runs-on: oteryn-staging
+    timeout-minutes: 7
+
+    steps:
+      - name: Copy text reports from analysis volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/tibia-linux-report"
+          rm -rf "${out}"
+          mkdir -p "${out}"
+
+          run_id="$(docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+
+          cid="$(docker create \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 true)"
+          trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
+
+          report_path="/analysis/client-analysis/${run_id}/report"
+          for name in \
+            exit-code.txt \
+            summary.txt \
+            counts.txt \
+            elf-header.txt \
+            dependencies.txt \
+            security-auth-indicators.txt \
+            urls.txt \
+            notes.txt \
+            sections.txt; do
+            docker cp "${cid}:${report_path}/${name}" "${out}/${name}"
+          done
+
+          {
+            echo "analysis_run_id=${run_id}"
+            echo "exported_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "binary_included=no"
+            echo "source_volume=oteryn-tibia-linux-analysis"
+          } > "${out}/artifact-metadata.txt"
+
+          ls -lah "${out}"
+
+      - name: Upload text-only report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tibia-linux-client-text-report
+          path: ${{ runner.temp }}/tibia-linux-report
+          if-no-files-found: error
+          retention-days: 1
