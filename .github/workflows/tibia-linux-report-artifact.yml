@@ -63,16 +63,18 @@ jobs:
                   return None, None
 
               print('===== EH FRAME FUNCTION RANGE =====')
-              eh = elf.get_section_by_name('.eh_frame')
               found = False
-              if eh is not None:
-                  for entry in eh.iter_CFI_entries():
+              try:
+                  dwarf = elf.get_dwarf_info()
+                  for entry in dwarf.EH_CFI_entries():
                       if isinstance(entry, FDE):
                           start = int(entry['initial_location'])
                           end = start + int(entry['address_range'])
                           if start <= target < end:
                               print(f'target=0x{target:x} function_start=0x{start:x} function_end=0x{end:x} size=0x{end-start:x}')
                               found = True
+              except Exception as exc:
+                  print(f'eh_frame_error={type(exc).__name__}:{exc}')
               if not found:
                   print('no_fde_found')
 
