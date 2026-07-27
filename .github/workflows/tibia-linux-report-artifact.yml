@@ -1,4 +1,4 @@
-name: Tibia Linux verified findings
+name: Tibia Linux final text artifact
 
 on:
   pull_request:
@@ -12,33 +12,48 @@ permissions:
   contents: read
 
 jobs:
-  findings:
-    name: Print concise verified findings
+  export:
+    name: Export verified static-analysis report
     runs-on: oteryn-staging
-    timeout-minutes: 5
+    timeout-minutes: 7
 
     steps:
-      - name: Read final static-analysis files
+      - name: Copy verified text reports
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm -i \
+          out="${RUNNER_TEMP}/tibia-linux-final-report"
+          rm -rf "${out}"
+          mkdir -p "${out}"
+
+          run_id="$(docker run --rm \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -s <<'SCRIPT'
-          set -eu
-          run_id="$(cat /analysis/latest-client-analysis-run-id)"
-          report="/analysis/client-analysis/${run_id}/report"
-          echo "run_id=${run_id}"
-          echo '--- decode-verification ---'
-          cat "${report}/decode-verification.txt"
-          echo '--- counts ---'
-          cat "${report}/counts.txt"
-          echo '--- elf-header-selected ---'
-          grep -E 'Class:|Data:|Type:|Machine:|Entry point|Number of program headers|Number of section headers' "${report}/elf-header.txt"
-          echo '--- dependencies ---'
-          cat "${report}/dependencies.txt"
-          echo '--- security-auth-indicators-first-120 ---'
-          head -n 120 "${report}/security-auth-indicators.txt"
-          echo '--- urls ---'
-          cat "${report}/urls.txt"
-          SCRIPT
+            alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+
+          docker run --rm \
+            --env "RUN_ID=${run_id}" \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -c \
+            'tar -C "/analysis/client-analysis/${RUN_ID}/report" -cf - \
+              decode-verification.txt counts.txt elf-header.txt dynamic.txt \
+              dependencies.txt notes.txt security-auth-indicators.txt urls.txt \
+              packed-header.txt' \
+            | tar -C "${out}" -xf -
+
+          {
+            echo "analysis_run_id=${run_id}"
+            echo "client_version=15.30.358f69"
+            echo "binary_included=no"
+            echo "source_volume=oteryn-tibia-linux-analysis"
+            echo "exported_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "${out}/artifact-metadata.txt"
+
+          find "${out}" -maxdepth 1 -type f -printf '%s %f\n' | sort -n
+
+      - name: Upload text-only report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tibia-linux-final-text-report
+          path: ${{ runner.temp }}/tibia-linux-final-report
+          if-no-files-found: error
+          retention-days: 1
