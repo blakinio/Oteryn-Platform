@@ -1,4 +1,4 @@
-name: Tibia Linux route and anti-cheat slices
+name: Tibia Linux QLibrary callers
 
 on:
   pull_request:
@@ -11,14 +11,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-qlibrary-callers
+  cancel-in-progress: true
+
 jobs:
-  export:
-    name: Export focused route and anti-cheat slices
+  callers:
+    name: Find QLibrary method callers and BEClient xrefs
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 10
 
     steps:
-      - name: Generate focused disassembly files
+      - name: Persist QLibrary caller report
         shell: bash
         run: |
           set -euo pipefail
@@ -26,35 +30,32 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             alpine:3.22 sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils >/dev/null
+          apk add --no-cache binutils grep >/dev/null
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          o="/analysis/client-analysis/${r}/report/control-slices"
-          rm -rf "$o" && mkdir -p "$o"
-          objdump -d -M intel --no-show-raw-insn --start-address=0x60f900 --stop-address=0x60fb40 "$c" > "$o/login-parser.txt"
-          objdump -d -M intel --no-show-raw-insn --start-address=0x693050 --stop-address=0x693220 "$c" > "$o/use-protected-route.txt"
-          objdump -d -M intel --no-show-raw-insn --start-address=0x69c350 --stop-address=0x69c500 "$c" > "$o/world-addresses.txt"
-          objdump -d -M intel --no-show-raw-insn --start-address=0xaa75d0 --stop-address=0xaa7800 "$c" > "$o/activation-fields.txt"
-          objdump -d -M intel --no-show-raw-insn --start-address=0x191c980 --stop-address=0x191cb80 "$c" > "$o/initial-protected-parser.txt"
-          readelf -Ws "$c" | grep -Ei 'QLibrary|QPluginLoader|loadHints|resolve' > "$o/qt-loader-symbols.txt" || true
-          strings -a -t x -n 4 "$c" | grep -Ei 'QLibrary|QPluginLoader|BEClient|BattlEye|useProtectedNetworkRoute|ProtectedWorldAddress|UnprotectedWorldAddress|initially_protected|anticheatprotection' > "$o/relevant-strings.txt" || true
-          chmod -R a+rX "$o"
+          o="/analysis/client-analysis/${r}/report/qlibrary-callers.txt"
+          d=/tmp/client.disasm
+          objdump -d -M intel --no-show-raw-insn "$c" > "$d"
+          {
+            echo '===== QLIBRARY CALLS ====='
+            grep -E 'call[[:space:]].*<(_ZN8QLibrary11setFileNameERK7QString|_ZN8QLibrary4loadEv|_ZN8QLibrary7resolveEPKc|_ZNK8QLibrary8isLoadedEv|_ZN8QLibrary6unloadEv)@plt>' "$d" || true
+            echo '===== BECLIENT DIRECT XREFS ====='
+            grep -E '#[[:space:]]*1d67997([^0-9a-f]|$)' "$d" || true
+            echo '===== BATTLEYE DIRECT XREFS ====='
+            grep -E '#[[:space:]]*(1c689bb|1d78fc0)([^0-9a-f]|$)' "$d" || true
+            echo '===== COUNTS ====='
+            printf 'qlibrary_calls='
+            grep -Ec 'call[[:space:]].*<(_ZN8QLibrary11setFileNameERK7QString|_ZN8QLibrary4loadEv|_ZN8QLibrary7resolveEPKc|_ZNK8QLibrary8isLoadedEv|_ZN8QLibrary6unloadEv)@plt>' "$d" || true
+            printf 'beclient_xrefs='
+            grep -Ec '#[[:space:]]*1d67997([^0-9a-f]|$)' "$d" || true
+          } > "$o"
+          chmod a+r "$o"
           SCRIPT
 
-      - name: Copy focused slices
+      - name: Print QLibrary caller report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-control-slices"
-          rm -rf "$out" && mkdir -p "$out"
-          r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
-          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/control-slices/." "$out/"
-
-      - name: Upload focused slices
-        uses: actions/upload-artifact@v4
-        with:
-          name: tibia-linux-control-slices
-          path: ${{ runner.temp }}/tibia-control-slices
-          retention-days: 1
+          docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -c 'r=$(cat /analysis/latest-client-analysis-run-id); cat "/analysis/client-analysis/$r/report/qlibrary-callers.txt"'
