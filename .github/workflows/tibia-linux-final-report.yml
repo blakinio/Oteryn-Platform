@@ -1,0 +1,53 @@
+name: Tibia Linux final report
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/tibia-linux-final-report.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    name: Print final verified client report
+    runs-on: oteryn-staging
+    timeout-minutes: 7
+
+    steps:
+      - name: Read persisted analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -s <<'SCRIPT'
+          set -eu
+          run_id="$(cat /analysis/latest-client-analysis-run-id)"
+          root="/analysis/client-analysis/${run_id}"
+          report="${root}/report"
+          client="${root}/download/client"
+
+          echo "run_id=${run_id}"
+          echo '===== VERIFIED CLIENT ====='
+          stat -c 'size=%s' "${client}"
+          sha256sum "${client}"
+          echo
+          echo '===== EXIT ====='
+          cat "${report}/exit-code.txt"
+          echo '===== SUMMARY ====='
+          cat "${report}/summary.txt"
+          echo '===== COUNTS ====='
+          cat "${report}/counts.txt"
+          echo '===== ELF HEADER ====='
+          cat "${report}/elf-header.txt"
+          echo '===== DEPENDENCIES ====='
+          cat "${report}/dependencies.txt"
+          echo '===== SECURITY / AUTH INDICATORS ====='
+          cat "${report}/security-auth-indicators.txt"
+          echo '===== URLS ====='
+          cat "${report}/urls.txt"
+          SCRIPT
