@@ -1,4 +1,4 @@
-name: Tibia Linux persisted route-selection export
+name: Tibia Linux Qt metaobject decoder
 
 on:
   pull_request:
@@ -11,41 +11,281 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-qt-metaobject-decoder
+  cancel-in-progress: true
+
 jobs:
-  export:
-    name: Export persisted protected-route report
+  decode:
+    name: Decode authentication and game-client metaobjects
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 12
 
     steps:
-      - name: Inspect persisted report
+      - name: Decode Qt metadata and static metacalls
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c '
-              r=$(cat /analysis/latest-client-analysis-run-id)
-              p="/analysis/client-analysis/$r/report/protected-route-selection"
-              test -d "$p"
-              echo "run_id=$r"
-              find "$p" -maxdepth 1 -type f -printf "%f\t%s bytes\n" | sort
-            '
+          docker run --rm -i \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            python:3.12-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils coreutils >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
 
-      - name: Copy persisted report
+          run_id="$(cat /analysis/latest-client-analysis-run-id)"
+          client="/analysis/client-analysis/${run_id}/download/client"
+          out="/analysis/client-analysis/${run_id}/report/qt-metaobject-decoder"
+          rm -rf "${out}" && mkdir -p "${out}/metacalls"
+
+          python3 - "${client}" "${out}" <<'PY'
+          import pathlib
+          import struct
+          import sys
+
+          from elftools.elf.elffile import ELFFile
+          from elftools.dwarf.callframe import FDE
+
+          binary, out_dir = sys.argv[1:]
+          targets = {
+              'requestCharacterGameserverLogin',
+              'onStartGameServerLoginStateEntered',
+              'connectClientToGameserverWithExistingCredentials',
+              'onConnectClientToGameserver',
+              'onAbortConnectClientToGameserver',
+          }
+
+          with open(binary, 'rb') as f:
+              blob = f.read()
+              f.seek(0)
+              elf = ELFFile(f)
+              sections = list(elf.iter_sections())
+              dynsym = elf.get_section_by_name('.dynsym')
+
+              def va_to_offset(va):
+                  for sec in sections:
+                      start = int(sec['sh_addr'])
+                      size = int(sec['sh_size'])
+                      if start <= va < start + size:
+                          return int(sec['sh_offset']) + va - start, sec.name
+                  return None, None
+
+              def section_of(va):
+                  _, name = va_to_offset(va)
+                  return name
+
+              resolved = {}
+              for sec in sections:
+                  if sec['sh_type'] != 'SHT_RELA':
+                      continue
+                  linked = elf.get_section(sec['sh_link']) if sec['sh_link'] else None
+                  for rel in sec.iter_relocations():
+                      slot = int(rel['r_offset'])
+                      typ = int(rel['r_info_type'])
+                      addend = int(rel['r_addend']) if rel.is_RELA() else 0
+                      value = None
+                      if typ == 8:  # R_X86_64_RELATIVE
+                          value = addend
+                      elif linked is not None:
+                          sym_index = int(rel['r_info_sym'])
+                          if sym_index:
+                              sym = linked.get_symbol(sym_index)
+                              sym_value = int(sym['st_value'])
+                              if sym_value:
+                                  value = sym_value + addend
+                      if value is not None:
+                          resolved[slot] = value
+
+              def qword(va):
+                  if va in resolved:
+                      return resolved[va]
+                  off, _ = va_to_offset(va)
+                  if off is None or off + 8 > len(blob):
+                      return None
+                  return struct.unpack_from('<Q', blob, off)[0]
+
+              def u32(va):
+                  off, _ = va_to_offset(va)
+                  if off is None or off + 4 > len(blob):
+                      return None
+                  return struct.unpack_from('<I', blob, off)[0]
+
+              def decode_stringdata(base):
+                  first = u32(base)
+                  if first is None or first == 0 or first % 8 != 0:
+                      return None
+                  count = first // 8
+                  if not (1 <= count <= 4096):
+                      return None
+                  strings = []
+                  for i in range(count):
+                      rel = u32(base + i * 8)
+                      length = u32(base + i * 8 + 4)
+                      if rel is None or length is None or length > 20000:
+                          return None
+                      off, sec = va_to_offset(base + rel)
+                      if off is None or off + length > len(blob):
+                          return None
+                      raw = blob[off:off + length]
+                      try:
+                          text = raw.decode('utf-8')
+                      except UnicodeDecodeError:
+                          return None
+                      if any(ord(ch) < 9 or (13 < ord(ch) < 32) for ch in text):
+                          return None
+                      strings.append(text)
+                  return strings
+
+              fdes = []
+              try:
+                  dwarf = elf.get_dwarf_info()
+                  for entry in dwarf.EH_CFI_entries():
+                      if isinstance(entry, FDE):
+                          start = int(entry['initial_location'])
+                          end = start + int(entry['address_range'])
+                          fdes.append((start, end))
+              except Exception:
+                  pass
+
+              def function_range(address):
+                  for start, end in fdes:
+                      if start <= address < end:
+                          return start, end
+                  return address, address + 0x3000
+
+              candidates = []
+              data_rel_ro = elf.get_section_by_name('.data.rel.ro')
+              if data_rel_ro is None:
+                  raise SystemExit('missing .data.rel.ro')
+              start = int(data_rel_ro['sh_addr'])
+              end = start + int(data_rel_ro['sh_size'])
+
+              for va in range(start, end - 56, 8):
+                  words = [qword(va + i * 8) for i in range(7)]
+                  if any(v is None for v in words):
+                      continue
+                  superdata, stringdata, metadata, metacall, related, metatypes, extra = words
+                  if section_of(stringdata) != '.rodata' or section_of(metadata) != '.rodata':
+                      continue
+                  if metacall and section_of(metacall) != '.text':
+                      continue
+                  strings = decode_stringdata(stringdata)
+                  if not strings:
+                      continue
+                  hits = sorted(targets.intersection(strings))
+                  if not hits:
+                      continue
+
+                  header = [u32(metadata + i * 4) for i in range(14)]
+                  if any(v is None for v in header):
+                      continue
+                  revision, class_idx = header[0], header[1]
+                  method_count, method_offset = header[4], header[5]
+                  signal_count = header[13]
+                  if not (0 <= class_idx < len(strings) and method_count < 4096):
+                      continue
+
+                  methods = []
+                  for index in range(method_count):
+                      row = [u32(metadata + (method_offset + index * 6 + j) * 4) for j in range(6)]
+                      if any(v is None for v in row):
+                          break
+                      name_idx, argc, params, tag, flags, meta_types = row
+                      name = strings[name_idx] if name_idx < len(strings) else f'<string#{name_idx}>'
+                      methods.append({
+                          'index': index,
+                          'name': name,
+                          'argc': argc,
+                          'params': params,
+                          'tag': tag,
+                          'flags': flags,
+                          'meta_types': meta_types,
+                          'kind': 'signal' if index < signal_count else 'method',
+                      })
+
+                  candidates.append({
+                      'static_metaobject': va,
+                      'superdata': superdata,
+                      'stringdata': stringdata,
+                      'metadata': metadata,
+                      'metacall': metacall,
+                      'metatypes': metatypes,
+                      'extra': extra,
+                      'revision': revision,
+                      'class_name': strings[class_idx],
+                      'hits': hits,
+                      'strings': strings,
+                      'methods': methods,
+                      'signal_count': signal_count,
+                      'range': function_range(metacall) if metacall else None,
+                  })
+
+              lines = []
+              metacalls = []
+              for c in candidates:
+                  lines.append(f"===== {c['class_name']} =====")
+                  lines.append(f"static_metaobject=0x{c['static_metaobject']:x}")
+                  lines.append(f"superdata=0x{c['superdata']:x} section={section_of(c['superdata'])}")
+                  lines.append(f"stringdata=0x{c['stringdata']:x}")
+                  lines.append(f"metadata=0x{c['metadata']:x}")
+                  lines.append(f"static_metacall=0x{c['metacall']:x}" if c['metacall'] else 'static_metacall=0')
+                  lines.append(f"metatypes=0x{c['metatypes']:x} section={section_of(c['metatypes'])}")
+                  lines.append(f"revision={c['revision']} signal_count={c['signal_count']} hits={','.join(c['hits'])}")
+                  if c['range']:
+                      lines.append(f"metacall_range=0x{c['range'][0]:x}-0x{c['range'][1]:x}")
+                  lines.append('--- methods ---')
+                  for m in c['methods']:
+                      marker = ' <== target' if m['name'] in targets else ''
+                      lines.append(
+                          f"index={m['index']} kind={m['kind']} name={m['name']!r} argc={m['argc']} "
+                          f"flags=0x{m['flags']:x} params={m['params']} meta_types={m['meta_types']}{marker}"
+                      )
+                  lines.append('--- strings ---')
+                  for i, text in enumerate(c['strings']):
+                      if text in targets or i == 0:
+                          lines.append(f"string_index={i} value={text!r}")
+                  lines.append('')
+                  if c['metacall']:
+                      metacalls.append((c['class_name'], c['metacall'], *c['range']))
+
+              pathlib.Path(out_dir, 'decoded-metaobjects.txt').write_text('\n'.join(lines) + '\n')
+              pathlib.Path(out_dir, 'metacalls.tsv').write_text(
+                  ''.join(f"{name}\t{address:x}\t{start:x}\t{end:x}\n" for name, address, start, end in metacalls)
+              )
+              if not candidates:
+                  raise SystemExit('no matching Qt metaobjects decoded')
+          PY
+
+          while IFS=$'\t' read -r class_name address start end; do
+            [ -n "${address}" ] || continue
+            safe="$(printf '%s' "${class_name}" | tr -c 'A-Za-z0-9._-' '_')"
+            # Keep disassembly bounded in case unwind metadata groups several functions.
+            max_end=$((0x${address} + 0x5000))
+            actual_end=$((0x${end}))
+            if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
+            printf -v stop_hex '0x%x' "${actual_end}"
+            objdump -d -M intel --no-show-raw-insn \
+              --start-address="0x${address}" --stop-address="${stop_hex}" "${client}" \
+              > "${out}/metacalls/${safe}-0x${address}.txt"
+          done < "${out}/metacalls.tsv"
+
+          chmod -R a+rX "${out}"
+          SCRIPT
+
+      - name: Copy decoded metaobjects
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-protected-route-selection"
-          rm -rf "$out" && mkdir -p "$out"
-          r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+          out="${RUNNER_TEMP}/tibia-qt-metaobject-decoder"
+          rm -rf "${out}" && mkdir -p "${out}"
+          run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/protected-route-selection/." "$out/"
+          trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/qt-metaobject-decoder/." "${out}/"
 
-      - name: Upload persisted report
+      - name: Upload decoded metaobjects
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-protected-route-selection
-          path: ${{ runner.temp }}/tibia-protected-route-selection
+          name: tibia-linux-qt-metaobject-decoder
+          path: ${{ runner.temp }}/tibia-qt-metaobject-decoder
           retention-days: 1
