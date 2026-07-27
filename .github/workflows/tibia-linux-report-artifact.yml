@@ -1,4 +1,4 @@
-name: Tibia Linux targeted Qt metaobject decoder
+name: Tibia Linux Qt relocation neighborhoods
 
 on:
   pull_request:
@@ -16,13 +16,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  decode:
-    name: Locate metaobjects from exact method strings
+  inspect:
+    name: Inspect Qt string-table relocation neighborhoods
     runs-on: oteryn-staging
-    timeout-minutes: 12
+    timeout-minutes: 7
 
     steps:
-      - name: Locate and decode target metaobjects
+      - name: Generate relocation neighborhood report
         shell: bash
         run: |
           set -euo pipefail
@@ -30,282 +30,86 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils >/dev/null
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
-
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/targeted-qt-metaobject"
-          rm -rf "${out}" && mkdir -p "${out}/metacalls"
+          out="/analysis/client-analysis/${run_id}/report/qt-relocation-neighborhoods"
+          rm -rf "${out}" && mkdir -p "${out}"
 
-          python3 - "${client}" "${out}" <<'PY'
-          import pathlib
-          import struct
-          import sys
-
+          python3 - "${client}" > "${out}/report.txt" <<'PY'
+          import struct, sys
           from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
 
-          binary, out_dir = sys.argv[1:]
-          targets = {
-              'requestCharacterGameserverLogin': 0x1c89a30,
-              'onStartGameServerLoginStateEntered': 0x1c89d7a,
-              'connectClientToGameserverWithExistingCredentials': 0x1c9211b,
-              'onConnectClientToGameserver': 0x1c9229f,
-              'onAbortConnectClientToGameserver': 0x1c922bb,
-          }
+          path=sys.argv[1]
+          ranges=[(0x1c87000,0x1c8b000,'authentication'),(0x1c90000,0x1c94000,'gameclient')]
+          with open(path,'rb') as f:
+              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
+              def v2o(v):
+                  for s in secs:
+                      a=int(s['sh_addr']); z=int(s['sh_size'])
+                      if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
+                  return None,None
+              def qraw(v):
+                  o,_=v2o(v)
+                  if o is None or o+8>len(blob):return None
+                  return struct.unpack_from('<Q',blob,o)[0]
+              relocs={}; rows=[]
+              for s in secs:
+                  if s['sh_type']!='SHT_RELA':continue
+                  linked=elf.get_section(s['sh_link']) if s['sh_link'] else None
+                  for r in s.iter_relocations():
+                      slot=int(r['r_offset']); typ=int(r['r_info_type']); add=int(r['r_addend']) if r.is_RELA() else 0
+                      val=None; sym=''
+                      if typ==8:val=add
+                      elif linked is not None and int(r['r_info_sym']):
+                          sy=linked.get_symbol(int(r['r_info_sym'])); sym=sy.name; sv=int(sy['st_value'])
+                          if sv:val=sv+add
+                      if val is not None:relocs[slot]=val
+                      rows.append((slot,typ,add,val,sym,s.name))
+              def q(v):return relocs.get(v,qraw(v))
+              def sec(v):return v2o(v)[1]
+              def text(v,limit=120):
+                  o,s=v2o(v)
+                  if o is None:return None
+                  e=blob.find(b'\0',o,min(len(blob),o+limit))
+                  if e<=o:return None
+                  raw=blob[o:e]
+                  if sum(32<=b<127 for b in raw)/len(raw)<.92:return None
+                  return raw.decode('utf-8',errors='replace')
 
-          with open(binary, 'rb') as f:
-              blob = f.read()
-              f.seek(0)
-              elf = ELFFile(f)
-              sections = list(elf.iter_sections())
-
-              def va_to_offset(va):
-                  for sec in sections:
-                      start = int(sec['sh_addr'])
-                      size = int(sec['sh_size'])
-                      if start <= va < start + size:
-                          return int(sec['sh_offset']) + va - start, sec.name
-                  return None, None
-
-              def offset_to_va(off):
-                  for sec in sections:
-                      start = int(sec['sh_offset'])
-                      size = int(sec['sh_size'])
-                      if start <= off < start + size:
-                          return int(sec['sh_addr']) + off - start, sec.name
-                  return None, None
-
-              def section_of(va):
-                  return va_to_offset(va)[1]
-
-              resolved = {}
-              reloc_rows = []
-              for sec in sections:
-                  if sec['sh_type'] != 'SHT_RELA':
-                      continue
-                  linked = elf.get_section(sec['sh_link']) if sec['sh_link'] else None
-                  for rel in sec.iter_relocations():
-                      slot = int(rel['r_offset'])
-                      typ = int(rel['r_info_type'])
-                      addend = int(rel['r_addend']) if rel.is_RELA() else 0
-                      value = None
-                      symbol_name = ''
-                      if typ == 8:
-                          value = addend
-                      elif linked is not None:
-                          sym_index = int(rel['r_info_sym'])
-                          if sym_index:
-                              sym = linked.get_symbol(sym_index)
-                              symbol_name = sym.name
-                              sym_value = int(sym['st_value'])
-                              if sym_value:
-                                  value = sym_value + addend
-                      if value is not None:
-                          resolved[slot] = value
-                      reloc_rows.append((slot, typ, addend, value, symbol_name, sec.name))
-
-              def raw_u32(va):
-                  off, _ = va_to_offset(va)
-                  if off is None or off + 4 > len(blob):
-                      return None
-                  return struct.unpack_from('<I', blob, off)[0]
-
-              def raw_qword(va):
-                  off, _ = va_to_offset(va)
-                  if off is None or off + 8 > len(blob):
-                      return None
-                  return struct.unpack_from('<Q', blob, off)[0]
-
-              def qword(va):
-                  return resolved.get(va, raw_qword(va))
-
-              def cstring(va, limit=500):
-                  off, sec = va_to_offset(va)
-                  if off is None:
-                      return None, sec
-                  end = blob.find(b'\0', off, min(len(blob), off + limit))
-                  if end < 0:
-                      return None, sec
-                  raw = blob[off:end]
-                  try:
-                      return raw.decode('utf-8'), sec
-                  except UnicodeDecodeError:
-                      return None, sec
-
-              def find_stringdata_base(target_va, target_text):
-                  length = len(target_text.encode('utf-8'))
-                  start = max(0, target_va - 0x40000)
-                  results = []
-                  for base in range(start & ~3, target_va + 1, 4):
-                      first = raw_u32(base)
-                      if first is None or first == 0 or first % 8:
-                          continue
-                      count = first // 8
-                      if not (1 <= count <= 8192):
-                          continue
-                      if base + first > target_va:
-                          continue
-                      for index in range(count):
-                          rel = raw_u32(base + index * 8)
-                          size = raw_u32(base + index * 8 + 4)
-                          if rel is None or size is None:
-                              break
-                          if size == length and base + rel == target_va:
-                              results.append((base, count, index))
-                              break
-                  return results
-
-              def decode_strings(base, count):
-                  strings = []
-                  for i in range(count):
-                      rel = raw_u32(base + i * 8)
-                      size = raw_u32(base + i * 8 + 4)
-                      if rel is None or size is None or size > 50000:
-                          return None
-                      off, _ = va_to_offset(base + rel)
-                      if off is None or off + size > len(blob):
-                          return None
-                      try:
-                          text = blob[off:off + size].decode('utf-8')
-                      except UnicodeDecodeError:
-                          return None
-                      strings.append(text)
-                  return strings
-
-              fdes = []
-              try:
-                  dwarf = elf.get_dwarf_info()
-                  for entry in dwarf.EH_CFI_entries():
-                      if isinstance(entry, FDE):
-                          start = int(entry['initial_location'])
-                          end = start + int(entry['address_range'])
-                          fdes.append((start, end))
-              except Exception:
-                  pass
-
-              def function_range(address):
-                  for start, end in fdes:
-                      if start <= address < end:
-                          return start, end
-                  return address, address + 0x4000
-
-              report = []
-              metacalls = set()
-              found_any = False
-
-              for target_text, target_va in targets.items():
-                  report.append(f'===== TARGET {target_text} @ 0x{target_va:x} =====')
-                  actual, sec = cstring(target_va)
-                  report.append(f'actual_string={actual!r} section={sec}')
-                  bases = find_stringdata_base(target_va, target_text)
-                  report.append(f'stringdata_candidate_count={len(bases)}')
-                  for base, count, index in bases:
-                      report.append(f'--- stringdata_base=0x{base:x} count={count} target_index={index} ---')
-                      strings = decode_strings(base, count)
-                      if not strings:
-                          report.append('decode_failed')
-                          continue
-                      report.append(f'class_name_candidate={strings[0]!r}')
-                      # Find relocation slots whose resolved value is this stringdata base.
-                      slots = sorted(slot for slot, value in resolved.items() if value == base)
-                      report.append(f'pointer_slots={",".join(hex(x) for x in slots) or "none"}')
-                      for slot in slots:
-                          for possible_q1_offset in (8, 16, 24, 0):
-                              meta_base = slot - possible_q1_offset
-                              words = [qword(meta_base + i * 8) for i in range(8)]
-                              if any(v is None for v in words):
-                                  continue
-                              # QMetaObject::Data layout is normally q1=stringdata, q2=metadata, q3=metacall.
-                              if base not in words[:4]:
-                                  continue
-                              report.append(
-                                  f'metaobject_candidate=0x{meta_base:x} string_slot_offset=0x{possible_q1_offset:x} '
-                                  + ' '.join(f'q{i}=0x{v:x}({section_of(v)})' for i, v in enumerate(words))
-                              )
-                              for metacall_index in (3, 4):
-                                  metacall = words[metacall_index]
-                                  if section_of(metacall) != '.text':
-                                      continue
-                                  # Metadata pointer is usually immediately before metacall.
-                                  metadata = words[metacall_index - 1]
-                                  if section_of(metadata) != '.rodata':
-                                      continue
-                                  header = [raw_u32(metadata + i * 4) for i in range(14)]
-                                  if any(v is None for v in header):
-                                      continue
-                                  method_count = header[4]
-                                  method_offset = header[5]
-                                  signal_count = header[13]
-                                  if method_count > 4096 or method_offset > 100000:
-                                      continue
-                                  report.append(
-                                      f'validated_metaobject class={strings[0]!r} metadata=0x{metadata:x} '
-                                      f'metacall=0x{metacall:x} methods={method_count} signals={signal_count}'
-                                  )
-                                  for mi in range(method_count):
-                                      row = [raw_u32(metadata + (method_offset + mi * 6 + j) * 4) for j in range(6)]
-                                      if any(v is None for v in row):
-                                          break
-                                      name_idx, argc, params, tag, flags, meta_types = row
-                                      name = strings[name_idx] if name_idx < len(strings) else f'<string#{name_idx}>'
-                                      marker = ' <== TARGET' if name in targets else ''
-                                      report.append(
-                                          f'method index={mi} kind={"signal" if mi < signal_count else "method"} '
-                                          f'name={name!r} argc={argc} flags=0x{flags:x} params={params} meta_types={meta_types}{marker}'
-                                      )
-                                  start, end = function_range(metacall)
-                                  report.append(f'metacall_range=0x{start:x}-0x{end:x}')
-                                  metacalls.add((strings[0], metacall, start, end))
-                                  found_any = True
-                  report.append('')
-
-              report.append('===== RELOCATIONS WITH ADDENDS NEAR TARGET STRING TABLES =====')
-              for slot, typ, addend, value, symbol, relsec in reloc_rows:
-                  if (0x1c87000 <= addend <= 0x1c8b000) or (0x1c90000 <= addend <= 0x1c94000):
-                      report.append(
-                          f'slot=0x{slot:x} slot_section={section_of(slot)} type={typ} addend=0x{addend:x} '
-                          f'value={None if value is None else hex(value)} symbol={symbol!r} reloc_section={relsec}'
-                      )
-
-              pathlib.Path(out_dir, 'targeted-metaobjects.txt').write_text('\n'.join(report) + '\n')
-              pathlib.Path(out_dir, 'metacalls.tsv').write_text(
-                  ''.join(f'{name}\t{address:x}\t{start:x}\t{end:x}\n' for name, address, start, end in sorted(metacalls))
-              )
-              if not found_any:
-                  pathlib.Path(out_dir, 'NOT_FOUND').write_text('No validated metaobject; inspect targeted-metaobjects.txt\n')
+              selected=[]
+              for row in rows:
+                  slot,typ,add,val,sym,rs=row
+                  for lo,hi,label in ranges:
+                      if lo<=add<hi or (val is not None and lo<=val<hi):
+                          selected.append((label,row));break
+              print(f'selected_relocation_count={len(selected)}')
+              for label,(slot,typ,add,val,sym,rs) in selected:
+                  print(f'===== {label} relocation slot=0x{slot:x} slot_section={sec(slot)} type={typ} addend=0x{add:x} value={None if val is None else hex(val)} symbol={sym!r} reloc_section={rs} =====')
+                  for delta in range(-0x30,0x49,8):
+                      va=slot+delta; value=q(va)
+                      print(f'  slot{delta:+#x}=0x{va:x} raw={None if qraw(va) is None else hex(qraw(va))} resolved={None if value is None else hex(value)} target_section={None if value is None else sec(value)} text={None if value is None else text(value)!r}')
+              print('===== EXACT TARGET STRING BYTES =====')
+              for va in (0x1c89a30,0x1c89d7a,0x1c9211b,0x1c9229f,0x1c922bb):
+                  print(f'va=0x{va:x} section={sec(va)} text={text(va,200)!r}')
           PY
-
-          while IFS=$'\t' read -r class_name address start end; do
-            [ -n "${address}" ] || continue
-            safe="$(printf '%s' "${class_name}" | tr -c 'A-Za-z0-9._-' '_')"
-            max_end=$((0x${address} + 0x6000))
-            actual_end=$((0x${end}))
-            if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
-            printf -v stop_hex '0x%x' "${actual_end}"
-            objdump -d -M intel --no-show-raw-insn \
-              --start-address="0x${address}" --stop-address="${stop_hex}" "${client}" \
-              > "${out}/metacalls/${safe}-0x${address}.txt"
-          done < "${out}/metacalls.tsv"
-
           chmod -R a+rX "${out}"
           SCRIPT
 
-      - name: Copy targeted decoder report
+      - name: Copy report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-targeted-qt-metaobject"
+          out="${RUNNER_TEMP}/tibia-qt-relocation-neighborhoods"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/targeted-qt-metaobject/." "${out}/"
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/qt-relocation-neighborhoods/." "${out}/"
 
-      - name: Upload targeted decoder report
+      - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-targeted-qt-metaobject
-          path: ${{ runner.temp }}/tibia-targeted-qt-metaobject
+          name: tibia-linux-qt-relocation-neighborhoods
+          path: ${{ runner.temp }}/tibia-qt-relocation-neighborhoods
           retention-days: 1
