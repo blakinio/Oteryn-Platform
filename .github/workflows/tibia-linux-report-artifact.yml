@@ -1,4 +1,4 @@
-name: Tibia Linux focused QLibrary slices
+name: Tibia Linux BattlEye Init call path
 
 on:
   pull_request:
@@ -13,12 +13,12 @@ permissions:
 
 jobs:
   export:
-    name: Export focused QLibrary anti-cheat slices
+    name: Export BattlEye Init control flow
     runs-on: oteryn-staging
     timeout-minutes: 7
 
     steps:
-      - name: Generate annotated QLibrary slices
+      - name: Generate annotated Init path
         shell: bash
         run: |
           set -euo pipefail
@@ -30,18 +30,14 @@ jobs:
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          o="/analysis/client-analysis/${r}/report/qlibrary-slices"
-          rm -rf "$o" && mkdir -p "$o"
-
-          make_slice() {
-            name="$1"; start="$2"; stop="$3"
-            d="/tmp/${name}.txt"
-            objdump -d -M intel --no-show-raw-insn --start-address="$start" --stop-address="$stop" "$c" > "$d"
-            {
-              echo '===== DISASSEMBLY ====='
-              cat "$d"
-              echo '===== REFERENCED STRINGS ====='
-              python3 - "$c" "$d" <<'PY'
+          o="/analysis/client-analysis/${r}/report/battleye-init-path.txt"
+          d=/tmp/init-path.txt
+          objdump -d -M intel --no-show-raw-insn --start-address=0x6fb300 --stop-address=0x6fb760 "$c" > "$d"
+          {
+            echo '===== DISASSEMBLY ====='
+            cat "$d"
+            echo '===== REFERENCED STRINGS ====='
+            python3 - "$c" "$d" <<'PY'
           import re,sys
           from elftools.elf.elffile import ELFFile
           binary,disasm=sys.argv[1:]
@@ -57,36 +53,30 @@ jobs:
           for va in vas:
               p,sec=off(va);value=None
               if p is not None:
-                  e=blob.find(b'\0',p,min(len(blob),p+300))
+                  e=blob.find(b'\0',p,min(len(blob),p+400))
                   if e>p:
                       raw=blob[p:e]
                       if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>=.85:
                           value=raw.decode(errors='replace')
               if value is not None: print(f'va=0x{va:x} section={sec} string={value!r}')
           PY
-            } > "$o/${name}.txt"
-          }
-
-          make_slice qlibrary-resolve 0x6fb250 0x6fb3c0
-          make_slice qlibrary-load 0x6fb740 0x6fb900
-          make_slice beclient-xref 0xc946b0 0xc94880
-          chmod -R a+rX "$o"
+          } > "$o"
+          chmod a+r "$o"
           SCRIPT
 
-      - name: Copy focused slices
+      - name: Copy Init path report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-qlibrary-slices"
-          rm -rf "$out" && mkdir -p "$out"
+          out="${RUNNER_TEMP}/battleye-init-path.txt"
           r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/qlibrary-slices/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/$r/report/battleye-init-path.txt" "$out"
 
-      - name: Upload QLibrary slices
+      - name: Upload Init path text
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-qlibrary-slices
-          path: ${{ runner.temp }}/tibia-qlibrary-slices
+          name: tibia-linux-battleye-init-path
+          path: ${{ runner.temp }}/battleye-init-path.txt
           retention-days: 1
