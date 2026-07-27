@@ -1,4 +1,4 @@
-name: Tibia Linux BEClient module analysis
+name: Tibia Linux BEClient findings
 
 on:
   pull_request:
@@ -11,113 +11,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-beclient-analysis
-  cancel-in-progress: true
-
 jobs:
-  analyze:
-    name: Verify and inspect native BEClient module
+  findings:
+    name: Print concise BEClient findings
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 5
 
     steps:
-      - name: Download, decode and inspect BEClient.so
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -i \
-            --network bridge \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            alpine:3.22 sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils ca-certificates coreutils curl file jq python3 xz >/dev/null
-
-          manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
-          manifest="/analysis/package-manifests/${manifest_run}/package.json"
-          root="/analysis/beclient-analysis"
-          download="${root}/download"
-          report="${root}/report"
-          rm -rf "${root}"
-          mkdir -p "${download}" "${report}"
-
-          record="$(jq -c '.files[] | select(.localfile == "bin/BattlEye/BEClient.so")' "${manifest}")"
-          config_record="$(jq -c '.files[] | select(.localfile == "bin/BattlEye/BEClient.cfg")' "${manifest}")"
-          test -n "${record}"
-          test -n "${config_record}"
-
-          relative_url="$(printf '%s' "${record}" | jq -r '.url')"
-          packed_hash="$(printf '%s' "${record}" | jq -r '.packedhash')"
-          packed_size="$(printf '%s' "${record}" | jq -r '.packedsize')"
-          unpacked_hash="$(printf '%s' "${record}" | jq -r '.unpackedhash')"
-          unpacked_size="$(printf '%s' "${record}" | jq -r '.unpackedsize')"
-
-          base='https://static.tibia.com/launcher/tibiaclient-linux-current'
-          url="${base}/${relative_url}"
-          packed="${download}/BEClient.so.lzma"
-          normalized="${download}/BEClient.normalized.lzma"
-          module="${download}/BEClient.so"
-
-          curl --fail --location --silent --show-error --compressed \
-            --referer "${url}" --retry 5 --retry-delay 2 \
-            --output "${packed}" "${url}"
-
-          test "$(stat -c %s "${packed}")" = "${packed_size}"
-          test "$(sha256sum "${packed}" | awk '{print $1}')" = "${packed_hash}"
-
-          python3 - "${packed}" "${normalized}" "${unpacked_size}" <<'PY'
-          import pathlib, struct, sys
-          source, target, expected = sys.argv[1:]
-          data = pathlib.Path(source).read_bytes()
-          if len(data) < 45:
-              raise SystemExit("short wrapped stream")
-          props = data[32:37]
-          stored = struct.unpack("<Q", data[37:45])[0]
-          payload = data[45:]
-          if stored != len(payload):
-              raise SystemExit(f"payload length mismatch: {stored} != {len(payload)}")
-          pathlib.Path(target).write_bytes(props + struct.pack("<Q", int(expected)) + payload)
-          PY
-
-          xz --format=lzma --decompress --stdout "${normalized}" > "${module}"
-          test "$(stat -c %s "${module}")" = "${unpacked_size}"
-          test "$(sha256sum "${module}" | awk '{print $1}')" = "${unpacked_hash}"
-          chmod +x "${module}"
-
-          config_url="${base}/$(printf '%s' "${config_record}" | jq -r '.url')"
-          curl --fail --location --silent --show-error --compressed \
-            --referer "${config_url}" --retry 5 --retry-delay 2 \
-            --output "${download}/BEClient.cfg" "${config_url}"
-          test "$(sha256sum "${download}/BEClient.cfg" | awk '{print $1}')" = "$(printf '%s' "${config_record}" | jq -r '.unpackedhash')"
-
-          {
-            echo "source_url=${url}"
-            echo "packed_size=$(stat -c %s "${packed}")"
-            echo "packed_sha256=$(sha256sum "${packed}" | awk '{print $1}')"
-            echo "unpacked_size=$(stat -c %s "${module}")"
-            echo "unpacked_sha256=$(sha256sum "${module}" | awk '{print $1}')"
-            printf 'file='
-            file -b "${module}"
-            echo "config_size=$(stat -c %s "${download}/BEClient.cfg")"
-            echo "config_sha256=$(sha256sum "${download}/BEClient.cfg" | awk '{print $1}')"
-          } > "${report}/summary.txt"
-
-          readelf -h "${module}" > "${report}/elf-header.txt"
-          readelf -d "${module}" > "${report}/dynamic.txt"
-          readelf -Ws "${module}" > "${report}/symbols.txt" 2>/dev/null || true
-          readelf -n "${module}" > "${report}/notes.txt" 2>/dev/null || true
-          strings -a -n 4 "${module}" > "${report}/strings.txt"
-
-          grep -E 'NEEDED|RPATH|RUNPATH|SONAME' "${report}/dynamic.txt" > "${report}/dependencies.txt" || true
-          awk '$4 == "FUNC" && ($5 == "GLOBAL" || $5 == "WEAK") && $7 != "UND" {print}' "${report}/symbols.txt" > "${report}/exports.txt" || true
-          grep -Ei 'battleye|beclient|service|update|heartbeat|packet|server|client|game|version|guid|session|socket|connect|send|recv|dlopen|dlsym|ptrace|proc|module|integrity' \
-            "${report}/strings.txt" | sort -u | head -n 500 > "${report}/selected-strings.txt" || true
-          cp "${download}/BEClient.cfg" "${report}/BEClient.cfg"
-
-          chmod -R a+rX "${root}"
-          SCRIPT
-
-      - name: Print concise BEClient report
+      - name: Read persisted BEClient analysis
         shell: bash
         run: |
           set -euo pipefail
@@ -128,13 +29,14 @@ jobs:
           report='/analysis/beclient-analysis/report'
           echo '===== SUMMARY ====='
           cat "${report}/summary.txt"
-          echo '===== CONFIG HEX / TEXT ====='
+          echo '===== CONFIG HEX ====='
           od -An -tx1 -v "${report}/BEClient.cfg"
+          echo '===== CONFIG TEXT ====='
           cat "${report}/BEClient.cfg" || true
           echo '===== DEPENDENCIES ====='
           cat "${report}/dependencies.txt"
           echo '===== EXPORTED FUNCTIONS ====='
-          head -n 100 "${report}/exports.txt"
+          head -n 80 "${report}/exports.txt"
           echo '===== SELECTED STRINGS ====='
-          head -n 160 "${report}/selected-strings.txt"
+          head -n 120 "${report}/selected-strings.txt"
           SCRIPT
