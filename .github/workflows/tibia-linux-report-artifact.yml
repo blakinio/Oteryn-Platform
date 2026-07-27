@@ -1,4 +1,4 @@
-name: Tibia Linux Qt jump-table targets
+name: Tibia Linux mapped login functions
 
 on:
   pull_request:
@@ -9,83 +9,43 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-qt-jump-targets
-  cancel-in-progress: true
-
 jobs:
-  trace:
-    name: Map login metacall indices to functions
+  export:
+    name: Export mapped login target functions
     runs-on: oteryn-staging
-    timeout-minutes: 10
+    timeout-minutes: 8
     steps:
-      - name: Decode jump tables and target functions
+      - name: Generate target disassembly from persisted map
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            python:3.12-alpine sh -s <<'SCRIPT'
+            alpine:3.22 sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils python3 >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
+          apk add --no-cache binutils coreutils >/dev/null
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
           out="/analysis/client-analysis/${run_id}/report/qt-jump-targets"
-          rm -rf "${out}" && mkdir -p "${out}/functions"
-
-          python3 - "${client}" "${out}" <<'PY'
-          import pathlib, struct, sys
-          from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-
-          binary,out_dir=sys.argv[1:]
-          blob=open(binary,'rb').read()
-          tables=[
-              ('AuthenticationController',0x1d6b940,51,{5:'requestCharacterGameserverLogin',27:'onStartGameServerLoginStateEntered'}),
-              ('TGameClient',0x1d6bd00,44,{11:'connectClientToGameserverWithExistingCredentials',20:'onConnectClientToGameserver',21:'onAbortConnectClientToGameserver'}),
-          ]
-          with open(binary,'rb') as f:
-              elf=ELFFile(f)
-              fdes=[]
-              try:
-                  dwarf=elf.get_dwarf_info()
-                  for entry in dwarf.EH_CFI_entries():
-                      if isinstance(entry,FDE):
-                          start=int(entry['initial_location']); fdes.append((start,start+int(entry['address_range'])))
-              except Exception: pass
-          def frange(addr):
-              for s,e in fdes:
-                  if s<=addr<e:return s,e
-              return addr,addr+0x3000
-          lines=[]; selected=[]
-          for label,base,count,names in tables:
-              lines.append(f'===== {label} table=0x{base:x} =====')
-              for i in range(count):
-                  rel=struct.unpack_from('<i',blob,base+i*4)[0]
-                  target=(base+rel)&0xffffffffffffffff
-                  marker=''
-                  if i in names:
-                      s,e=frange(target)
-                      marker=f' <== {names[i]} function=0x{s:x}-0x{e:x}'
-                      selected.append((label,i,names[i],target,s,e))
-                  lines.append(f'index={i} rel={rel:+#x} target=0x{target:x}{marker}')
-              lines.append('')
-          pathlib.Path(out_dir,'jump-targets.txt').write_text('\n'.join(lines)+'\n')
-          pathlib.Path(out_dir,'selected.tsv').write_text(''.join(f'{label}\t{i}\t{name}\t{target:x}\t{s:x}\t{e:x}\n' for label,i,name,target,s,e in selected))
-          PY
-
-          while IFS=$'\t' read -r class_name index method target start end; do
+          test -s "${out}/selected.tsv"
+          mkdir -p "${out}/functions"
+          cat "${out}/jump-targets.txt"
+          echo '===== SELECTED ====='
+          cat "${out}/selected.tsv"
+          while IFS="$(printf '\t')" read -r class_name index method target start end; do
             [ -n "${target}" ] || continue
-            max_end=$((0x${start}+0x9000)); actual_end=$((0x${end}))
+            max_end=$((0x${start}+0x9000))
+            actual_end=$((0x${end}))
             if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
-            printf -v stop_hex '0x%x' "${actual_end}"
+            stop_hex="$(printf '0x%x' "${actual_end}")"
             safe="${class_name}-${index}-${method}"
-            objdump -d -M intel --no-show-raw-insn --start-address="0x${start}" --stop-address="${stop_hex}" "${client}" > "${out}/functions/${safe}.txt"
+            objdump -d -M intel --no-show-raw-insn \
+              --start-address="0x${start}" --stop-address="${stop_hex}" "${client}" \
+              > "${out}/functions/${safe}.txt"
           done < "${out}/selected.tsv"
           chmod -R a+rX "${out}"
           SCRIPT
-      - name: Copy target report
+      - name: Copy mapped report
         shell: bash
         run: |
           set -euo pipefail
@@ -95,7 +55,7 @@ jobs:
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
           docker cp "${cid}:/analysis/client-analysis/${run_id}/report/qt-jump-targets/." "${out}/"
-      - name: Upload target report
+      - name: Upload mapped report
         uses: actions/upload-artifact@v4
         with:
           name: tibia-linux-qt-jump-targets
