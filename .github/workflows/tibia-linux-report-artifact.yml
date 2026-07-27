@@ -1,4 +1,4 @@
-name: Tibia Linux exact login metacalls
+name: Tibia Linux Qt jump-table targets
 
 on:
   pull_request:
@@ -10,92 +10,94 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-exact-login-metacalls
+  group: tibia-linux-qt-jump-targets
   cancel-in-progress: true
 
 jobs:
-  decode:
-    name: Decode exact auth-controller and gameclient metacalls
+  trace:
+    name: Map login metacall indices to functions
     runs-on: oteryn-staging
     timeout-minutes: 10
     steps:
-      - name: Decode metadata tables and disassemble metacalls
+      - name: Decode jump tables and target functions
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            alpine:3.22 sh -s <<'SCRIPT'
+            python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils grep python3 >/dev/null
+          apk add --no-cache binutils coreutils python3 >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/exact-login-metacalls"
-          rm -rf "${out}" && mkdir -p "${out}"
-          python3 - "${client}" > "${out}/decoded-methods.txt" <<'PY'
-          import struct, sys
-          blob=open(sys.argv[1],'rb').read()
-          classes=[
-              ('AuthenticationController',0x1c89760,0x1c89140,0xcf9710),
-              ('TGameClient',0x1c91cf4,0x1c91740,0xd04dc0),
+          out="/analysis/client-analysis/${run_id}/report/qt-jump-targets"
+          rm -rf "${out}" && mkdir -p "${out}/functions"
+
+          python3 - "${client}" "${out}" <<'PY'
+          import pathlib, struct, sys
+          from elftools.elf.elffile import ELFFile
+          from elftools.dwarf.callframe import FDE
+
+          binary,out_dir=sys.argv[1:]
+          blob=open(binary,'rb').read()
+          tables=[
+              ('AuthenticationController',0x1d6b940,51,{5:'requestCharacterGameserverLogin',27:'onStartGameServerLoginStateEntered'}),
+              ('TGameClient',0x1d6bd00,44,{11:'connectClientToGameserverWithExistingCredentials',20:'onConnectClientToGameserver',21:'onAbortConnectClientToGameserver'}),
           ]
-          targets={
-              'requestCharacterGameserverLogin',
-              'onStartGameServerLoginStateEntered',
-              'connectClientToGameserverWithExistingCredentials',
-              'onConnectClientToGameserver',
-              'onAbortConnectClientToGameserver',
-          }
-          def u32(va): return struct.unpack_from('<I',blob,va)[0]
-          for label,stringdata,metadata,metacall in classes:
-              print(f'===== {label} =====')
-              first=u32(stringdata)
-              print(f'stringdata=0x{stringdata:x} metadata=0x{metadata:x} metacall=0x{metacall:x} first=0x{first:x}')
-              if first==0 or first%8:
-                  print('invalid_stringdata'); continue
-              count=first//8
-              strings=[]
+          with open(binary,'rb') as f:
+              elf=ELFFile(f)
+              fdes=[]
+              try:
+                  dwarf=elf.get_dwarf_info()
+                  for entry in dwarf.EH_CFI_entries():
+                      if isinstance(entry,FDE):
+                          start=int(entry['initial_location']); fdes.append((start,start+int(entry['address_range'])))
+              except Exception: pass
+          def frange(addr):
+              for s,e in fdes:
+                  if s<=addr<e:return s,e
+              return addr,addr+0x3000
+          lines=[]; selected=[]
+          for label,base,count,names in tables:
+              lines.append(f'===== {label} table=0x{base:x} =====')
               for i in range(count):
-                  rel=u32(stringdata+i*8); ln=u32(stringdata+i*8+4)
-                  strings.append(blob[stringdata+rel:stringdata+rel+ln].decode('utf-8'))
-              class_name=repr(strings[0]) if strings else 'None'
-              print(f'string_count={count} class_name={class_name}')
-              header=[u32(metadata+i*4) for i in range(14)]
-              print('metadata_header='+' '.join(hex(x) for x in header))
-              method_count,method_offset,signal_count=header[4],header[5],header[13]
-              print(f'method_count={method_count} method_offset={method_offset} signal_count={signal_count}')
-              for i in range(method_count):
-                  row=[u32(metadata+(method_offset+i*6+j)*4) for j in range(6)]
-                  ni,argc,params,tag,flags,mtypes=row
-                  name=strings[ni] if ni<len(strings) else f'<string#{ni}>'
-                  marker=' <== TARGET' if name in targets else ''
-                  kind='signal' if i<signal_count else 'method'
-                  print(f'method index={i} kind={kind} name={name!r} argc={argc} flags=0x{flags:x} params={params} meta_types={mtypes}{marker}')
-              print()
+                  rel=struct.unpack_from('<i',blob,base+i*4)[0]
+                  target=(base+rel)&0xffffffffffffffff
+                  marker=''
+                  if i in names:
+                      s,e=frange(target)
+                      marker=f' <== {names[i]} function=0x{s:x}-0x{e:x}'
+                      selected.append((label,i,names[i],target,s,e))
+                  lines.append(f'index={i} rel={rel:+#x} target=0x{target:x}{marker}')
+              lines.append('')
+          pathlib.Path(out_dir,'jump-targets.txt').write_text('\n'.join(lines)+'\n')
+          pathlib.Path(out_dir,'selected.tsv').write_text(''.join(f'{label}\t{i}\t{name}\t{target:x}\t{s:x}\t{e:x}\n' for label,i,name,target,s,e in selected))
           PY
-          objdump -d -M intel --no-show-raw-insn --start-address=0xcf9710 --stop-address=0xcf9e80 "${client}" > "${out}/AuthenticationController-metacall.txt"
-          objdump -d -M intel --no-show-raw-insn --start-address=0xd04dc0 --stop-address=0xd05472 "${client}" > "${out}/TGameClient-metacall.txt"
-          {
-            echo '===== AUTH METACALL CONTROL FLOW ====='
-            grep -n -E '(cmp|test|je|jne|ja|jmp|call)' "${out}/AuthenticationController-metacall.txt" || true
-            echo '===== GAMECLIENT METACALL CONTROL FLOW ====='
-            grep -n -E '(cmp|test|je|jne|ja|jmp|call)' "${out}/TGameClient-metacall.txt" || true
-          } > "${out}/metacall-control-flow.txt"
+
+          while IFS=$'\t' read -r class_name index method target start end; do
+            [ -n "${target}" ] || continue
+            max_end=$((0x${start}+0x9000)); actual_end=$((0x${end}))
+            if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
+            printf -v stop_hex '0x%x' "${actual_end}"
+            safe="${class_name}-${index}-${method}"
+            objdump -d -M intel --no-show-raw-insn --start-address="0x${start}" --stop-address="${stop_hex}" "${client}" > "${out}/functions/${safe}.txt"
+          done < "${out}/selected.tsv"
           chmod -R a+rX "${out}"
           SCRIPT
-      - name: Copy exact login metacalls
+      - name: Copy target report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-exact-login-metacalls"
+          out="${RUNNER_TEMP}/tibia-qt-jump-targets"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/exact-login-metacalls/." "${out}/"
-      - name: Upload exact login metacalls
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/qt-jump-targets/." "${out}/"
+      - name: Upload target report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-exact-login-metacalls
-          path: ${{ runner.temp }}/tibia-exact-login-metacalls
+          name: tibia-linux-qt-jump-targets
+          path: ${{ runner.temp }}/tibia-qt-jump-targets
           retention-days: 1
