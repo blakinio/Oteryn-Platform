@@ -1,4 +1,4 @@
-name: Tibia Linux compression identification
+name: Tibia Linux compression probe report
 
 on:
   pull_request:
@@ -11,159 +11,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-compression-identification
-  cancel-in-progress: true
-
 jobs:
-  identify:
-    name: Identify and decode packed Linux client
+  report:
+    name: Print persisted compression probe
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 5
 
     steps:
-      - name: Inspect header and try supported decoders
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -i \
-            --network bridge \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            golang:1.24-alpine sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache coreutils file jq xz zstd gzip bzip2 >/dev/null
-
-          run_id="$(cat /analysis/latest-client-analysis-run-id)"
-          root="/analysis/client-analysis/${run_id}"
-          packed="${root}/download/client.lzma"
-          report="${root}/report"
-          manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
-          manifest="/analysis/package-manifests/${manifest_run}/package.json"
-          record="$(jq -c '.files[] | select(.localfile == "bin/client")' "${manifest}")"
-          expected_hash="$(printf '%s' "${record}" | jq -r '.unpackedhash')"
-          expected_size="$(printf '%s' "${record}" | jq -r '.unpackedsize')"
-          mkdir -p "${report}" /tmp/tibia-format
-
-          {
-            echo "packed_size=$(stat -c %s "${packed}")"
-            echo "packed_sha256=$(sha256sum "${packed}" | awk '{print $1}')"
-            echo "file=$(file -b "${packed}")"
-            echo "first_128_hex=$(od -An -tx1 -N128 "${packed}" | tr -s ' ' | tr '\n' ' ' | sed 's/^ //;s/ $//')"
-            echo "first_64_ascii=$(od -An -tc -N64 "${packed}" | tr -s ' ' | tr '\n' ' ' | sed 's/^ //;s/ $//')"
-          } | tee "${report}/packed-header.txt"
-
-          cd /tmp/tibia-format
-          cat > go.mod <<'EOF'
-          module tibia-format-probe
-
-          go 1.24
-
-          require github.com/ulikunitz/xz v0.5.11
-          EOF
-          cat > main.go <<'EOF'
-          package main
-
-          import (
-            "crypto/sha256"
-            "fmt"
-            "io"
-            "os"
-
-            "github.com/ulikunitz/xz"
-            "github.com/ulikunitz/xz/lzma"
-          )
-
-          type opener struct {
-            name string
-            open func(io.Reader) (io.Reader, error)
-          }
-
-          func attempt(inPath, outDir string, op opener) {
-            in, err := os.Open(inPath)
-            if err != nil {
-              fmt.Printf("decoder=%s open_input_error=%q\n", op.name, err)
-              return
-            }
-            r, err := op.open(in)
-            if err != nil {
-              in.Close()
-              fmt.Printf("decoder=%s init_error=%q\n", op.name, err)
-              return
-            }
-            outPath := outDir + "/decoded-" + op.name
-            out, err := os.Create(outPath)
-            if err != nil {
-              in.Close()
-              fmt.Printf("decoder=%s create_output_error=%q\n", op.name, err)
-              return
-            }
-            h := sha256.New()
-            n, copyErr := io.Copy(io.MultiWriter(out, h), r)
-            closeErr := out.Close()
-            in.Close()
-            if copyErr != nil {
-              fmt.Printf("decoder=%s copy_error=%q bytes=%d\n", op.name, copyErr, n)
-              return
-            }
-            if closeErr != nil {
-              fmt.Printf("decoder=%s close_error=%q bytes=%d\n", op.name, closeErr, n)
-              return
-            }
-            fmt.Printf("decoder=%s success=true bytes=%d sha256=%x output=%s\n", op.name, n, h.Sum(nil), outPath)
-          }
-
-          func main() {
-            if len(os.Args) != 3 {
-              fmt.Fprintln(os.Stderr, "usage: probe input output-dir")
-              os.Exit(2)
-            }
-            attempts := []opener{
-              {"lzma", func(r io.Reader) (io.Reader, error) { return lzma.NewReader(r) }},
-              {"lzma2-8m", func(r io.Reader) (io.Reader, error) { return lzma.NewReader2(r) }},
-              {"lzma2-64m", func(r io.Reader) (io.Reader, error) {
-                return (lzma.Reader2Config{DictCap: 64 << 20}).NewReader2(r)
-              }},
-              {"xz", func(r io.Reader) (io.Reader, error) { return xz.NewReader(r) }},
-            }
-            for _, op := range attempts {
-              attempt(os.Args[1], os.Args[2], op)
-            }
-          }
-          EOF
-
-          go mod download
-          go run . "${packed}" "${root}/download" 2>&1 | tee "${report}/go-format-probe.txt"
-
-          {
-            echo '===== command probes ====='
-            for probe in \
-              'xz --format=lzma --test' \
-              'xz --format=xz --test' \
-              'zstd --test' \
-              'gzip --test' \
-              'bzip2 --test'; do
-              set +e
-              output="$(sh -c "${probe} \"${packed}\"" 2>&1)"
-              rc=$?
-              set -e
-              printf 'probe=%s rc=%s output=%s\n' "${probe}" "${rc}" "${output}"
-            done
-          } | tee "${report}/command-format-probes.txt"
-
-          echo '===== decoded candidates =====' | tee "${report}/decoded-candidates.txt"
-          find "${root}/download" -maxdepth 1 -type f -name 'decoded-*' -print | sort | while IFS= read -r candidate; do
-            size="$(stat -c %s "${candidate}")"
-            hash="$(sha256sum "${candidate}" | awk '{print $1}')"
-            kind="$(file -b "${candidate}")"
-            printf 'candidate=%s size=%s sha256=%s file=%s expected_size_match=%s expected_hash_match=%s\n' \
-              "${candidate}" "${size}" "${hash}" "${kind}" \
-              "$([ "${size}" = "${expected_size}" ] && echo yes || echo no)" \
-              "$([ "${hash}" = "${expected_hash}" ] && echo yes || echo no)" \
-              | tee -a "${report}/decoded-candidates.txt"
-          done
-          SCRIPT
-
-      - name: Print format probe result
+      - name: Read probe files from analysis volume
         shell: bash
         run: |
           set -euo pipefail
@@ -173,12 +28,18 @@ jobs:
           set -eu
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           report="/analysis/client-analysis/${run_id}/report"
+          download="/analysis/client-analysis/${run_id}/download"
+          echo "run_id=${run_id}"
+          echo '===== REPORT FILES ====='
+          find "${report}" -maxdepth 1 -type f -exec stat -c '%s %n' {} \; | sort -n
           echo '===== PACKED HEADER ====='
-          cat "${report}/packed-header.txt"
-          echo '===== GO PROBES ====='
-          cat "${report}/go-format-probe.txt"
+          test ! -f "${report}/packed-header.txt" || cat "${report}/packed-header.txt"
+          echo '===== GO FORMAT PROBE ====='
+          test ! -f "${report}/go-format-probe.txt" || cat "${report}/go-format-probe.txt"
           echo '===== COMMAND PROBES ====='
-          cat "${report}/command-format-probes.txt"
+          test ! -f "${report}/command-format-probes.txt" || cat "${report}/command-format-probes.txt"
           echo '===== DECODED CANDIDATES ====='
-          cat "${report}/decoded-candidates.txt"
+          test ! -f "${report}/decoded-candidates.txt" || cat "${report}/decoded-candidates.txt"
+          echo '===== CANDIDATE FILES ====='
+          find "${download}" -maxdepth 1 -type f -name 'decoded-*' -exec stat -c '%s %n' {} \; | sort -n || true
           SCRIPT
