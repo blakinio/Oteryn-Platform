@@ -1,4 +1,4 @@
-name: Tibia Linux verification diagnostics
+name: Tibia Linux Go LZMA decode
 
 on:
   pull_request:
@@ -11,22 +11,27 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-go-lzma-decode
+  cancel-in-progress: true
+
 jobs:
-  diagnose:
-    name: Diagnose downloaded Linux client files
+  decode:
+    name: Decode and inspect verified Linux client
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 15
 
     steps:
-      - name: Compare persisted files with manifest
+      - name: Decode with exact packer library
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -s <<'SCRIPT'
-          set -eu
-          apk add --no-cache coreutils file findutils jq xz >/dev/null
+            --network bridge \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            golang:1.24-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils coreutils file findutils grep jq sed >/dev/null
 
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           root="/analysis/client-analysis/${run_id}"
@@ -36,29 +41,126 @@ jobs:
           manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
           manifest="/analysis/package-manifests/${manifest_run}/package.json"
           record="$(jq -c '.files[] | select(.localfile == "bin/client")' "${manifest}")"
+          expected_hash="$(printf '%s' "${record}" | jq -r '.unpackedhash')"
+          expected_size="$(printf '%s' "${record}" | jq -r '.unpackedsize')"
 
-          echo "run_id=${run_id}"
-          echo "manifest_run=${manifest_run}"
-          echo "record=${record}"
-          echo '===== ROOT TREE ====='
-          find "${root}" -maxdepth 4 -type f -exec stat -c '%s %n' {} \; | sort -n
-          echo '===== EXIT CODE ====='
-          test ! -f "${report}/exit-code.txt" || cat "${report}/exit-code.txt"
-          echo '===== PACKED ====='
-          if test -f "${packed}"; then
-            stat -c 'size=%s' "${packed}"
-            sha256sum "${packed}"
-            file "${packed}"
-            xz --format=lzma --test "${packed}" && echo 'lzma_test=ok' || echo 'lzma_test=failed'
-          else
-            echo 'missing'
-          fi
-          echo '===== UNPACKED ====='
-          if test -f "${client}"; then
-            stat -c 'size=%s' "${client}"
-            sha256sum "${client}"
-            file "${client}"
-          else
-            echo 'missing'
-          fi
+          mkdir -p "${report}" /tmp/tibia-lzma
+          cd /tmp/tibia-lzma
+          cat > go.mod <<'EOF'
+          module tibia-lzma-decoder
+
+          go 1.24
+
+          require github.com/ulikunitz/xz v0.5.11
+          EOF
+          cat > main.go <<'EOF'
+          package main
+
+          import (
+            "fmt"
+            "io"
+            "os"
+
+            "github.com/ulikunitz/xz/lzma"
+          )
+
+          func main() {
+            if len(os.Args) != 3 {
+              fmt.Fprintln(os.Stderr, "usage: decoder input output")
+              os.Exit(2)
+            }
+            in, err := os.Open(os.Args[1])
+            if err != nil {
+              panic(err)
+            }
+            defer in.Close()
+
+            reader, err := lzma.NewReader(in)
+            if err != nil {
+              panic(err)
+            }
+            out, err := os.Create(os.Args[2])
+            if err != nil {
+              panic(err)
+            }
+            n, copyErr := io.Copy(out, reader)
+            closeErr := out.Close()
+            if copyErr != nil {
+              panic(copyErr)
+            }
+            if closeErr != nil {
+              panic(closeErr)
+            }
+            fmt.Printf("decoded_bytes=%d\n", n)
+          }
+          EOF
+
+          go mod download
+          go run . "${packed}" "${client}" | tee "${report}/go-lzma-decode.txt"
+          chmod +x "${client}"
+
+          actual_size="$(stat -c %s "${client}")"
+          actual_hash="$(sha256sum "${client}" | awk '{print $1}')"
+          test "${actual_size}" = "${expected_size}"
+          test "${actual_hash}" = "${expected_hash}"
+
+          {
+            echo "packed_first_64_bytes=$(od -An -tx1 -N64 "${packed}" | tr -s ' ' | tr '\n' ' ' | sed 's/^ //;s/ $//')"
+            echo "expected_size=${expected_size}"
+            echo "actual_size=${actual_size}"
+            echo "expected_sha256=${expected_hash}"
+            echo "actual_sha256=${actual_hash}"
+            printf 'file='
+            file -b "${client}"
+          } > "${report}/decode-verification.txt"
+
+          readelf -h "${client}" > "${report}/elf-header.txt"
+          readelf -d "${client}" > "${report}/dynamic.txt"
+          readelf -n "${client}" > "${report}/notes.txt" 2>/dev/null || true
+          strings -a -n 5 "${client}" > "${report}/strings.txt"
+
+          grep -E 'NEEDED|RPATH|RUNPATH' "${report}/dynamic.txt" > "${report}/dependencies.txt" || true
+          grep -Ei 'battleye|beclient|beservice|--battleye|protected|unprotected|anticheat|anti-cheat|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' \
+            "${report}/strings.txt" | sort -u | head -n 1000 > "${report}/security-auth-indicators.txt" || true
+          grep -Eo 'https?://[^[:space:]"<>]+' "${report}/strings.txt" | sed 's/[),;]$//' | sort -u | head -n 1000 > "${report}/urls.txt" || true
+
+          {
+            printf 'battleye_matches='
+            grep -Eic 'battleye|beclient|beservice|--battleye' "${report}/strings.txt" || true
+            printf 'protected_unprotected_matches='
+            grep -Eic 'protected|unprotected|anticheat|anti-cheat' "${report}/strings.txt" || true
+            printf 'auth_field_matches='
+            grep -Eic 'loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' "${report}/strings.txt" || true
+            printf 'url_count='
+            wc -l < "${report}/urls.txt"
+            printf 'dependency_count='
+            wc -l < "${report}/dependencies.txt"
+          } > "${report}/counts.txt"
+
+          echo 0 > "${report}/exit-code.txt"
+          chmod -R a+rX "${root}"
+          SCRIPT
+
+      - name: Print concise verified result
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -s <<'SCRIPT'
+          set -eu
+          run_id="$(cat /analysis/latest-client-analysis-run-id)"
+          report="/analysis/client-analysis/${run_id}/report"
+          echo '===== DECODE VERIFICATION ====='
+          cat "${report}/decode-verification.txt"
+          echo '===== COUNTS ====='
+          cat "${report}/counts.txt"
+          echo '===== ELF HEADER ====='
+          cat "${report}/elf-header.txt"
+          echo '===== DEPENDENCIES ====='
+          cat "${report}/dependencies.txt"
+          echo '===== SECURITY / AUTH INDICATORS ====='
+          cat "${report}/security-auth-indicators.txt"
+          echo '===== URLS ====='
+          cat "${report}/urls.txt"
           SCRIPT
