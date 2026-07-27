@@ -1,4 +1,4 @@
-name: Tibia Linux route-state consumers
+name: Tibia Linux runtime route consumer
 
 on:
   pull_request:
@@ -11,18 +11,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-route-state-consumers
-  cancel-in-progress: true
-
 jobs:
-  trace:
-    name: Trace protected and unprotected route-state consumers
+  export:
+    name: Export runtime route-selection consumer
     runs-on: oteryn-staging
-    timeout-minutes: 10
+    timeout-minutes: 7
 
     steps:
-      - name: Generate route-state xref report
+      - name: Generate route-consumer slices
         shell: bash
         run: |
           set -euo pipefail
@@ -33,44 +29,43 @@ jobs:
           apk add --no-cache binutils grep >/dev/null
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          o="/analysis/client-analysis/${r}/report/route-state-xrefs.txt"
-          d=/tmp/client.disasm
+          root="/analysis/client-analysis/${r}/report/runtime-route-consumer"
+          xrefs="/analysis/client-analysis/${r}/report/route-state-xrefs.txt"
+          rm -rf "$root" && mkdir -p "$root"
 
-          # Global QString/key objects initialized from the login-response field names.
-          # address -> logical field
-          cat > /tmp/targets.tsv <<'EOF'
-          3195d80 externalportprotected
-          3195d60 externalportunprotected
-          3195dc0 externaladdressprotected
-          3195da0 externaladdressunprotected
-          3195d00 anticheatprotection
-          31e87c0 useProtectedNetworkRoute
-          318d3d0 ProtectedWorldAddress
-          318d3f0 UnprotectedWorldAddress
-          EOF
-
-          objdump -d -M intel --no-show-raw-insn "$c" > "$d"
           {
-            echo '===== TARGETS ====='
-            cat /tmp/targets.tsv
-            echo '===== DIRECT REFERENCES BY TARGET ====='
-            while read -r addr name; do
-              echo "--- ${name} @ 0x${addr} ---"
-              grep -E "#[[:space:]]*${addr}([^0-9a-f]|$)" "$d" || true
-            done < /tmp/targets.tsv
+            echo '===== RUNTIME XREFS ONLY ====='
+            grep -E '^[[:space:]]+[0-9a-f]+:' "$xrefs" \
+              | grep -Ev '^[[:space:]]+60f|^[[:space:]]+69311e|^[[:space:]]+69c40d|^[[:space:]]+69c431' || true
             echo '===== COUNTS ====='
-            while read -r addr name; do
-              count="$(grep -Ec "#[[:space:]]*${addr}([^0-9a-f]|$)" "$d" || true)"
-              echo "${name}=${count}"
-            done < /tmp/targets.tsv
-          } > "$o"
-          chmod a+r "$o"
+            sed -n '/===== COUNTS =====/,$p' "$xrefs"
+          } > "$root/runtime-xrefs.txt"
+
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0xe0fc80 --stop-address=0xe10080 \
+            "$c" > "$root/login-response-consumer.txt"
+
+          # Consumers of logical route choice and resolved world addresses.
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0x0 --stop-address=0x0 "$c" > /dev/null 2>&1 || true
+
+          chmod -R a+rX "$root"
           SCRIPT
 
-      - name: Print route-state xrefs
+      - name: Copy runtime route report
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c 'r=$(cat /analysis/latest-client-analysis-run-id); cat "/analysis/client-analysis/$r/report/route-state-xrefs.txt"'
+          out="${RUNNER_TEMP}/tibia-runtime-route-consumer"
+          rm -rf "$out" && mkdir -p "$out"
+          r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/analysis/client-analysis/$r/report/runtime-route-consumer/." "$out/"
+
+      - name: Upload runtime route report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tibia-linux-runtime-route-consumer
+          path: ${{ runner.temp }}/tibia-runtime-route-consumer
+          retention-days: 1
