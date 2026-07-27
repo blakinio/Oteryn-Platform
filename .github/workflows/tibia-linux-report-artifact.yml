@@ -1,4 +1,4 @@
-name: Tibia Linux first loader caller artifact
+name: Tibia Linux route and anti-cheat slices
 
 on:
   pull_request:
@@ -13,71 +13,48 @@ permissions:
 
 jobs:
   export:
-    name: Export first loader caller with annotations
+    name: Export focused route and anti-cheat slices
     runs-on: oteryn-staging
     timeout-minutes: 7
 
     steps:
-      - name: Generate annotated caller report
+      - name: Generate focused disassembly files
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            python:3.12-alpine sh -s <<'SCRIPT'
+            alpine:3.22 sh -s <<'SCRIPT'
           set -euo pipefail
           apk add --no-cache binutils >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          o="/analysis/client-analysis/${r}/report/first-loader-caller.txt"
-          d=/tmp/caller.txt
-          objdump -d -M intel --no-show-raw-insn --start-address=0x19f92a0 --stop-address=0x19f9910 "$c" > "$d"
-          {
-            echo '===== DISASSEMBLY ====='
-            cat "$d"
-            echo '===== REFERENCED STRINGS ====='
-            python3 - "$c" "$d" <<'PY'
-          import re, sys
-          from elftools.elf.elffile import ELFFile
-          binary, disasm = sys.argv[1:]
-          text = open(disasm, errors='replace').read()
-          vas = sorted({int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text)})
-          with open(binary,'rb') as f:
-              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
-          def offset(va):
-              for s in secs:
-                  a,z=int(s['sh_addr']),int(s['sh_size'])
-                  if a <= va < a+z: return int(s['sh_offset'])+va-a,s.name
-              return None,None
-          for va in vas:
-              off,sec=offset(va); value=None
-              if off is not None:
-                  end=blob.find(b'\0',off,min(len(blob),off+300))
-                  if end>off:
-                      raw=blob[off:end]
-                      if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>=.85:
-                          value=raw.decode(errors='replace')
-              if value is not None:
-                  print(f'va=0x{va:x} section={sec} string={value!r}')
-          PY
-          } > "$o"
-          chmod a+r "$o"
+          o="/analysis/client-analysis/${r}/report/control-slices"
+          rm -rf "$o" && mkdir -p "$o"
+          objdump -d -M intel --no-show-raw-insn --start-address=0x60f900 --stop-address=0x60fb40 "$c" > "$o/login-parser.txt"
+          objdump -d -M intel --no-show-raw-insn --start-address=0x693050 --stop-address=0x693220 "$c" > "$o/use-protected-route.txt"
+          objdump -d -M intel --no-show-raw-insn --start-address=0x69c350 --stop-address=0x69c500 "$c" > "$o/world-addresses.txt"
+          objdump -d -M intel --no-show-raw-insn --start-address=0xaa75d0 --stop-address=0xaa7800 "$c" > "$o/activation-fields.txt"
+          objdump -d -M intel --no-show-raw-insn --start-address=0x191c980 --stop-address=0x191cb80 "$c" > "$o/initial-protected-parser.txt"
+          readelf -Ws "$c" | grep -Ei 'QLibrary|QPluginLoader|loadHints|resolve' > "$o/qt-loader-symbols.txt" || true
+          strings -a -t x -n 4 "$c" | grep -Ei 'QLibrary|QPluginLoader|BEClient|BattlEye|useProtectedNetworkRoute|ProtectedWorldAddress|UnprotectedWorldAddress|initially_protected|anticheatprotection' > "$o/relevant-strings.txt" || true
+          chmod -R a+rX "$o"
           SCRIPT
 
-      - name: Copy caller report
+      - name: Copy focused slices
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/first-loader-caller.txt"
+          out="${RUNNER_TEMP}/tibia-control-slices"
+          rm -rf "$out" && mkdir -p "$out"
           r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/first-loader-caller.txt" "$out"
+          docker cp "$cid:/analysis/client-analysis/$r/report/control-slices/." "$out/"
 
-      - name: Upload caller text
+      - name: Upload focused slices
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-first-loader-caller
-          path: ${{ runner.temp }}/first-loader-caller.txt
+          name: tibia-linux-control-slices
+          path: ${{ runner.temp }}/tibia-control-slices
           retention-days: 1
