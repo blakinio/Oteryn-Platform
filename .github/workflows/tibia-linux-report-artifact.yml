@@ -1,4 +1,4 @@
-name: Tibia Linux runtime route consumer
+name: Tibia Linux world-address consumers
 
 on:
   pull_request:
@@ -13,12 +13,12 @@ permissions:
 
 jobs:
   export:
-    name: Export runtime route-selection consumer
+    name: Export protected and unprotected address consumers
     runs-on: oteryn-staging
     timeout-minutes: 7
 
     steps:
-      - name: Generate route-consumer slices
+      - name: Generate focused address-consumer disassembly
         shell: bash
         run: |
           set -euo pipefail
@@ -26,46 +26,35 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             alpine:3.22 sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils grep >/dev/null
+          apk add --no-cache binutils >/dev/null
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          root="/analysis/client-analysis/${r}/report/runtime-route-consumer"
-          xrefs="/analysis/client-analysis/${r}/report/route-state-xrefs.txt"
-          rm -rf "$root" && mkdir -p "$root"
-
-          {
-            echo '===== RUNTIME XREFS ONLY ====='
-            grep -E '^[[:space:]]+[0-9a-f]+:' "$xrefs" \
-              | grep -Ev '^[[:space:]]+60f|^[[:space:]]+69311e|^[[:space:]]+69c40d|^[[:space:]]+69c431' || true
-            echo '===== COUNTS ====='
-            sed -n '/===== COUNTS =====/,$p' "$xrefs"
-          } > "$root/runtime-xrefs.txt"
+          o="/analysis/client-analysis/${r}/report/world-address-consumers"
+          rm -rf "$o" && mkdir -p "$o"
 
           objdump -d -M intel --no-show-raw-insn \
-            --start-address=0xe0fc80 --stop-address=0xe10080 \
-            "$c" > "$root/login-response-consumer.txt"
-
-          # Consumers of logical route choice and resolved world addresses.
+            --start-address=0x6f11d0 --stop-address=0x6f1490 \
+            "$c" > "$o/consumer-6f12.txt"
           objdump -d -M intel --no-show-raw-insn \
-            --start-address=0x0 --stop-address=0x0 "$c" > /dev/null 2>&1 || true
-
-          chmod -R a+rX "$root"
+            --start-address=0xe1b3e0 --stop-address=0xe1b780 \
+            "$c" > "$o/consumer-e1b5.txt"
+          chmod -R a+rX "$o"
           SCRIPT
 
-      - name: Copy runtime route report
+      - name: Copy address-consumer slices
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-runtime-route-consumer"
+          out="${RUNNER_TEMP}/tibia-world-address-consumers"
           rm -rf "$out" && mkdir -p "$out"
           r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/runtime-route-consumer/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/$r/report/world-address-consumers/." "$out/"
 
-      - name: Upload runtime route report
+      - name: Upload address-consumer slices
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-runtime-route-consumer
-          path: ${{ runner.temp }}/tibia-runtime-route-consumer
+          name: tibia-linux-world-address-consumers
+          path: ${{ runner.temp }}/tibia-world-address-consumers
           retention-days: 1
