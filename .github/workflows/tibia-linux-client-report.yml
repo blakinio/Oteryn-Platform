@@ -13,12 +13,12 @@ permissions:
 
 jobs:
   report:
-    name: Read persisted Linux client analysis
+    name: Diagnose persisted Linux client analysis
     runs-on: oteryn-staging
     timeout-minutes: 7
 
     steps:
-      - name: Discover and print verified client report
+      - name: Print client analysis directory only
         shell: bash
         run: |
           set -euo pipefail
@@ -27,62 +27,32 @@ jobs:
             alpine:3.22 \
             sh -lc '
               set -eu
-              apk add --no-cache binutils coreutils file findutils grep >/dev/null
+              apk add --no-cache coreutils file findutils jq xz >/dev/null
 
-              echo "===== ANALYSIS VOLUME ROOT ====="
-              find /analysis -maxdepth 3 -type f -o -type d | sort | head -n 500
-              echo
-
-              client="$(find /analysis -type f -path "*/client-analysis/*/download/client" -print | sort | tail -n 1)"
-              if test -z "${client}"; then
-                echo "client_not_found"
-                echo "===== ALL CLIENT-NAMED FILES ====="
-                find /analysis -type f -name client -print | sort || true
-                exit 2
-              fi
-
-              root="$(dirname "$(dirname "${client}")")"
-              report="${root}/report"
-
-              echo "client=${client}"
-              echo "root=${root}"
-              echo
-              echo "===== FILES ====="
-              find "${root}" -maxdepth 3 -type f -exec stat -c "%s %n" {} \; | sort -n
-              echo
-              echo "===== VERIFIED CLIENT ====="
-              stat -c "size=%s" "${client}"
-              sha256sum "${client}"
-              file "${client}"
-              echo
-              echo "===== SUMMARY ====="
-              test ! -f "${report}/summary.txt" || cat "${report}/summary.txt"
-              echo
-              echo "===== ELF HEADER ====="
-              test ! -f "${report}/elf-header.txt" || cat "${report}/elf-header.txt"
-              echo
-              echo "===== DEPENDENCIES ====="
-              if test -f "${report}/dynamic.txt"; then
-                grep -E "NEEDED|RPATH|RUNPATH" "${report}/dynamic.txt" || true
+              echo "===== CLIENT ANALYSIS DIRECTORIES ====="
+              if test -d /analysis/client-analysis; then
+                find /analysis/client-analysis -maxdepth 5 -print | sort
+              else
+                echo "client-analysis directory missing"
               fi
               echo
-              echo "===== MATCH COUNTS ====="
-              if test -f "${report}/strings.txt"; then
-                printf "battleye="
-                grep -Eic "battleye|beclient|beservice|--battleye" "${report}/strings.txt" || true
-                printf "protected_unprotected="
-                grep -Eic "protected|unprotected|anticheat|anti-cheat" "${report}/strings.txt" || true
-                printf "auth_fields="
-                grep -Eic "loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin" "${report}/strings.txt" || true
+
+              echo "===== CLIENT ANALYSIS FILES ====="
+              if test -d /analysis/client-analysis; then
+                find /analysis/client-analysis -type f -exec stat -c "%s %n" {} \; | sort -n
               fi
               echo
-              echo "===== SECURITY AND AUTH STRINGS ====="
-              if test -f "${report}/strings.txt"; then
-                grep -Ei "battleye|beclient|beservice|--battleye|protected|unprotected|anticheat|anti-cheat|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin" "${report}/strings.txt" \
-                  | sort -u \
-                  | head -n 500 || true
-              fi
+
+              echo "===== CLIENT-LIKE FILE HASHES ====="
+              find /analysis -type f \( -name client -o -name client.lzma \) -print | sort | while IFS= read -r path; do
+                stat -c "size=%s path=%n" "${path}"
+                sha256sum "${path}"
+                file "${path}"
+              done
               echo
-              echo "===== URLS ====="
-              test ! -f "${report}/urls.txt" || head -n 300 "${report}/urls.txt"
+
+              manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
+              manifest="/analysis/package-manifests/${manifest_run}/package.json"
+              echo "===== EXPECTED CLIENT RECORD ====="
+              jq -c '.files[] | select(.localfile == "bin/client")' "${manifest}"
             '
