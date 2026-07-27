@@ -1,4 +1,4 @@
-name: Tibia Linux exact Qt metaobject decode
+name: Tibia Linux exact Qt decode export
 
 on:
   pull_request:
@@ -11,133 +11,27 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-targeted-qt-metaobject
-  cancel-in-progress: true
-
 jobs:
-  decode:
-    name: Decode exact authentication and gameclient metaobjects
+  export:
+    name: Export persisted exact Qt decode
     runs-on: oteryn-staging
-    timeout-minutes: 10
+    timeout-minutes: 7
 
     steps:
-      - name: Decode exact Qt tables and metacalls
+      - name: Inspect persisted exact decode
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            python:3.12-alpine sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils coreutils >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
-          run_id="$(cat /analysis/latest-client-analysis-run-id)"
-          client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/exact-qt-metaobjects"
-          rm -rf "${out}" && mkdir -p "${out}"
+          docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -c '
+              r=$(cat /analysis/latest-client-analysis-run-id)
+              p="/analysis/client-analysis/$r/report/exact-qt-metaobjects"
+              test -d "$p"
+              find "$p" -maxdepth 2 -type f -printf "%P\t%s bytes\n" | sort
+            '
 
-          python3 - "${client}" "${out}" <<'PY'
-          import pathlib, struct, sys
-          from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-
-          binary,out_dir=sys.argv[1:]
-          classes=[
-              ('TAuthenticationProcessController',0x2f5e960,0x1c88c50,0x1c88840,0xd84960),
-              ('TGameClient',0x2f60120,0x1c91cf4,0x1c91740,0xd04dc0),
-          ]
-          targets={'requestCharacterGameserverLogin','onStartGameServerLoginStateEntered','connectClientToGameserverWithExistingCredentials','onConnectClientToGameserver','onAbortConnectClientToGameserver'}
-
-          with open(binary,'rb') as f:
-              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
-              def v2o(v):
-                  for s in secs:
-                      a=int(s['sh_addr']);z=int(s['sh_size'])
-                      if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
-                  return None,None
-              def u32(v):
-                  o,_=v2o(v)
-                  if o is None or o+4>len(blob):return None
-                  return struct.unpack_from('<I',blob,o)[0]
-              fdes=[]
-              try:
-                  dwarf=elf.get_dwarf_info()
-                  for e in dwarf.EH_CFI_entries():
-                      if isinstance(e,FDE):
-                          s=int(e['initial_location']); fdes.append((s,s+int(e['address_range'])))
-              except Exception:pass
-              def frange(v):
-                  for s,e in fdes:
-                      if s<=v<e:return s,e
-                  return v,v+0x5000
-
-              lines=[]; ranges=[]
-              for name,static_obj,stringdata,metadata,metacall in classes:
-                  lines.append(f'===== {name} =====')
-                  lines.append(f'static_metaobject=0x{static_obj:x} stringdata=0x{stringdata:x} metadata=0x{metadata:x} metacall=0x{metacall:x}')
-                  raw_sd=[u32(stringdata+i*4) for i in range(32)]
-                  raw_md=[u32(metadata+i*4) for i in range(32)]
-                  lines.append('stringdata_u32_first32='+' '.join('None' if x is None else hex(x) for x in raw_sd))
-                  lines.append('metadata_u32_first32='+' '.join('None' if x is None else hex(x) for x in raw_md))
-
-                  first=raw_sd[0]
-                  strings=[]
-                  if first and first%8==0 and 0<first//8<10000:
-                      count=first//8
-                      lines.append(f'string_count_from_first_offset={count}')
-                      valid=True
-                      for i in range(count):
-                          rel=u32(stringdata+i*8); ln=u32(stringdata+i*8+4)
-                          if rel is None or ln is None or ln>50000:
-                              valid=False; break
-                          o,_=v2o(stringdata+rel)
-                          if o is None or o+ln>len(blob):valid=False;break
-                          try:s=blob[o:o+ln].decode('utf-8')
-                          except UnicodeDecodeError:valid=False;break
-                          strings.append(s)
-                      lines.append(f'string_decode_valid={valid}')
-                  else:
-                      count=0; valid=False
-                      lines.append('string_count_from_first_offset=invalid')
-
-                  if valid:
-                      for i,s in enumerate(strings):
-                          marker=' <== TARGET' if s in targets else ''
-                          if marker or i==0:
-                              lines.append(f'string index={i} value={s!r}{marker}')
-
-                  header=[u32(metadata+i*4) for i in range(14)]
-                  lines.append('metadata_header='+' '.join('None' if x is None else hex(x) for x in header))
-                  if valid and all(x is not None for x in header):
-                      method_count=header[4]; method_offset=header[5]; signal_count=header[13]
-                      lines.append(f'method_count={method_count} method_offset={method_offset} signal_count={signal_count}')
-                      if method_count<10000 and method_offset<100000:
-                          for mi in range(method_count):
-                              row=[u32(metadata+(method_offset+mi*6+j)*4) for j in range(6)]
-                              if any(x is None for x in row):break
-                              ni,argc,params,tag,flags,mtypes=row
-                              mn=strings[ni] if ni<len(strings) else f'<string#{ni}>'
-                              marker=' <== TARGET' if mn in targets else ''
-                              lines.append(f'method index={mi} kind={"signal" if mi<signal_count else "method"} name={mn!r} argc={argc} flags=0x{flags:x} params={params} meta_types={mtypes}{marker}')
-                  fs,fe=frange(metacall); ranges.append((name,metacall,fs,fe)); lines.append(f'metacall_function_range=0x{fs:x}-0x{fe:x}')
-                  lines.append('')
-
-              pathlib.Path(out_dir,'decoded.txt').write_text('\n'.join(lines)+'\n')
-              pathlib.Path(out_dir,'ranges.tsv').write_text(''.join(f'{n}\t{a:x}\t{s:x}\t{e:x}\n' for n,a,s,e in ranges))
-          PY
-
-          while IFS=$'\t' read -r name address start end; do
-            [ -n "${address}" ] || continue
-            max_end=$((0x${address}+0x7000)); actual_end=$((0x${end}));
-            if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
-            printf -v stop_hex '0x%x' "${actual_end}"
-            objdump -d -M intel --no-show-raw-insn --start-address="0x${address}" --stop-address="${stop_hex}" "${client}" > "${out}/${name}-metacall.txt"
-          done < "${out}/ranges.tsv"
-          chmod -R a+rX "${out}"
-          SCRIPT
-
-      - name: Copy exact decode
+      - name: Copy persisted exact decode
         shell: bash
         run: |
           set -euo pipefail
@@ -148,7 +42,7 @@ jobs:
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
           docker cp "${cid}:/analysis/client-analysis/${run_id}/report/exact-qt-metaobjects/." "${out}/"
 
-      - name: Upload exact decode
+      - name: Upload persisted exact decode
         uses: actions/upload-artifact@v4
         with:
           name: tibia-linux-exact-qt-metaobjects
