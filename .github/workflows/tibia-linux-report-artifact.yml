@@ -1,4 +1,4 @@
-name: Tibia Linux Qt relocation neighborhoods
+name: Tibia Linux exact Qt metaobject decode
 
 on:
   pull_request:
@@ -16,13 +16,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  inspect:
-    name: Inspect Qt string-table relocation neighborhoods
+  decode:
+    name: Decode exact authentication and gameclient metaobjects
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 10
 
     steps:
-      - name: Generate relocation neighborhood report
+      - name: Decode exact Qt tables and metacalls
         shell: bash
         run: |
           set -euo pipefail
@@ -30,86 +30,127 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
+          apk add --no-cache binutils coreutils >/dev/null
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/qt-relocation-neighborhoods"
+          out="/analysis/client-analysis/${run_id}/report/exact-qt-metaobjects"
           rm -rf "${out}" && mkdir -p "${out}"
 
-          python3 - "${client}" > "${out}/report.txt" <<'PY'
-          import struct, sys
+          python3 - "${client}" "${out}" <<'PY'
+          import pathlib, struct, sys
           from elftools.elf.elffile import ELFFile
+          from elftools.dwarf.callframe import FDE
 
-          path=sys.argv[1]
-          ranges=[(0x1c87000,0x1c8b000,'authentication'),(0x1c90000,0x1c94000,'gameclient')]
-          with open(path,'rb') as f:
+          binary,out_dir=sys.argv[1:]
+          classes=[
+              ('TAuthenticationProcessController',0x2f5e960,0x1c88c50,0x1c88840,0xd84960),
+              ('TGameClient',0x2f60120,0x1c91cf4,0x1c91740,0xd04dc0),
+          ]
+          targets={'requestCharacterGameserverLogin','onStartGameServerLoginStateEntered','connectClientToGameserverWithExistingCredentials','onConnectClientToGameserver','onAbortConnectClientToGameserver'}
+
+          with open(binary,'rb') as f:
               blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
               def v2o(v):
                   for s in secs:
-                      a=int(s['sh_addr']); z=int(s['sh_size'])
+                      a=int(s['sh_addr']);z=int(s['sh_size'])
                       if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
                   return None,None
-              def qraw(v):
+              def u32(v):
                   o,_=v2o(v)
-                  if o is None or o+8>len(blob):return None
-                  return struct.unpack_from('<Q',blob,o)[0]
-              relocs={}; rows=[]
-              for s in secs:
-                  if s['sh_type']!='SHT_RELA':continue
-                  linked=elf.get_section(s['sh_link']) if s['sh_link'] else None
-                  for r in s.iter_relocations():
-                      slot=int(r['r_offset']); typ=int(r['r_info_type']); add=int(r['r_addend']) if r.is_RELA() else 0
-                      val=None; sym=''
-                      if typ==8:val=add
-                      elif linked is not None and int(r['r_info_sym']):
-                          sy=linked.get_symbol(int(r['r_info_sym'])); sym=sy.name; sv=int(sy['st_value'])
-                          if sv:val=sv+add
-                      if val is not None:relocs[slot]=val
-                      rows.append((slot,typ,add,val,sym,s.name))
-              def q(v):return relocs.get(v,qraw(v))
-              def sec(v):return v2o(v)[1]
-              def text(v,limit=120):
-                  o,s=v2o(v)
-                  if o is None:return None
-                  e=blob.find(b'\0',o,min(len(blob),o+limit))
-                  if e<=o:return None
-                  raw=blob[o:e]
-                  if sum(32<=b<127 for b in raw)/len(raw)<.92:return None
-                  return raw.decode('utf-8',errors='replace')
+                  if o is None or o+4>len(blob):return None
+                  return struct.unpack_from('<I',blob,o)[0]
+              fdes=[]
+              try:
+                  dwarf=elf.get_dwarf_info()
+                  for e in dwarf.EH_CFI_entries():
+                      if isinstance(e,FDE):
+                          s=int(e['initial_location']); fdes.append((s,s+int(e['address_range'])))
+              except Exception:pass
+              def frange(v):
+                  for s,e in fdes:
+                      if s<=v<e:return s,e
+                  return v,v+0x5000
 
-              selected=[]
-              for row in rows:
-                  slot,typ,add,val,sym,rs=row
-                  for lo,hi,label in ranges:
-                      if lo<=add<hi or (val is not None and lo<=val<hi):
-                          selected.append((label,row));break
-              print(f'selected_relocation_count={len(selected)}')
-              for label,(slot,typ,add,val,sym,rs) in selected:
-                  print(f'===== {label} relocation slot=0x{slot:x} slot_section={sec(slot)} type={typ} addend=0x{add:x} value={None if val is None else hex(val)} symbol={sym!r} reloc_section={rs} =====')
-                  for delta in range(-0x30,0x49,8):
-                      va=slot+delta; value=q(va)
-                      print(f'  slot{delta:+#x}=0x{va:x} raw={None if qraw(va) is None else hex(qraw(va))} resolved={None if value is None else hex(value)} target_section={None if value is None else sec(value)} text={None if value is None else text(value)!r}')
-              print('===== EXACT TARGET STRING BYTES =====')
-              for va in (0x1c89a30,0x1c89d7a,0x1c9211b,0x1c9229f,0x1c922bb):
-                  print(f'va=0x{va:x} section={sec(va)} text={text(va,200)!r}')
+              lines=[]; ranges=[]
+              for name,static_obj,stringdata,metadata,metacall in classes:
+                  lines.append(f'===== {name} =====')
+                  lines.append(f'static_metaobject=0x{static_obj:x} stringdata=0x{stringdata:x} metadata=0x{metadata:x} metacall=0x{metacall:x}')
+                  raw_sd=[u32(stringdata+i*4) for i in range(32)]
+                  raw_md=[u32(metadata+i*4) for i in range(32)]
+                  lines.append('stringdata_u32_first32='+' '.join('None' if x is None else hex(x) for x in raw_sd))
+                  lines.append('metadata_u32_first32='+' '.join('None' if x is None else hex(x) for x in raw_md))
+
+                  first=raw_sd[0]
+                  strings=[]
+                  if first and first%8==0 and 0<first//8<10000:
+                      count=first//8
+                      lines.append(f'string_count_from_first_offset={count}')
+                      valid=True
+                      for i in range(count):
+                          rel=u32(stringdata+i*8); ln=u32(stringdata+i*8+4)
+                          if rel is None or ln is None or ln>50000:
+                              valid=False; break
+                          o,_=v2o(stringdata+rel)
+                          if o is None or o+ln>len(blob):valid=False;break
+                          try:s=blob[o:o+ln].decode('utf-8')
+                          except UnicodeDecodeError:valid=False;break
+                          strings.append(s)
+                      lines.append(f'string_decode_valid={valid}')
+                  else:
+                      count=0; valid=False
+                      lines.append('string_count_from_first_offset=invalid')
+
+                  if valid:
+                      for i,s in enumerate(strings):
+                          marker=' <== TARGET' if s in targets else ''
+                          if marker or i==0:
+                              lines.append(f'string index={i} value={s!r}{marker}')
+
+                  header=[u32(metadata+i*4) for i in range(14)]
+                  lines.append('metadata_header='+' '.join('None' if x is None else hex(x) for x in header))
+                  if valid and all(x is not None for x in header):
+                      method_count=header[4]; method_offset=header[5]; signal_count=header[13]
+                      lines.append(f'method_count={method_count} method_offset={method_offset} signal_count={signal_count}')
+                      if method_count<10000 and method_offset<100000:
+                          for mi in range(method_count):
+                              row=[u32(metadata+(method_offset+mi*6+j)*4) for j in range(6)]
+                              if any(x is None for x in row):break
+                              ni,argc,params,tag,flags,mtypes=row
+                              mn=strings[ni] if ni<len(strings) else f'<string#{ni}>'
+                              marker=' <== TARGET' if mn in targets else ''
+                              lines.append(f'method index={mi} kind={"signal" if mi<signal_count else "method"} name={mn!r} argc={argc} flags=0x{flags:x} params={params} meta_types={mtypes}{marker}')
+                  fs,fe=frange(metacall); ranges.append((name,metacall,fs,fe)); lines.append(f'metacall_function_range=0x{fs:x}-0x{fe:x}')
+                  lines.append('')
+
+              pathlib.Path(out_dir,'decoded.txt').write_text('\n'.join(lines)+'\n')
+              pathlib.Path(out_dir,'ranges.tsv').write_text(''.join(f'{n}\t{a:x}\t{s:x}\t{e:x}\n' for n,a,s,e in ranges))
           PY
+
+          while IFS=$'\t' read -r name address start end; do
+            [ -n "${address}" ] || continue
+            max_end=$((0x${address}+0x7000)); actual_end=$((0x${end}));
+            if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
+            printf -v stop_hex '0x%x' "${actual_end}"
+            objdump -d -M intel --no-show-raw-insn --start-address="0x${address}" --stop-address="${stop_hex}" "${client}" > "${out}/${name}-metacall.txt"
+          done < "${out}/ranges.tsv"
           chmod -R a+rX "${out}"
           SCRIPT
 
-      - name: Copy report
+      - name: Copy exact decode
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-qt-relocation-neighborhoods"
+          out="${RUNNER_TEMP}/tibia-exact-qt-metaobjects"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/qt-relocation-neighborhoods/." "${out}/"
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/exact-qt-metaobjects/." "${out}/"
 
-      - name: Upload report
+      - name: Upload exact decode
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-qt-relocation-neighborhoods
-          path: ${{ runner.temp }}/tibia-qt-relocation-neighborhoods
+          name: tibia-linux-exact-qt-metaobjects
+          path: ${{ runner.temp }}/tibia-exact-qt-metaobjects
           retention-days: 1
