@@ -1,4 +1,4 @@
-name: Tibia Linux exact Qt decode export
+name: Tibia Linux auth-controller and gameclient metacalls
 
 on:
   pull_request:
@@ -11,40 +11,225 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-auth-controller-metacalls
+  cancel-in-progress: true
+
 jobs:
-  export:
-    name: Export persisted exact Qt decode
+  decode:
+    name: Locate auth controller and map Qt metacall cases
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 12
 
     steps:
-      - name: Inspect persisted exact decode
+      - name: Decode bounded metaobjects and metacalls
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c '
-              r=$(cat /analysis/latest-client-analysis-run-id)
-              p="/analysis/client-analysis/$r/report/exact-qt-metaobjects"
-              test -d "$p"
-              find "$p" -maxdepth 2 -type f -printf "%P\t%s bytes\n" | sort
-            '
+          docker run --rm -i \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            python:3.12-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils coreutils grep >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
 
-      - name: Copy persisted exact decode
+          run_id="$(cat /analysis/latest-client-analysis-run-id)"
+          client="/analysis/client-analysis/${run_id}/download/client"
+          out="/analysis/client-analysis/${run_id}/report/auth-controller-metacalls"
+          rm -rf "${out}" && mkdir -p "${out}/metacalls"
+
+          python3 - "${client}" "${out}" <<'PY'
+          import pathlib, struct, sys
+          from elftools.elf.elffile import ELFFile
+          from elftools.dwarf.callframe import FDE
+
+          binary, out_dir = sys.argv[1:]
+          targets = {
+              'requestCharacterGameserverLogin',
+              'onStartGameServerLoginStateEntered',
+              'connectClientToGameserverWithExistingCredentials',
+              'onConnectClientToGameserver',
+              'onAbortConnectClientToGameserver',
+          }
+
+          with open(binary, 'rb') as f:
+              blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
+
+              def va_to_offset(va):
+                  for sec in sections:
+                      start = int(sec['sh_addr']); size = int(sec['sh_size'])
+                      if start <= va < start + size:
+                          return int(sec['sh_offset']) + va - start, sec.name
+                  return None, None
+
+              def section_of(va):
+                  return va_to_offset(va)[1]
+
+              resolved = {}
+              for sec in sections:
+                  if sec['sh_type'] != 'SHT_RELA':
+                      continue
+                  linked = elf.get_section(sec['sh_link']) if sec['sh_link'] else None
+                  for rel in sec.iter_relocations():
+                      slot = int(rel['r_offset']); typ = int(rel['r_info_type'])
+                      addend = int(rel['r_addend']) if rel.is_RELA() else 0
+                      value = None
+                      if typ == 8:
+                          value = addend
+                      elif linked is not None and int(rel['r_info_sym']):
+                          sym = linked.get_symbol(int(rel['r_info_sym']))
+                          sym_value = int(sym['st_value'])
+                          if sym_value:
+                              value = sym_value + addend
+                      if value is not None:
+                          resolved[slot] = value
+
+              def raw_qword(va):
+                  off, _ = va_to_offset(va)
+                  if off is None or off + 8 > len(blob): return None
+                  return struct.unpack_from('<Q', blob, off)[0]
+
+              def qword(va):
+                  return resolved.get(va, raw_qword(va))
+
+              def u32(va):
+                  off, _ = va_to_offset(va)
+                  if off is None or off + 4 > len(blob): return None
+                  return struct.unpack_from('<I', blob, off)[0]
+
+              def decode_stringdata(base):
+                  first = u32(base)
+                  if first is None or first == 0 or first % 8:
+                      return None
+                  count = first // 8
+                  if not (1 <= count <= 10000):
+                      return None
+                  result = []
+                  for i in range(count):
+                      rel = u32(base + i * 8); size = u32(base + i * 8 + 4)
+                      if rel is None or size is None or size > 50000:
+                          return None
+                      off, _ = va_to_offset(base + rel)
+                      if off is None or off + size > len(blob):
+                          return None
+                      try:
+                          result.append(blob[off:off + size].decode('utf-8'))
+                      except UnicodeDecodeError:
+                          return None
+                  return result
+
+              fdes = []
+              try:
+                  dwarf = elf.get_dwarf_info()
+                  for entry in dwarf.EH_CFI_entries():
+                      if isinstance(entry, FDE):
+                          start = int(entry['initial_location'])
+                          fdes.append((start, start + int(entry['address_range'])))
+              except Exception:
+                  pass
+
+              def function_range(address):
+                  for start, end in fdes:
+                      if start <= address < end:
+                          return start, end
+                  return address, address + 0x5000
+
+              report = []
+              selected = []
+              # Bounded scan around the authentication-controller metaobject cluster,
+              # plus the already verified TGameClient object.
+              windows = [
+                  (0x2f5e800, 0x2f5ee80, 'auth-cluster'),
+                  (0x2f600c0, 0x2f60240, 'gameclient-cluster'),
+              ]
+              for lo, hi, label in windows:
+                  report.append(f'===== WINDOW {label} 0x{lo:x}-0x{hi:x} =====')
+                  for base in range(lo, hi, 8):
+                      words = [qword(base + i * 8) for i in range(7)]
+                      if any(v is None for v in words):
+                          continue
+                      superdata, stringdata, metadata, metacall, related, metatypes, extra = words
+                      if section_of(stringdata) != '.rodata' or section_of(metadata) != '.rodata':
+                          continue
+                      if metacall == 0 or section_of(metacall) != '.text':
+                          continue
+                      strings = decode_stringdata(stringdata)
+                      if not strings:
+                          continue
+                      header = [u32(metadata + i * 4) for i in range(14)]
+                      if any(v is None for v in header):
+                          continue
+                      method_count, method_offset, signal_count = header[4], header[5], header[13]
+                      if method_count > 4096 or method_offset > 100000:
+                          continue
+                      hits = sorted(targets.intersection(strings))
+                      report.append(
+                          f'candidate base=0x{base:x} class={strings[0]!r} super=0x{superdata:x} '
+                          f'stringdata=0x{stringdata:x} metadata=0x{metadata:x} metacall=0x{metacall:x} '
+                          f'methods={method_count} signals={signal_count} hits={hits}'
+                      )
+                      methods = []
+                      for index in range(method_count):
+                          row = [u32(metadata + (method_offset + index * 6 + j) * 4) for j in range(6)]
+                          if any(v is None for v in row):
+                              break
+                          name_idx, argc, params, tag, flags, meta_types = row
+                          name = strings[name_idx] if name_idx < len(strings) else f'<string#{name_idx}>'
+                          methods.append((index, name, argc, flags, params, meta_types))
+                      for index, name, argc, flags, params, meta_types in methods:
+                          if name in targets:
+                              report.append(
+                                  f'  TARGET index={index} kind={"signal" if index < signal_count else "method"} '
+                                  f'name={name!r} argc={argc} flags=0x{flags:x} params={params} meta_types={meta_types}'
+                              )
+                      if hits or strings[0] == 'tibia::client::TGameClient':
+                          start, end = function_range(metacall)
+                          selected.append((strings[0], base, metacall, start, end, methods, signal_count))
+                  report.append('')
+
+              pathlib.Path(out_dir, 'decoded-candidates.txt').write_text('\n'.join(report) + '\n')
+              lines = []
+              for class_name, base, metacall, start, end, methods, signal_count in selected:
+                  lines.append(f'{class_name}\t{base:x}\t{metacall:x}\t{start:x}\t{end:x}')
+              pathlib.Path(out_dir, 'selected.tsv').write_text('\n'.join(lines) + ('\n' if lines else ''))
+          PY
+
+          while IFS=$'\t' read -r class_name base metacall start end; do
+            [ -n "${metacall}" ] || continue
+            safe="$(printf '%s' "${class_name}" | tr -c 'A-Za-z0-9._-' '_')"
+            max_end=$((0x${metacall} + 0x7000))
+            actual_end=$((0x${end}))
+            if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
+            printf -v stop_hex '0x%x' "${actual_end}"
+            objdump -d -M intel --no-show-raw-insn \
+              --start-address="0x${metacall}" --stop-address="${stop_hex}" "${client}" \
+              > "${out}/metacalls/${safe}-0x${metacall}.txt"
+          done < "${out}/selected.tsv"
+
+          # Focus the verified TGameClient switch around method ids 11, 20 and 21.
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0xd04dc0 --stop-address=0xd05472 "${client}" \
+            > "${out}/TGameClient-static-metacall.txt"
+          grep -n -B 8 -A 22 -E '(cmp[[:space:]].*(0xb|0x14|0x15)|case|call[[:space:]]+[0-9a-f]+)' \
+            "${out}/TGameClient-static-metacall.txt" > "${out}/TGameClient-static-metacall-focus.txt" || true
+
+          chmod -R a+rX "${out}"
+          SCRIPT
+
+      - name: Copy decoded controller report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-exact-qt-metaobjects"
+          out="${RUNNER_TEMP}/tibia-auth-controller-metacalls"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/exact-qt-metaobjects/." "${out}/"
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/auth-controller-metacalls/." "${out}/"
 
-      - name: Upload persisted exact decode
+      - name: Upload decoded controller report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-exact-qt-metaobjects
-          path: ${{ runner.temp }}/tibia-exact-qt-metaobjects
+          name: tibia-linux-auth-controller-metacalls
+          path: ${{ runner.temp }}/tibia-auth-controller-metacalls
           retention-days: 1
