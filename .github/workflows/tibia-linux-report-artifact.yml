@@ -1,4 +1,4 @@
-name: Tibia Linux gameserver route accessors
+name: Tibia Linux connection-controller route slot
 
 on:
   pull_request:
@@ -10,17 +10,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-gameserver-route-accessors
+  group: tibia-linux-connection-controller-route-slot
   cancel-in-progress: true
 
 jobs:
   trace:
-    name: Identify functions accessing both world routes
+    name: Trace connection-controller slot and session route getters
     runs-on: oteryn-staging
     timeout-minutes: 12
 
     steps:
-      - name: Generate route-accessor report
+      - name: Decode vtables and focused functions
         shell: bash
         run: |
           set -euo pipefail
@@ -33,29 +33,84 @@ jobs:
 
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/gameserver-route-accessors"
-          rm -rf "${out}" && mkdir -p "${out}/functions" "${out}/callers"
-          full=/tmp/client.disasm
+          out="/analysis/client-analysis/${run_id}/report/connection-controller-route-slot"
+          rm -rf "${out}" && mkdir -p "${out}/functions"
 
           python3 - "${client}" "${out}" <<'PY'
-          import pathlib, struct, sys
+          import pathlib
+          import struct
+          import sys
+
           from elftools.elf.elffile import ELFFile
           from elftools.dwarf.callframe import FDE
 
           binary, out_dir = sys.argv[1:]
-          targets = [
-              ('route_pair_7222', 0x7222a1),
-              ('route_pair_7226', 0x722678),
-              ('route_pair_7227', 0x722781),
-              ('route_pair_722b', 0x722b68),
-              ('packed_ports_9ce1', 0x9ce1f3),
-              ('meta_type_virtual_704220', 0x704220),
-              ('meta_type_virtual_703af0', 0x703af0),
-              ('meta_type_virtual_746900', 0x746900),
+          vtables = [
+              ('ConnectionController', 0x3083f28, list(range(0, 40))),
+              ('GameserverGameSessionHighSlots', 0x3076d20, list(range(140, 161))),
+              ('GameserverGameSessionCore', 0x3076d20, list(range(0, 32))),
           ]
 
           with open(binary, 'rb') as f:
-              blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
+              blob = f.read()
+              f.seek(0)
+              elf = ELFFile(f)
+              sections = list(elf.iter_sections())
+
+              def va_to_offset(va):
+                  for sec in sections:
+                      start = int(sec['sh_addr'])
+                      size = int(sec['sh_size'])
+                      if start <= va < start + size:
+                          return int(sec['sh_offset']) + va - start, sec.name
+                  return None, None
+
+              def section_of(va):
+                  return va_to_offset(va)[1]
+
+              resolved = {}
+              for sec in sections:
+                  if sec['sh_type'] != 'SHT_RELA':
+                      continue
+                  linked = elf.get_section(sec['sh_link']) if sec['sh_link'] else None
+                  for rel in sec.iter_relocations():
+                      slot = int(rel['r_offset'])
+                      typ = int(rel['r_info_type'])
+                      addend = int(rel['r_addend']) if rel.is_RELA() else 0
+                      value = None
+                      if typ == 8:
+                          value = addend
+                      elif linked is not None and int(rel['r_info_sym']):
+                          sym = linked.get_symbol(int(rel['r_info_sym']))
+                          sym_value = int(sym['st_value'])
+                          if sym_value:
+                              value = sym_value + addend
+                      if value is not None:
+                          resolved[slot] = value
+
+              def raw_qword(va):
+                  off, _ = va_to_offset(va)
+                  if off is None or off + 8 > len(blob):
+                      return None
+                  return struct.unpack_from('<Q', blob, off)[0]
+
+              def qword(va):
+                  return resolved.get(va, raw_qword(va))
+
+              def cstring(va, limit=600):
+                  off, sec = va_to_offset(va)
+                  if off is None:
+                      return None, sec
+                  end = blob.find(b'\0', off, min(len(blob), off + limit))
+                  if end <= off:
+                      return None, sec
+                  raw = blob[off:end]
+                  try:
+                      value = raw.decode('utf-8')
+                  except UnicodeDecodeError:
+                      return None, sec
+                  return value, sec
+
               fdes = []
               try:
                   dwarf = elf.get_dwarf_info()
@@ -67,124 +122,144 @@ jobs:
                   pass
 
               def function_range(address):
-                  candidates = [(s, e) for s, e in fdes if s <= address < e]
-                  return min(candidates, key=lambda x: x[1]-x[0]) if candidates else (address, address+0x5000)
+                  matches = [(start, end) for start, end in fdes if start <= address < end]
+                  if matches:
+                      return min(matches, key=lambda item: item[1] - item[0])
+                  return address, address + 0x5000
 
-              def va_to_offset(va):
-                  for sec in sections:
-                      start=int(sec['sh_addr']); size=int(sec['sh_size'])
-                      if start <= va < start+size:
-                          return int(sec['sh_offset'])+va-start, sec.name
-                  return None, None
+              report = []
+              selected = []
+              seen_targets = set()
 
-              resolved = {}
-              for sec in sections:
-                  if sec['sh_type'] != 'SHT_RELA': continue
-                  linked = elf.get_section(sec['sh_link']) if sec['sh_link'] else None
-                  for rel in sec.iter_relocations():
-                      slot=int(rel['r_offset']); typ=int(rel['r_info_type']); add=int(rel['r_addend']) if rel.is_RELA() else 0
-                      value=None
-                      if typ==8: value=add
-                      elif linked is not None and int(rel['r_info_sym']):
-                          sym=linked.get_symbol(int(rel['r_info_sym'])); sv=int(sym['st_value'])
-                          if sv: value=sv+add
-                      if value is not None: resolved[slot]=value
-
-              def raw_qword(va):
-                  off,_=va_to_offset(va)
-                  if off is None or off+8>len(blob): return None
-                  return struct.unpack_from('<Q',blob,off)[0]
-              def qword(va): return resolved.get(va,raw_qword(va))
-              def section_of(va): return va_to_offset(va)[1]
-
-              rows=[]
-              for name,address in targets:
-                  start,end=function_range(address)
-                  rows.append((name,address,start,end))
-              pathlib.Path(out_dir,'ranges.tsv').write_text(''.join(f'{n}\t{a:x}\t{s:x}\t{e:x}\n' for n,a,s,e in rows))
-
-              # Find vtable slots pointing at these function starts or interior targets.
-              report=[]
-              for name,address,start,end in rows:
-                  report.append(f'===== {name} target=0x{address:x} function=0x{start:x}-0x{end:x} =====')
-                  for slot,value in sorted(resolved.items()):
-                      if value == start or value == address:
-                          report.append(f'relocation_slot=0x{slot:x} slot_section={section_of(slot)} value=0x{value:x}')
-                          for delta in range(-24,33,8):
-                              va=slot+delta; q=qword(va)
-                              report.append(f'  slot{delta:+#x}=0x{va:x} value={None if q is None else hex(q)} target_section={None if q is None else section_of(q)}')
+              for label, vptr, slots in vtables:
+                  report.append(f'===== {label} VPTR 0x{vptr:x} =====')
+                  offset_to_top = qword(vptr - 16)
+                  typeinfo = qword(vptr - 8)
+                  report.append(f'offset_to_top={None if offset_to_top is None else hex(offset_to_top)}')
+                  report.append(f'typeinfo={None if typeinfo is None else hex(typeinfo)} section={None if typeinfo is None else section_of(typeinfo)}')
+                  if typeinfo:
+                      name_ptr = qword(typeinfo + 8)
+                      name, name_sec = cstring(name_ptr) if name_ptr else (None, None)
+                      report.append(f'typeinfo_name_ptr={None if name_ptr is None else hex(name_ptr)} section={name_sec} name={name!r}')
+                  for index in slots:
+                      slot_va = vptr + index * 8
+                      target = qword(slot_va)
+                      report.append(
+                          f'slot={index} offset=0x{index*8:x} slot_va=0x{slot_va:x} '
+                          f'target={None if target is None else hex(target)} section={None if target is None else section_of(target)}'
+                      )
+                      if target and section_of(target) == '.text' and target not in seen_targets:
+                          start, end = function_range(target)
+                          selected.append((label, index, target, start, end))
+                          seen_targets.add(target)
                   report.append('')
-              pathlib.Path(out_dir,'vtable-xrefs.txt').write_text('\n'.join(report)+'\n')
+
+              # Explicitly mark the critical virtual dispatches.
+              critical = [
+                  ('ConnectionController_slot12', 0x3083f28 + 0x60),
+                  ('GameSession_slot149', 0x3076d20 + 149 * 8),
+                  ('GameSession_slot150', 0x3076d20 + 150 * 8),
+                  ('GameSession_slot151', 0x3076d20 + 151 * 8),
+                  ('GameSession_slot152', 0x3076d20 + 152 * 8),
+                  ('GameSession_slot153', 0x3076d20 + 153 * 8),
+                  ('GameSession_slot154', 0x3076d20 + 154 * 8),
+                  ('GameSession_slot155', 0x3076d20 + 155 * 8),
+              ]
+              report.append('===== CRITICAL SLOTS =====')
+              for name, slot_va in critical:
+                  target = qword(slot_va)
+                  report.append(f'{name} slot_va=0x{slot_va:x} target={None if target is None else hex(target)}')
+
+              pathlib.Path(out_dir, 'vtable-map.txt').write_text('\n'.join(report) + '\n')
+              pathlib.Path(out_dir, 'ranges.tsv').write_text(
+                  ''.join(f'{label}\t{index}\t{target:x}\t{start:x}\t{end:x}\n' for label, index, target, start, end in selected)
+              )
           PY
 
-          while IFS="$(printf '\t')" read -r name address start end; do
-            [ -n "${address}" ] || continue
-            max_end=$((0x${start}+0x12000)); actual_end=$((0x${end}))
+          while IFS="$(printf '\t')" read -r label index target start end; do
+            [ -n "${target}" ] || continue
+            max_end=$((0x${start} + 0x12000))
+            actual_end=$((0x${end}))
             if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
             stop_hex="$(printf '0x%x' "${actual_end}")"
-            objdump -d -M intel --no-show-raw-insn --start-address="0x${start}" --stop-address="${stop_hex}" "${client}" > "${out}/functions/${name}.txt"
-          done < "${out}/ranges.tsv"
-
-          objdump -d -M intel --no-show-raw-insn "${client}" > "${full}"
-
-          while IFS="$(printf '\t')" read -r name address start end; do
-            [ -n "${start}" ] || continue
-            echo "===== CALLERS OF ${name} 0x${start} =====" > "${out}/callers/${name}.txt"
-            grep -B 45 -A 75 -E "call[[:space:]]+${start}([[:space:]]|<)" "${full}" >> "${out}/callers/${name}.txt" || true
-            echo "===== DIRECT CODE/DATA REFERENCES TO START =====" >> "${out}/callers/${name}.txt"
-            grep -B 30 -A 50 -E "#[[:space:]]*${start}([^0-9a-f]|$)" "${full}" >> "${out}/callers/${name}.txt" || true
+            safe="${label}-slot${index}-0x${target}"
+            objdump -d -M intel --no-show-raw-insn \
+              --start-address="0x${start}" --stop-address="${stop_hex}" "${client}" \
+              > "${out}/functions/${safe}.txt"
           done < "${out}/ranges.tsv"
 
           {
-            echo '===== RANGES ====='; cat "${out}/ranges.tsv"
-            for f in "${out}"/functions/*.txt; do
-              echo "===== $(basename "$f") ROUTE/PORT/BRANCH LINES ====="
-              grep -n -B 12 -A 24 -E '(0xbc0|0xbd8|0xbdc|0xbe0|0xbf8|0xbfa|0x1a0|0x1b8|0x1bc|0x1c0|0x1d8|0x1da|QUrl|QHostAddress|connect|cmp|test|cmov|sete|setne)' "$f" | head -n 4000 || true
+            echo '===== CRITICAL VTABLE MAP ====='
+            sed -n '/===== CRITICAL SLOTS =====/,$p' "${out}/vtable-map.txt"
+            for f in "${out}"/functions/ConnectionController-slot12-* \
+                     "${out}"/functions/GameserverGameSessionHighSlots-slot149-* \
+                     "${out}"/functions/GameserverGameSessionHighSlots-slot150-* \
+                     "${out}"/functions/GameserverGameSessionHighSlots-slot151-* \
+                     "${out}"/functions/GameserverGameSessionHighSlots-slot152-* \
+                     "${out}"/functions/GameserverGameSessionHighSlots-slot153-* \
+                     "${out}"/functions/GameserverGameSessionHighSlots-slot154-* \
+                     "${out}"/functions/GameserverGameSessionHighSlots-slot155-*; do
+              [ -f "$f" ] || continue
+              echo "===== $(basename "$f") ====="
+              grep -n -B 18 -A 35 -E '(0xbc0|0xbd8|0xbdc|0xbe0|0xbf8|0xbfa|0x1a0|0x1b8|0x1bc|0x1c0|0x1d8|0x1da|QHostAddress|QTcpSocket|connect|cmp|test|cmov|sete|setne|call[[:space:]])' "$f" | head -n 5000 || true
             done
-          } > "${out}/focus.txt"
+          } > "${out}/critical-focus.txt"
 
           python3 - "${client}" "${out}"/functions/*.txt > "${out}/referenced-data.txt" <<'PY'
-          import re,sys
+          import re
+          import sys
           from elftools.elf.elffile import ELFFile
-          binary,*inputs=sys.argv[1:]; addrs=set()
-          for p in inputs:
-              text=open(p,encoding='utf-8',errors='replace').read()
-              addrs.update(int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)',text))
-          with open(binary,'rb') as f:
-              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
-          def v2o(v):
-              for s in secs:
-                  a=int(s['sh_addr']); z=int(s['sh_size'])
-                  if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
-              return None,None
-          for v in sorted(addrs):
-              o,s=v2o(v)
-              if o is None: continue
-              e=blob.find(b'\0',o,min(len(blob),o+700)); val=None
-              if e>o:
-                  raw=blob[o:e]
-                  if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>.9:
-                      val=raw.decode('utf-8',errors='replace')
-              print(f'va=0x{v:x} section={s} string={val!r}')
+
+          binary, *inputs = sys.argv[1:]
+          addresses = set()
+          for path in inputs:
+              text = open(path, encoding='utf-8', errors='replace').read()
+              addresses.update(int(value, 16) for value in re.findall(r'#\s*([0-9a-fA-F]+)', text))
+
+          with open(binary, 'rb') as f:
+              blob = f.read()
+              f.seek(0)
+              elf = ELFFile(f)
+              sections = list(elf.iter_sections())
+
+          def va_to_offset(va):
+              for sec in sections:
+                  start = int(sec['sh_addr'])
+                  size = int(sec['sh_size'])
+                  if start <= va < start + size:
+                      return int(sec['sh_offset']) + va - start, sec.name
+              return None, None
+
+          for va in sorted(addresses):
+              off, sec = va_to_offset(va)
+              if off is None:
+                  continue
+              end = blob.find(b'\0', off, min(len(blob), off + 800))
+              value = None
+              if end > off:
+                  raw = blob[off:end]
+                  if raw and sum(32 <= byte < 127 or byte in (9, 10, 13) for byte in raw) / len(raw) > 0.9:
+                      value = raw.decode('utf-8', errors='replace')
+              print(f'va=0x{va:x} section={sec} string={value!r}')
           PY
 
           chmod -R a+rX "${out}"
           SCRIPT
 
-      - name: Copy route-accessor report
+      - name: Copy focused route-slot report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-gameserver-route-accessors"
+          out="${RUNNER_TEMP}/tibia-connection-controller-route-slot"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/gameserver-route-accessors/." "${out}/"
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/connection-controller-route-slot/." "${out}/"
 
-      - name: Upload route-accessor report
+      - name: Upload focused route-slot report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-gameserver-route-accessors
-          path: ${{ runner.temp }}/tibia-gameserver-route-accessors
+          name: tibia-linux-connection-controller-route-slot
+          path: ${{ runner.temp }}/tibia-connection-controller-route-slot
           retention-days: 1
