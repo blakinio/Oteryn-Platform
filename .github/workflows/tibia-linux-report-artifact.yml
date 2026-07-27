@@ -1,4 +1,4 @@
-name: Tibia Linux focused anti-cheat xrefs
+name: Tibia Linux BattlEye loader function
 
 on:
   pull_request:
@@ -11,31 +11,78 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-loader-function
+  cancel-in-progress: true
+
 jobs:
-  report:
-    name: Print focused route and loader summary
+  inspect:
+    name: Disassemble and annotate BE module loader
     runs-on: oteryn-staging
-    timeout-minutes: 5
+    timeout-minutes: 7
 
     steps:
-      - name: Filter persisted xref report
+      - name: Print loader disassembly and referenced strings
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
+          docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -c '
-              r=$(cat /analysis/latest-client-analysis-run-id)
-              f="/analysis/client-analysis/$r/report/compact-xrefs.txt"
-              echo "===== ROUTE AND SERVER-FIELD XREFS ====="
-              sed -n "/===== DIRECT XREF INSTRUCTIONS =====/,/===== LOADER CALL INSTRUCTIONS =====/p" "$f" \
-                | grep -Ev "1d78fc0|^=====" || true
-              echo "===== LOADER CALLS ====="
-              sed -n "/===== LOADER CALL INSTRUCTIONS =====/,/===== COUNTS =====/p" "$f" \
-                | grep -v "^=====" || true
-              echo "===== FOCUSED COUNTS ====="
-              printf "route_server_xrefs="
-              sed -n "/===== DIRECT XREF INSTRUCTIONS =====/,/===== LOADER CALL INSTRUCTIONS =====/p" "$f" \
-                | grep -Ev "1d78fc0|^=====" | grep -c . || true
-              sed -n "/===== COUNTS =====/,$p" "$f"
-            '
+            python:3.12-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
+
+          run_id="$(cat /analysis/latest-client-analysis-run-id)"
+          client="/analysis/client-analysis/${run_id}/download/client"
+          disasm=/tmp/loader.txt
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0x19f1700 --stop-address=0x19f1a80 \
+            "${client}" > "${disasm}"
+
+          echo '===== LOADER DISASSEMBLY ====='
+          cat "${disasm}"
+          echo '===== REFERENCED DATA / STRINGS ====='
+          python3 - "${client}" "${disasm}" <<'PY'
+          import re
+          import sys
+          from elftools.elf.elffile import ELFFile
+
+          binary, disasm_path = sys.argv[1:]
+          text = open(disasm_path, encoding="utf-8", errors="replace").read()
+          addresses = sorted({int(x, 16) for x in re.findall(r"#\s*([0-9a-fA-F]+)", text)})
+
+          with open(binary, "rb") as f:
+              blob = f.read()
+              f.seek(0)
+              elf = ELFFile(f)
+              sections = list(elf.iter_sections())
+
+          def va_to_offset(va):
+              for sec in sections:
+                  start = int(sec["sh_addr"])
+                  size = int(sec["sh_size"])
+                  if start <= va < start + size:
+                      return int(sec["sh_offset"]) + va - start, sec.name
+              return None, None
+
+          def c_string(off, limit=256):
+              if off is None or off >= len(blob):
+                  return None
+              end = blob.find(b"\0", off, min(len(blob), off + limit))
+              if end < 0:
+                  return None
+              raw = blob[off:end]
+              if len(raw) < 2:
+                  return None
+              printable = sum(32 <= b < 127 or b in (9, 10, 13) for b in raw)
+              if printable / len(raw) < 0.85:
+                  return None
+              return raw.decode("utf-8", errors="replace")
+
+          for va in addresses:
+              off, section = va_to_offset(va)
+              value = c_string(off)
+              print(f"va=0x{va:x} section={section} file_offset={None if off is None else hex(off)} string={value!r}")
+          PY
+          SCRIPT
