@@ -1,4 +1,4 @@
-name: Tibia Linux exact BattlEye loader strings
+name: Tibia Linux anti-cheat code xrefs
 
 on:
   pull_request:
@@ -11,31 +11,151 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-anticheat-xrefs
+  cancel-in-progress: true
+
 jobs:
-  inspect:
-    name: Print exact loader and route selectors
+  xrefs:
+    name: Trace loader and protected-route code references
     runs-on: oteryn-staging
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     steps:
-      - name: Read exact symbols and strings
+      - name: Analyze RIP-relative references
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -s <<'SCRIPT'
-          set -eu
+            python:3.12-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
           apk add --no-cache binutils >/dev/null
+          pip install --no-cache-dir pyelftools==0.32 capstone==5.0.6 >/dev/null
+
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
+          report="/analysis/client-analysis/${run_id}/report/code-xrefs.txt"
 
-          echo '===== LOADER IMPORTS ====='
-          readelf -Ws "${client}" | grep -E 'UND (dlopen|dlsym|dlclose)@' || true
-          echo '===== MODULE PATH / ABI STRINGS ====='
-          strings -a -t x -n 4 "${client}" | grep -Ei 'BEClient(_x64)?\.so|BattlEye/BEClient|BECLIENT_1\.0|GetVer|BEClient\.cfg' || true
-          echo '===== ROUTE SELECTORS ====='
-          strings -a -t x -n 4 "${client}" | grep -Ei 'useProtectedNetworkRoute|ProtectedWorldAddress|UnprotectedWorldAddress|externaladdressprotected|externaladdressunprotected|externalportprotected|externalportunprotected' || true
-          echo '===== ACTIVATION / SERVER FIELDS ====='
-          strings -a -t x -n 4 "${client}" | grep -Ei 'BattlEyeInitiallyActive|BattlEyeActivationTimestamp|availableBattlEyeTypes|initially_protected|anticheatprotection|battleye|clienttype|sessionkey' | head -n 120 || true
+          python3 - "${client}" > "${report}" <<'PY'
+          import collections
+          import sys
+
+          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
+          from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
+          from elftools.elf.elffile import ELFFile
+
+          path = sys.argv[1]
+          target_names = [
+              "useProtectedNetworkRoute",
+              "ProtectedWorldAddress",
+              "UnprotectedWorldAddress",
+              "externaladdressprotected",
+              "externaladdressunprotected",
+              "externalportprotected",
+              "externalportunprotected",
+              "BattlEyeInitiallyActive",
+              "BattlEyeActivationTimestamp",
+              "availableBattlEyeTypes",
+              "initially_protected",
+              "anticheatprotection",
+              "BEClient",
+              "BattlEye",
+          ]
+
+          with open(path, "rb") as f:
+              blob = f.read()
+              f.seek(0)
+              elf = ELFFile(f)
+              sections = list(elf.iter_sections())
+              text = elf.get_section_by_name(".text")
+              if text is None:
+                  raise SystemExit("missing .text")
+              text_data = text.data()
+              text_addr = int(text["sh_addr"])
+
+              def offset_to_va(offset: int):
+                  for section in sections:
+                      start = int(section["sh_offset"])
+                      size = int(section["sh_size"])
+                      if start <= offset < start + size:
+                          return int(section["sh_addr"]) + offset - start, section.name
+                  return None, None
+
+              targets = {}
+              print("===== TARGET LOCATIONS =====")
+              for name in target_names:
+                  needle = name.encode() + b"\0"
+                  start = 0
+                  entries = []
+                  while True:
+                      off = blob.find(needle, start)
+                      if off < 0:
+                          break
+                      va, section = offset_to_va(off)
+                      entries.append((off, va, section))
+                      if va is not None:
+                          targets.setdefault(va, []).append(name)
+                      start = off + 1
+                  print(f"target={name} occurrences={len(entries)}")
+                  for off, va, section in entries:
+                      print(f"  file_offset=0x{off:x} va={None if va is None else hex(va)} section={section}")
+
+              md = Cs(CS_ARCH_X86, CS_MODE_64)
+              md.detail = True
+              history = collections.deque(maxlen=10)
+              active = []
+              xref_counts = collections.Counter()
+              contexts = []
+
+              for insn in md.disasm(text_data, text_addr):
+                  rendered = f"0x{insn.address:x}: {insn.mnemonic} {insn.op_str}".rstrip()
+                  for ctx in list(active):
+                      ctx["lines"].append(rendered)
+                      ctx["remaining"] -= 1
+                      if ctx["remaining"] <= 0:
+                          contexts.append(ctx)
+                          active.remove(ctx)
+
+                  hit_names = set()
+                  for op in insn.operands:
+                      if op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
+                          target = insn.address + insn.size + op.mem.disp
+                          hit_names.update(targets.get(target, []))
+                      elif op.type == X86_OP_IMM:
+                          hit_names.update(targets.get(op.imm, []))
+
+                  for name in sorted(hit_names):
+                      xref_counts[name] += 1
+                      if xref_counts[name] <= 12:
+                          active.append({
+                              "name": name,
+                              "address": insn.address,
+                              "lines": list(history) + [rendered],
+                              "remaining": 12,
+                          })
+                  history.append(rendered)
+
+              contexts.extend(active)
+              print("===== XREF COUNTS =====")
+              for name in target_names:
+                  print(f"target={name} xrefs={xref_counts[name]}")
+              print("===== XREF CONTEXTS =====")
+              for ctx in contexts:
+                  print(f"--- target={ctx['name']} xref=0x{ctx['address']:x} ---")
+                  for line in ctx["lines"]:
+                      print(line)
+          PY
+
+          {
+            echo '===== DLOPEN / DLSYM CALL CONTEXTS ====='
+            objdump -d -M intel --no-show-raw-insn "${client}" \
+              | grep -B 16 -A 24 -E 'call[[:space:]].*<(dlopen|dlsym|dlclose)@plt>' \
+              | head -n 800 || true
+          } >> "${report}"
+
+          echo '===== XREF SUMMARY ====='
+          sed -n '/===== XREF COUNTS =====/,/===== XREF CONTEXTS =====/p' "${report}"
+          echo '===== FIRST CONTEXTS ====='
+          sed -n '/===== XREF CONTEXTS =====/,$p' "${report}" | head -n 320
           SCRIPT
