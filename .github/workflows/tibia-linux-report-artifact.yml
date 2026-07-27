@@ -1,4 +1,4 @@
-name: Tibia Linux wrapped LZMA decode
+name: Tibia Linux verified findings
 
 on:
   pull_request:
@@ -11,120 +11,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tibia-linux-wrapped-lzma-decode
-  cancel-in-progress: true
-
 jobs:
-  decode:
-    name: Normalize wrapper and verify Linux client ELF
+  findings:
+    name: Print concise verified findings
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 5
 
     steps:
-      - name: Normalize wrapped stream and decode
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            alpine:3.22 sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils coreutils file jq python3 xz >/dev/null
-
-          run_id="$(cat /analysis/latest-client-analysis-run-id)"
-          root="/analysis/client-analysis/${run_id}"
-          packed="${root}/download/client.lzma"
-          client="${root}/download/client"
-          normalized="${root}/download/client.normalized.lzma"
-          normalized_unknown="${root}/download/client.normalized-unknown.lzma"
-          report="${root}/report"
-          manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
-          manifest="/analysis/package-manifests/${manifest_run}/package.json"
-          record="$(jq -c '.files[] | select(.localfile == "bin/client")' "${manifest}")"
-          expected_hash="$(printf '%s' "${record}" | jq -r '.unpackedhash')"
-          expected_size="$(printf '%s' "${record}" | jq -r '.unpackedsize')"
-          mkdir -p "${report}"
-
-          python3 - "${packed}" "${normalized}" "${normalized_unknown}" "${expected_size}" <<'PY'
-          import pathlib
-          import struct
-          import sys
-
-          source, normalized, normalized_unknown, expected_size = sys.argv[1:]
-          data = pathlib.Path(source).read_bytes()
-          expected = int(expected_size)
-          if len(data) < 45:
-              raise SystemExit("packed file shorter than wrapper")
-          prefix = data[:32]
-          props = data[32:37]
-          stored_length = struct.unpack("<Q", data[37:45])[0]
-          payload = data[45:]
-          if stored_length != len(payload):
-              raise SystemExit(f"stored payload length {stored_length} != actual {len(payload)}")
-          pathlib.Path(normalized).write_bytes(props + struct.pack("<Q", expected) + payload)
-          pathlib.Path(normalized_unknown).write_bytes(props + (b"\xff" * 8) + payload)
-          print(f"wrapper_prefix_hex={prefix.hex()}")
-          print(f"lzma_properties_hex={props.hex()}")
-          print(f"stored_payload_length={stored_length}")
-          print(f"actual_payload_length={len(payload)}")
-          print(f"expected_unpacked_length={expected}")
-          PY
-
-          set +e
-          xz --format=lzma --decompress --stdout "${normalized}" > "${client}"
-          decode_rc=$?
-          set -e
-          if [ "${decode_rc}" -ne 0 ]; then
-            echo "known_size_decode_rc=${decode_rc}" > "${report}/wrapper-decode-error.txt"
-            xz --format=lzma --decompress --stdout "${normalized_unknown}" > "${client}"
-          fi
-          chmod +x "${client}"
-
-          actual_size="$(stat -c %s "${client}")"
-          actual_hash="$(sha256sum "${client}" | awk '{print $1}')"
-          test "${actual_size}" = "${expected_size}"
-          test "${actual_hash}" = "${expected_hash}"
-
-          {
-            echo "run_id=${run_id}"
-            echo "expected_size=${expected_size}"
-            echo "actual_size=${actual_size}"
-            echo "expected_sha256=${expected_hash}"
-            echo "actual_sha256=${actual_hash}"
-            echo "packed_size=$(stat -c %s "${packed}")"
-            echo "normalized_size=$(stat -c %s "${normalized}")"
-            printf 'file='
-            file -b "${client}"
-          } > "${report}/decode-verification.txt"
-
-          readelf -h "${client}" > "${report}/elf-header.txt"
-          readelf -d "${client}" > "${report}/dynamic.txt"
-          readelf -n "${client}" > "${report}/notes.txt" 2>/dev/null || true
-          strings -a -n 5 "${client}" > "${report}/strings.txt"
-          grep -E 'NEEDED|RPATH|RUNPATH' "${report}/dynamic.txt" > "${report}/dependencies.txt" || true
-          grep -Ei 'battleye|beclient|beservice|--battleye|protected|unprotected|anticheat|anti-cheat|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' \
-            "${report}/strings.txt" | sort -u | head -n 1000 > "${report}/security-auth-indicators.txt" || true
-          grep -Eo 'https?://[^[:space:]"<>]+' "${report}/strings.txt" | sed 's/[),;]$//' | sort -u | head -n 1000 > "${report}/urls.txt" || true
-
-          {
-            printf 'battleye_matches='
-            grep -Eic 'battleye|beclient|beservice|--battleye' "${report}/strings.txt" || true
-            printf 'protected_unprotected_matches='
-            grep -Eic 'protected|unprotected|anticheat|anti-cheat' "${report}/strings.txt" || true
-            printf 'auth_field_matches='
-            grep -Eic 'loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' "${report}/strings.txt" || true
-            printf 'url_count='
-            wc -l < "${report}/urls.txt"
-            printf 'dependency_count='
-            wc -l < "${report}/dependencies.txt"
-          } > "${report}/counts.txt"
-
-          echo 0 > "${report}/exit-code.txt"
-          chmod -R a+rX "${root}"
-          SCRIPT
-
-      - name: Print verified analysis
+      - name: Read final static-analysis files
         shell: bash
         run: |
           set -euo pipefail
@@ -134,16 +28,17 @@ jobs:
           set -eu
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           report="/analysis/client-analysis/${run_id}/report"
-          echo '===== DECODE VERIFICATION ====='
+          echo "run_id=${run_id}"
+          echo '--- decode-verification ---'
           cat "${report}/decode-verification.txt"
-          echo '===== COUNTS ====='
+          echo '--- counts ---'
           cat "${report}/counts.txt"
-          echo '===== ELF HEADER ====='
-          cat "${report}/elf-header.txt"
-          echo '===== DEPENDENCIES ====='
+          echo '--- elf-header-selected ---'
+          grep -E 'Class:|Data:|Type:|Machine:|Entry point|Number of program headers|Number of section headers' "${report}/elf-header.txt"
+          echo '--- dependencies ---'
           cat "${report}/dependencies.txt"
-          echo '===== SECURITY / AUTH INDICATORS ====='
-          cat "${report}/security-auth-indicators.txt"
-          echo '===== URLS ====='
+          echo '--- security-auth-indicators-first-120 ---'
+          head -n 120 "${report}/security-auth-indicators.txt"
+          echo '--- urls ---'
           cat "${report}/urls.txt"
           SCRIPT
