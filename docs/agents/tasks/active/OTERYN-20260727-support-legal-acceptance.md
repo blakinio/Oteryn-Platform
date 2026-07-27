@@ -54,10 +54,10 @@ modules:
   - Testing / Acceptance E2E
   - Agent governance
 dependencies:
-  - PR #259 must merge before the conflict-free successor is opened
+  - PR #259 merged as d08062c653a137e1359b5626fda635b170704cd8
   - Issue #240
 blockers:
-  - final Announcements merge
+  - prepared package must be transplanted onto the fresh post-Announcements branch before opening a PR
 cross_repository_tasks:
   - none
 ```
@@ -66,8 +66,8 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-07-27T22:35:00+02:00
-head: 4f6b66056df43de6f9c23e639d0455ef4ec5dcd5
+updated_at: 2026-07-27T20:40:18Z
+head: 4dd52785da3361394485d2c719f95f37222ecd54
 branch: test/OTERYN-20260727-support-legal-acceptance
 pr: none
 status: implementing
@@ -91,20 +91,29 @@ owned_paths:
   - docs/agents/tasks/active/OTERYN-20260727-announcements-acceptance.md
   - docs/agents/tasks/archive/OTERYN-20260727-announcements-acceptance.md
 proven:
-  - Lower-layer feature tests cover every typed route, publication boundary, approved links, exact permission, legal immutability and audit redaction.
-  - The prepared browser package includes every one of the eight typed public routes and the exact administrator role boundary.
+  - PR #259 merged to main as d08062c653a137e1359b5626fda635b170704cd8 after all thirteen exact-head workflows passed.
+  - The prepared Support and Legal package exists on head 4dd52785da3361394485d2c719f95f37222ecd54 and contains one workflow, one Playwright matrix, one isolated seed and two browser specifications.
+  - The prep branch is exactly at 4dd52785da3361394485d2c719f95f37222ecd54; live compare reported identical with zero commits ahead or behind that SHA.
+  - The prep branch diverges from current main with merge base 05d08714a0b87ee8a453d01bded605ff42de8bbc, is one commit behind and contains forty-four ancestor commits, so it is not a safe PR head.
+  - Fresh branch test/OTERYN-20260727-support-legal-acceptance-v2 exists at d08062c653a137e1359b5626fda635b170704cd8 and contains no transplanted Support and Legal files yet.
+  - Lower-layer feature evidence covers all eight typed public routes, publication boundaries, approved support links, legal-version immutability, exact permission and audit redaction.
+  - The affected trust boundary is public editorial reading plus privileged administrator mutation guarded by auth, confirmed MFA and exact support.content.manage permission.
+  - No Canary or login-server schema, protocol or session compatibility changes are involved; no migration or production rollback is required.
+  - Only synthetic acceptance configuration is used; no secret or production-only configuration is present in the prepared files.
 derived:
-  - The package can be reconciled onto the post-Announcements main without copying shared ledger or task state from the child branch.
+  - Opening a PR from the prep branch would reintroduce already-merged Announcements history and unrelated changes.
+  - The safe continuation is a narrow file transplant onto the existing v2 branch followed by a draft PR while the ledger remains planned.
 unknown:
-  - first exact-head Support and Legal browser result
+  - The first exact-head Support and Legal browser result on the post-Announcements base has not run.
+  - Prepared browser assertions may require focused adjustment after their first deterministic workflow artifact.
 conflicts: []
 first_failure:
-  marker: none
-  evidence: the browser package has not yet run because its parent Announcements PR is still in final merge gates
+  marker: stale-prep-branch-after-announcements-merge
+  evidence: compare d08062c653a137e1359b5626fda635b170704cd8...test/OTERYN-20260727-support-legal-acceptance returned diverged, ahead_by 44, behind_by 1 and merge base 05d08714a0b87ee8a453d01bded605ff42de8bbc.
 rejected_hypotheses:
-  - feature tests alone prove the composed public and administrator browser lifecycle
-  - a public report form should be added to make Support complete
-  - legal history may be replaced in place after publication
+  - The prep branch can be opened directly as a clean successor PR: live compare proves it carries unrelated pre-merge ancestry.
+  - Feature tests alone close the composed browser contract: the canonical ledger still records route-complete Playwright evidence as the remaining gap.
+  - A public ticket-submission form is required for completion: the delivered contract intentionally routes users only to approved allowlisted channels and stores no ticket payload.
 changed_paths:
   - .github/workflows/support-legal-acceptance.yml
   - scripts/acceptance/playwright.support-legal.config.mjs
@@ -113,12 +122,21 @@ changed_paths:
   - scripts/acceptance/tests/support-legal-admin-acceptance.spec.mjs
   - docs/agents/tasks/active/OTERYN-20260727-support-legal-acceptance.md
 validation:
-  - command: repository and feature-test inspection
+  - command: compare 4dd52785da3361394485d2c719f95f37222ecd54...test/OTERYN-20260727-support-legal-acceptance
     result: PASS
-    evidence: typed routes, controllers, public presenters, approved support link policy, legal version action and translation action inspected
+    evidence: GitHub reported identical, ahead_by 0 and behind_by 0.
+  - command: compare d08062c653a137e1359b5626fda635b170704cd8...test/OTERYN-20260727-support-legal-acceptance
+    result: FAIL
+    evidence: GitHub reported diverged, ahead_by 44, behind_by 1 and merge base 05d08714a0b87ee8a453d01bded605ff42de8bbc.
+  - command: Support and Legal source and lower-layer test inspection
+    result: PASS
+    evidence: typed routes, public presenters, allowlisted links, legal version action, translation action, exact middleware and feature tests were inspected.
+  - command: Support and Legal Acceptance workflow
+    result: NOT_RUN
+    evidence: the package has not yet been transplanted to the clean post-Announcements branch and has no PR.
 blockers:
-  - final Announcements merge
-next_action: Rebuild this package on post-Announcements main, open a draft PR and execute the exact-SHA Support and Legal workflow while the ledger remains planned.
+  - prepared files are on the stale prep branch rather than the clean v2 branch
+next_action: Copy only the five Support and Legal acceptance files plus this active task onto test/OTERYN-20260727-support-legal-acceptance-v2, archive the merged Announcements task, update ACTIVE_WORK narrowly and open a draft PR while leaving the ledger planned.
 ```
 
 ## Notes
