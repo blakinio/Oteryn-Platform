@@ -1,4 +1,4 @@
-name: Tibia Linux focused loader artifact
+name: Tibia Linux dynamic-loader callers
 
 on:
   pull_request:
@@ -11,73 +11,52 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-loader-callers
+  cancel-in-progress: true
+
 jobs:
-  export:
-    name: Export focused BE loader disassembly
+  callers:
+    name: Find loader wrapper callers
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 10
 
     steps:
-      - name: Generate focused loader report
+      - name: Persist exact caller instructions
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            python:3.12-alpine sh -s <<'SCRIPT'
+            alpine:3.22 sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
+          apk add --no-cache binutils grep >/dev/null
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          o="/analysis/client-analysis/${r}/report/loader-focused.txt"
-          d=/tmp/loader.txt
-          objdump -d -M intel --no-show-raw-insn --start-address=0x19f17c0 --stop-address=0x19f1950 "$c" > "$d"
+          o="/analysis/client-analysis/${r}/report/loader-callers.txt"
+          d=/tmp/client.disasm
+          objdump -d -M intel --no-show-raw-insn "$c" > "$d"
           {
-            echo '===== DISASSEMBLY ====='
-            cat "$d"
-            echo '===== REFERENCED STRINGS ====='
-            python3 - "$c" "$d" <<'PY'
-          import re, sys
-          from elftools.elf.elffile import ELFFile
-          binary, disasm = sys.argv[1:]
-          text = open(disasm, errors='replace').read()
-          vas = sorted({int(x, 16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text)})
-          with open(binary, 'rb') as f:
-              blob = f.read(); f.seek(0); elf = ELFFile(f); secs = list(elf.iter_sections())
-          def off_for(va):
-              for s in secs:
-                  a, z = int(s['sh_addr']), int(s['sh_size'])
-                  if a <= va < a + z: return int(s['sh_offset']) + va - a, s.name
-              return None, None
-          for va in vas:
-              off, sec = off_for(va)
-              value = None
-              if off is not None:
-                  end = blob.find(b'\0', off, min(len(blob), off + 300))
-                  if end > off:
-                      raw = blob[off:end]
-                      if raw and sum(32 <= b < 127 or b in (9,10,13) for b in raw) / len(raw) >= .85:
-                          value = raw.decode(errors='replace')
-              print(f'va=0x{va:x} section={sec} string={value!r}')
-          PY
+            echo '===== LOAD-LIBRARY WRAPPER CALLERS ====='
+            grep -E 'call[[:space:]]+19f17e9([[:space:]]|<)' "$d" || true
+            echo '===== CLOSE-LIBRARY WRAPPER CALLERS ====='
+            grep -E 'call[[:space:]]+19f1863([[:space:]]|<)' "$d" || true
+            echo '===== LOAD-SYMBOL WRAPPER CALLERS ====='
+            grep -E 'call[[:space:]]+19f1882([[:space:]]|<)' "$d" || true
+            echo '===== GETVER STRING LOCATIONS ====='
+            strings -a -t x -n 4 "$c" | grep -E '[[:space:]]GetVer$' || true
+            echo '===== INIT STRING LOCATIONS ====='
+            strings -a -t x -n 4 "$c" | grep -E '[[:space:]]Init$' || true
+            echo '===== BECLIENT STRING LOCATIONS ====='
+            strings -a -t x -n 4 "$c" | grep -Ei 'BEClient|BattlEye/|BECLIENT_1\.0' || true
           } > "$o"
           chmod a+r "$o"
           SCRIPT
 
-      - name: Copy focused report
+      - name: Print exact caller report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/loader-focused.txt"
-          r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
-          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/loader-focused.txt" "$out"
-
-      - name: Upload focused text report
-        uses: actions/upload-artifact@v4
-        with:
-          name: tibia-linux-loader-focused
-          path: ${{ runner.temp }}/loader-focused.txt
-          retention-days: 1
+          docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -c 'r=$(cat /analysis/latest-client-analysis-run-id); cat "/analysis/client-analysis/$r/report/loader-callers.txt"'
