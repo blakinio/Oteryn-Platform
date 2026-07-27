@@ -1,4 +1,4 @@
-name: Tibia Linux text report artifact
+name: Tibia Linux verified text analysis
 
 on:
   pull_request:
@@ -11,24 +11,144 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: tibia-linux-verified-analysis
+  cancel-in-progress: true
+
 jobs:
-  export:
-    name: Export verified text report
+  analyze:
+    name: Analyze verified Linux client and export report
     runs-on: oteryn-staging
-    timeout-minutes: 7
+    timeout-minutes: 15
 
     steps:
+      - name: Download and statically analyze verified client
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker volume inspect oteryn-tibia-linux-analysis >/dev/null
+
+          docker run --rm -i \
+            --network bridge \
+            --env "RUN_ID=${run_id}" \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            alpine:3.22 sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils ca-certificates coreutils curl file findutils grep jq sed xz >/dev/null
+
+          manifest_run="$(cat /analysis/latest-package-manifest-run-id)"
+          manifest="/analysis/package-manifests/${manifest_run}/package.json"
+          test -f "${manifest}"
+
+          root="/analysis/client-analysis/${RUN_ID}"
+          download_dir="${root}/download"
+          report_dir="${root}/report"
+          rm -rf "${root}"
+          mkdir -p "${download_dir}" "${report_dir}"
+          printf '%s\n' "${RUN_ID}" > /analysis/latest-client-analysis-run-id
+
+          on_exit() {
+            status=$?
+            printf '%s\n' "${status}" > "${report_dir}/exit-code.txt"
+          }
+          trap on_exit EXIT
+
+          version="$(jq -r '.version' "${manifest}")"
+          executable="$(jq -r '.executable' "${manifest}")"
+          record="$(jq -c '.files[] | select(.localfile == "bin/client")' "${manifest}")"
+          test -n "${record}"
+
+          relative_url="$(printf '%s' "${record}" | jq -r '.url')"
+          packed_hash="$(printf '%s' "${record}" | jq -r '.packedhash')"
+          packed_size="$(printf '%s' "${record}" | jq -r '.packedsize')"
+          unpacked_hash="$(printf '%s' "${record}" | jq -r '.unpackedhash')"
+          unpacked_size="$(printf '%s' "${record}" | jq -r '.unpackedsize')"
+          executable_flag="$(printf '%s' "${record}" | jq -r '.executable')"
+
+          base='https://static.tibia.com/launcher/tibiaclient-linux-current'
+          url="${base}/${relative_url}"
+          packed="${download_dir}/client.lzma"
+          client="${download_dir}/client"
+
+          curl --fail --location --silent --show-error --compressed \
+            --referer "${url}" \
+            --retry 5 --retry-delay 2 \
+            --output "${packed}" \
+            "${url}"
+
+          actual_packed_size="$(stat -c %s "${packed}")"
+          actual_packed_hash="$(sha256sum "${packed}" | awk '{print $1}')"
+          test "${actual_packed_size}" = "${packed_size}"
+          test "${actual_packed_hash}" = "${packed_hash}"
+
+          xz --format=lzma --decompress --stdout "${packed}" > "${client}"
+          chmod +x "${client}"
+
+          actual_unpacked_size="$(stat -c %s "${client}")"
+          actual_unpacked_hash="$(sha256sum "${client}" | awk '{print $1}')"
+          test "${actual_unpacked_size}" = "${unpacked_size}"
+          test "${actual_unpacked_hash}" = "${unpacked_hash}"
+
+          {
+            printf 'version=%s\n' "${version}"
+            printf 'manifest_executable=%s\n' "${executable}"
+            printf 'record_executable=%s\n' "${executable_flag}"
+            printf 'source_url=%s\n' "${url}"
+            printf 'packed_size=%s\n' "${actual_packed_size}"
+            printf 'packed_sha256=%s\n' "${actual_packed_hash}"
+            printf 'unpacked_size=%s\n' "${actual_unpacked_size}"
+            printf 'unpacked_sha256=%s\n' "${actual_unpacked_hash}"
+            printf 'file='
+            file -b "${client}"
+          } > "${report_dir}/summary.txt"
+
+          readelf -h "${client}" > "${report_dir}/elf-header.txt"
+          readelf -S "${client}" > "${report_dir}/sections.txt"
+          readelf -d "${client}" > "${report_dir}/dynamic.txt"
+          readelf -n "${client}" > "${report_dir}/notes.txt" 2>/dev/null || true
+          strings -a -n 5 "${client}" > "${report_dir}/strings.txt"
+
+          grep -E 'NEEDED|RPATH|RUNPATH' "${report_dir}/dynamic.txt" \
+            > "${report_dir}/dependencies.txt" || true
+
+          grep -Ei 'battleye|beclient|beservice|--battleye|protected|unprotected|anticheat|anti-cheat|loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' \
+            "${report_dir}/strings.txt" \
+            | sort -u \
+            | head -n 1000 \
+            > "${report_dir}/security-auth-indicators.txt" || true
+
+          grep -Eo 'https?://[^[:space:]"<>]+' "${report_dir}/strings.txt" \
+            | sed 's/[),;]$//' \
+            | sort -u \
+            | head -n 1000 \
+            > "${report_dir}/urls.txt" || true
+
+          battleye_count="$(grep -Eic 'battleye|beclient|beservice|--battleye' "${report_dir}/strings.txt" || true)"
+          protection_count="$(grep -Eic 'protected|unprotected|anticheat|anti-cheat' "${report_dir}/strings.txt" || true)"
+          auth_count="$(grep -Eic 'loginservice|sessionkey|clienttype|clientversion|assetversion|two.?factor|loginconfirmation|trusteddevice|devicecookie|masslogin' "${report_dir}/strings.txt" || true)"
+          url_count="$(wc -l < "${report_dir}/urls.txt")"
+          dependency_count="$(wc -l < "${report_dir}/dependencies.txt")"
+
+          {
+            printf 'battleye_matches=%s\n' "${battleye_count}"
+            printf 'protected_unprotected_matches=%s\n' "${protection_count}"
+            printf 'auth_field_matches=%s\n' "${auth_count}"
+            printf 'url_count=%s\n' "${url_count}"
+            printf 'dependency_count=%s\n' "${dependency_count}"
+          } > "${report_dir}/counts.txt"
+
+          chmod -R a+rX "${root}"
+          SCRIPT
+
       - name: Copy text reports from analysis volume
         shell: bash
         run: |
           set -euo pipefail
+          run_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           out="${RUNNER_TEMP}/tibia-linux-report"
           rm -rf "${out}"
           mkdir -p "${out}"
-
-          run_id="$(docker run --rm \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
 
           cid="$(docker create \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
@@ -56,7 +176,10 @@ jobs:
             echo "source_volume=oteryn-tibia-linux-analysis"
           } > "${out}/artifact-metadata.txt"
 
-          ls -lah "${out}"
+          echo '===== SUMMARY ====='
+          cat "${out}/summary.txt"
+          echo '===== COUNTS ====='
+          cat "${out}/counts.txt"
 
       - name: Upload text-only report
         uses: actions/upload-artifact@v4
