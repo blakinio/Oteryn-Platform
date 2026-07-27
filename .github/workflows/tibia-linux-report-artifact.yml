@@ -1,4 +1,4 @@
-name: Tibia Linux authentication helper flow
+name: Tibia Linux playdata to gameserver flow
 
 on:
   pull_request:
@@ -12,17 +12,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-auth-helper-flow
+  group: tibia-linux-playdata-gameserver-flow
   cancel-in-progress: true
 
 jobs:
   trace:
-    name: Trace authentication JSON helper and world parser calls
+    name: Trace playdata model into gameserver connection
     runs-on: oteryn-staging
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
-      - name: Generate helper flow report
+      - name: Generate playdata and gameserver report
         shell: bash
         run: |
           set -euo pipefail
@@ -35,80 +35,148 @@ jobs:
 
           r="$(cat /analysis/latest-client-analysis-run-id)"
           c="/analysis/client-analysis/${r}/download/client"
-          out="/analysis/client-analysis/${r}/report/auth-helper-flow"
+          out="/analysis/client-analysis/${r}/report/playdata-gameserver-flow"
           rm -rf "$out" && mkdir -p "$out"
           d=/tmp/client.disasm
           objdump -d -M intel --no-show-raw-insn "$c" > "$d"
 
           objdump -d -M intel --no-show-raw-insn \
-            --start-address=0xe1a810 --stop-address=0xe1afdc "$c" \
-            > "$out/helper-e1a810.txt"
+            --start-address=0xabff80 --stop-address=0xac0c80 "$c" \
+            > "$out/auth-caller-ac0000.txt"
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0x196e200 --stop-address=0x196e980 "$c" \
+            > "$out/tcp-constructors-196e.txt"
 
           {
-            echo '===== DIRECT CALLERS OF e1a810 ====='
-            grep -E 'call[[:space:]]+e1a810([[:space:]]|<)' "$d" || true
-            echo '===== DIRECT CALLERS OF WORLD PARSER e0fcf0 ====='
-            grep -E 'call[[:space:]]+e0fcf0([[:space:]]|<)' "$d" || true
-            echo '===== INDIRECT CALLS INSIDE HELPER ====='
-            grep -E 'call[[:space:]]+.*\*|call[[:space:]]+(QWORD|DWORD) PTR' "$out/helper-e1a810.txt" || true
-            echo '===== FIELD-SIZED MEMORY OPERATIONS INSIDE HELPER ====='
-            grep -E '(0x80|0x78|0x74|0x70|0x54|0x50|0x48|0x38|0x30|0x20)' "$out/helper-e1a810.txt" || true
-          } > "$out/helper-index.txt"
+            echo '===== PLAYDATA KEY GLOBAL XREFS ====='
+            for a in 3195aa0 3195ac0 3195ae0; do
+              echo "--- global 0x${a} ---"
+              grep -B 12 -A 18 -E "#[[:space:]]*${a}([^0-9a-f]|$)" "$d" || true
+            done
+            echo '===== AUTH CALLER DIRECT CALLEES ====='
+            grep -E 'call[[:space:]]+[0-9a-f]+([[:space:]]|<)' "$out/auth-caller-ac0000.txt" || true
+            echo '===== AUTH CALLER MODEL OFFSETS ====='
+            grep -E '\[[^]]+\+(0x70|0x78|0x80|0x88|0x90|0x98|0xa0|0xa8|0xb0|0xb8|0xc0|0xc8|0xd0|0x178)\]' "$out/auth-caller-ac0000.txt" || true
+          } > "$out/playdata-index.txt"
 
-          python3 - "$c" "$out/helper-e1a810.txt" > "$out/helper-referenced-data.txt" <<'PY'
+          python3 - "$c" "$out/auth-caller-ac0000.txt" "$out/tcp-constructors-196e.txt" > "$out/annotated-referenced-data.txt" <<'PY'
           import re, sys
           from elftools.elf.elffile import ELFFile
-
-          binary, disasm = sys.argv[1:]
-          text = open(disasm, encoding='utf-8', errors='replace').read()
-          addresses = sorted({int(x, 16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text)})
+          binary, *inputs = sys.argv[1:]
+          addresses = set()
+          for p in inputs:
+              text = open(p, encoding='utf-8', errors='replace').read()
+              addresses.update(int(x, 16) for x in re.findall(r'#\s*([0-9a-fA-F]+)', text))
           with open(binary, 'rb') as f:
-              blob = f.read()
-              f.seek(0)
-              elf = ELFFile(f)
-              sections = list(elf.iter_sections())
-
+              blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
           def va_to_offset(va):
               for sec in sections:
-                  start = int(sec['sh_addr'])
-                  size = int(sec['sh_size'])
-                  if start <= va < start + size:
-                      return int(sec['sh_offset']) + va - start, sec.name
+                  start=int(sec['sh_addr']); size=int(sec['sh_size'])
+                  if start <= va < start+size:
+                      return int(sec['sh_offset'])+va-start, sec.name
               return None, None
-
-          for va in addresses:
+          for va in sorted(addresses):
               off, sec = va_to_offset(va)
-              if off is None:
-                  continue
-              end = blob.find(b'\0', off, min(len(blob), off + 260))
-              value = None
-              if end > off:
-                  raw = blob[off:end]
-                  if raw and sum(32 <= b < 127 or b in (9,10,13) for b in raw) / len(raw) > 0.88:
-                      value = raw.decode('utf-8', errors='replace')
+              if off is None: continue
+              end=blob.find(b'\0', off, min(len(blob), off+320)); value=None
+              if end>off:
+                  raw=blob[off:end]
+                  if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>0.88:
+                      value=raw.decode('utf-8', errors='replace')
               print(f'va=0x{va:x} section={sec} string={value!r}')
           PY
 
-          grep -B 50 -A 90 -E 'call[[:space:]]+e1a810([[:space:]]|<)' "$d" \
-            | head -n 2500 > "$out/helper-caller-contexts.txt" || true
+          cat > /tmp/named-strings.tsv <<'EOF'
+          1c89a30 requestCharacterGameserverLogin
+          1c89d7a onStartGameServerLoginStateEntered
+          1c9211b connectClientToGameserverWithExistingCredentials
+          1c9229f onConnectClientToGameserver
+          1c922bb onAbortConnectClientToGameserver
+          1ca9fa0 TGameserverTCPConnection_RTTI_name
+          1ca9fe0 TGameserverNetworkPacketConnection_RTTI_name
+          1c98b80 TGameserverGameSession_RTTI_name
+          EOF
+          {
+            echo '===== NAMED STRING XREFS ====='
+            while read -r a n; do
+              echo "--- ${n} @ 0x${a} ---"
+              grep -B 20 -A 30 -E "#[[:space:]]*${a}([^0-9a-f]|$)" "$d" || true
+            done < /tmp/named-strings.tsv
+          } > "$out/gameserver-name-xrefs.txt"
+
+          python3 - "$c" > "$out/gameserver-rtti-vtables.txt" <<'PY'
+          import struct, sys
+          from elftools.elf.elffile import ELFFile
+          names = {
+              'N5tibia7network24TGameserverTCPConnectionE',
+              'N5tibia7network34TGameserverNetworkPacketConnectionE',
+              'N5tibia4game22TGameserverGameSessionE',
+          }
+          path=sys.argv[1]
+          with open(path,'rb') as f:
+              blob=f.read(); f.seek(0); elf=ELFFile(f); sections=list(elf.iter_sections())
+          def off_to_va(off):
+              for sec in sections:
+                  s=int(sec['sh_offset']); z=int(sec['sh_size'])
+                  if s<=off<s+z: return int(sec['sh_addr'])+off-s, sec.name
+              return None,None
+          def va_to_off(va):
+              for sec in sections:
+                  s=int(sec['sh_addr']); z=int(sec['sh_size'])
+                  if s<=va<s+z: return int(sec['sh_offset'])+va-s, sec.name
+              return None,None
+          for name in sorted(names):
+              needle=name.encode()+b'\0'; pos=blob.find(needle)
+              print(f'===== {name} =====')
+              if pos<0: print('name_not_found'); continue
+              name_va,_=off_to_va(pos); print(f'name_va=0x{name_va:x}')
+              ptr=struct.pack('<Q',name_va)
+              ti_positions=[]; p=0
+              while True:
+                  p=blob.find(ptr,p)
+                  if p<0: break
+                  va,sec=off_to_va(p); ti_positions.append((p,va,sec)); p+=1
+              for p,ti_name_slot,sec in ti_positions:
+                  typeinfo_va=ti_name_slot-8
+                  print(f'typeinfo_candidate=0x{typeinfo_va:x} section={sec}')
+                  tiptr=struct.pack('<Q',typeinfo_va); q=0
+                  while True:
+                      q=blob.find(tiptr,q)
+                      if q<0: break
+                      slot_va,slot_sec=off_to_va(q)
+                      print(f'  typeinfo_xref_slot=0x{slot_va:x} section={slot_sec}')
+                      if slot_sec=='.data.rel.ro':
+                          base=slot_va-8; vptr=slot_va+8
+                          print(f'  vtable_base=0x{base:x} vptr=0x{vptr:x}')
+                          for i in range(24):
+                              off,_=va_to_off(vptr+i*8)
+                              if off is None: break
+                              val=struct.unpack_from('<Q',blob,off)[0]
+                              _,vsec=va_to_off(val)
+                              print(f'    slot={i} va=0x{vptr+i*8:x} value=0x{val:x} target_section={vsec}')
+                      q+=1
+          PY
+
+          grep -B 30 -A 50 -E 'call[[:space:]]+196e[0-9a-f]{3}([[:space:]]|<)' "$d" \
+            | head -n 3000 > "$out/tcp-constructor-callers.txt" || true
 
           chmod -R a+rX "$out"
           SCRIPT
 
-      - name: Copy helper flow report
+      - name: Copy playdata gameserver report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-auth-helper-flow"
+          out="${RUNNER_TEMP}/tibia-playdata-gameserver-flow"
           rm -rf "$out" && mkdir -p "$out"
           r="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/$r/report/auth-helper-flow/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/$r/report/playdata-gameserver-flow/." "$out/"
 
-      - name: Upload helper flow report
+      - name: Upload playdata gameserver report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-auth-helper-flow
-          path: ${{ runner.temp }}/tibia-auth-helper-flow
+          name: tibia-linux-playdata-gameserver-flow
+          path: ${{ runner.temp }}/tibia-playdata-gameserver-flow
           retention-days: 1
