@@ -1,4 +1,4 @@
-name: Tibia Linux route branch type trace
+name: Tibia Linux TCP route selector
 
 on:
   pull_request:
@@ -10,16 +10,17 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-route-branch-types
+  group: tibia-linux-tcp-route-selector
   cancel-in-progress: true
 
 jobs:
   trace:
-    name: Identify route branch helpers and object types
+    name: Trace TCP route selection and BattlEye resume callback
     runs-on: oteryn-staging
-    timeout-minutes: 12
+    timeout-minutes: 15
+
     steps:
-      - name: Generate focused helper and RTTI report
+      - name: Generate route-selector report
         shell: bash
         run: |
           set -euo pipefail
@@ -32,8 +33,9 @@ jobs:
 
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/route-branch-types"
-          rm -rf "${out}" && mkdir -p "${out}/functions"
+          out="/analysis/client-analysis/${run_id}/report/tcp-route-selector"
+          rm -rf "${out}" && mkdir -p "${out}/functions" "${out}/contexts"
+          full=/tmp/client.disasm
 
           python3 - "${client}" "${out}" <<'PY'
           import pathlib, struct, sys
@@ -41,20 +43,37 @@ jobs:
           from elftools.dwarf.callframe import FDE
 
           binary, out_dir = sys.argv[1:]
-          helper_targets = [
-              ('selectOrNormalizeGameserverRecord', 0x6fadb0),
-              ('sessionMetaPopulateA', 0x6b8c80),
-              ('sessionMetaPopulateB', 0x7525c0),
-              ('protectedBranchPopulate', 0x6b8cd0),
-          ]
-          vptrs = [
-              0x2f609e0, 0x2f609b8, 0x30762d0,
-              0x2f60d28, 0x2f60cd8, 0x2f60d00,
-              0x2f5ef20, 0x2f60d60,
+          targets = [
+              ('TGameserverTCPConnection_ctor', 0x196e3d0),
+              ('tcp_vslot_3', 0x7e32f0),
+              ('tcp_vslot_4', 0x7e33d0),
+              ('tcp_secondary_slot_0', 0x7e3060),
+              ('tcp_secondary_slot_1', 0x7e31a0),
+              ('tcp_qt_metacall', 0xdc5da0),
+              ('tcp_qt_metacast_or_meta', 0xdd4670),
+              ('tcp_qobject_method', 0xdd7b70),
+              ('BE_setup_and_session_resume', 0x6fadb0),
+              ('BE_callback_window', 0x6fb500),
+              ('GameserverSession_initialize', 0x7e6a40),
           ]
 
           with open(binary, 'rb') as f:
               blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
+              fdes = []
+              try:
+                  dwarf = elf.get_dwarf_info()
+                  for entry in dwarf.EH_CFI_entries():
+                      if isinstance(entry, FDE):
+                          start = int(entry['initial_location'])
+                          fdes.append((start, start + int(entry['address_range'])))
+              except Exception:
+                  pass
+
+              def function_range(address):
+                  candidates = [(s, e) for s, e in fdes if s <= address < e]
+                  if candidates:
+                      return min(candidates, key=lambda x: x[1] - x[0])
+                  return address, address + 0x5000
 
               def va_to_offset(va):
                   for sec in sections:
@@ -93,68 +112,42 @@ jobs:
               def section_of(va):
                   return va_to_offset(va)[1]
 
-              def cstring(va, limit=500):
-                  off, sec = va_to_offset(va)
-                  if off is None: return None, sec
-                  end = blob.find(b'\0', off, min(len(blob), off + limit))
-                  if end <= off: return None, sec
-                  raw = blob[off:end]
-                  try:
-                      text = raw.decode('utf-8')
-                  except UnicodeDecodeError:
-                      return None, sec
-                  if text and sum(32 <= ord(ch) < 127 for ch in text) / len(text) < 0.9:
-                      return None, sec
-                  return text, sec
-
-              fdes = []
-              try:
-                  dwarf = elf.get_dwarf_info()
-                  for entry in dwarf.EH_CFI_entries():
-                      if isinstance(entry, FDE):
-                          start = int(entry['initial_location'])
-                          fdes.append((start, start + int(entry['address_range'])))
-              except Exception:
-                  pass
-
-              def function_range(address):
-                  for start, end in fdes:
-                      if start <= address < end:
-                          return start, end
-                  return address, address + 0x5000
-
-              ranges = []
-              for name, address in helper_targets:
-                  start, end = function_range(address)
-                  ranges.append((name, address, start, end))
-              pathlib.Path(out_dir, 'ranges.tsv').write_text(
-                  ''.join(f'{name}\t{address:x}\t{start:x}\t{end:x}\n' for name, address, start, end in ranges)
-              )
-
               lines = []
+              for name, address in targets:
+                  start, end = function_range(address)
+                  lines.append(f'{name}\t{address:x}\t{start:x}\t{end:x}')
+              pathlib.Path(out_dir, 'ranges.tsv').write_text('\n'.join(lines) + '\n')
+
+              vptrs = [0x3082b38, 0x3082b98, 0x3082ba8, 0x3076d20]
+              report = []
               for vptr in vptrs:
-                  lines.append(f'===== VPTR 0x{vptr:x} =====')
-                  lines.append(f'vptr_section={section_of(vptr)}')
-                  offset_to_top = qword(vptr - 16)
+                  report.append(f'===== VPTR 0x{vptr:x} =====')
                   typeinfo = qword(vptr - 8)
-                  lines.append(f'offset_to_top_raw={None if offset_to_top is None else hex(offset_to_top)}')
-                  lines.append(f'typeinfo={None if typeinfo is None else hex(typeinfo)} section={None if typeinfo is None else section_of(typeinfo)}')
+                  report.append(f'typeinfo={None if typeinfo is None else hex(typeinfo)} section={None if typeinfo is None else section_of(typeinfo)}')
                   if typeinfo:
-                      typeinfo_vptr = qword(typeinfo)
                       name_ptr = qword(typeinfo + 8)
-                      name, name_sec = cstring(name_ptr) if name_ptr else (None, None)
-                      lines.append(f'typeinfo_vptr={None if typeinfo_vptr is None else hex(typeinfo_vptr)} section={None if typeinfo_vptr is None else section_of(typeinfo_vptr)}')
-                      lines.append(f'typeinfo_name_ptr={None if name_ptr is None else hex(name_ptr)} section={name_sec} name={name!r}')
-                  for index in range(16):
+                      name = None
+                      if name_ptr:
+                          off, sec = va_to_offset(name_ptr)
+                          if off is not None:
+                              end = blob.find(b'\0', off, min(len(blob), off + 500))
+                              if end > off:
+                                  name = blob[off:end].decode('utf-8', errors='replace')
+                          report.append(f'typeinfo_name_ptr=0x{name_ptr:x} name={name!r}')
+                  for index in range(32):
                       target = qword(vptr + index * 8)
-                      lines.append(f'slot={index} slot_va=0x{vptr + index*8:x} target={None if target is None else hex(target)} section={None if target is None else section_of(target)}')
-                  lines.append('')
-              pathlib.Path(out_dir, 'rtti-vtables.txt').write_text('\n'.join(lines) + '\n')
+                      report.append(
+                          f'slot={index} slot_va=0x{vptr + index*8:x} '
+                          f'target={None if target is None else hex(target)} '
+                          f'section={None if target is None else section_of(target)}'
+                      )
+                  report.append('')
+              pathlib.Path(out_dir, 'vtable-map.txt').write_text('\n'.join(report) + '\n')
           PY
 
           while IFS="$(printf '\t')" read -r name address start end; do
             [ -n "${address}" ] || continue
-            max_end=$((0x${start} + 0xc000))
+            max_end=$((0x${start} + 0x18000))
             actual_end=$((0x${end}))
             if [ "${actual_end}" -gt "${max_end}" ]; then actual_end="${max_end}"; fi
             stop_hex="$(printf '0x%x' "${actual_end}")"
@@ -163,23 +156,37 @@ jobs:
               > "${out}/functions/${name}.txt"
           done < "${out}/ranges.tsv"
 
-          objdump -d -M intel --no-show-raw-insn \
-            --start-address=0x6fdbd0 --stop-address=0x6fea20 "${client}" \
-            > "${out}/route-branch.txt"
+          objdump -d -M intel --no-show-raw-insn "${client}" > "${full}"
 
           {
-            echo '===== FUNCTION RANGES ====='
-            cat "${out}/ranges.tsv"
-            echo '===== HELPER CALLS AND BYTE TESTS ====='
-            for f in "${out}"/functions/*.txt; do
-              echo "--- $(basename "$f") ---"
-              grep -E '(call|cmp|test|cmov|sete|setne|movzx).*' "$f" | head -n 1200 || true
-            done
-            echo '===== ROUTE BRANCH KEY LINES ====='
-            grep -n -B 14 -A 30 -E '(6fe4fb|6fe7e1|rsp\+0x348|rsp\+0x349|rsp\+0x34a|r12\+0x1e8|r12\+0x1ea|2f609e0|2f609b8|2f60d28|2f60cd8|2f60d00)' "${out}/route-branch.txt" || true
-          } > "${out}/focus.txt"
+            echo '===== ROUTE MEMBER OFFSET REFERENCES ====='
+            grep -E '\[[^]]+\+(0xbc0|0xbd8|0xbdc|0xbe0|0xbf8|0xbfa|0x1a0|0x1b8|0x1bc|0x1c0|0x1d8|0x1da)\]' "${full}" || true
+            echo '===== CONNECT-RELATED DYNAMIC SYMBOLS ====='
+            readelf -Ws "${client}" | grep -Ei '(connectToHost|waitForConnected|QAbstractSocket|QTcpSocket|QHostAddress|peerAddress|peerPort|socketDescriptor|connect@|getaddrinfo|socket@)' || true
+            echo '===== CONNECT-RELATED CALLS ====='
+            grep -E 'call[[:space:]].*<(.*connectToHost.*|.*waitForConnected.*|.*QAbstractSocket.*|.*QTcpSocket.*|connect@plt|getaddrinfo@plt|socket@plt)>' "${full}" || true
+            echo '===== KNOWN TCP VTABLE TARGET CALLERS ====='
+            grep -E 'call[[:space:]]+(7e3060|7e31a0|7e32f0|7e33d0|196e3d0)([[:space:]]|<)' "${full}" || true
+          } > "${out}/global-index.txt"
 
-          python3 - "${client}" "${out}/route-branch.txt" "${out}"/functions/*.txt > "${out}/referenced-data.txt" <<'PY'
+          grep -n -B 28 -A 45 -E '\[[^]]+\+(0xbc0|0xbd8|0xbdc|0xbe0|0xbf8|0xbfa|0x1a0|0x1b8|0x1bc|0x1c0|0x1d8|0x1da)\]' "${full}" \
+            | head -n 6000 > "${out}/contexts/route-offset-contexts.txt" || true
+
+          grep -n -B 35 -A 60 -E 'call[[:space:]].*<(.*connectToHost.*|.*waitForConnected.*|.*QAbstractSocket.*|.*QTcpSocket.*|connect@plt|getaddrinfo@plt|socket@plt)>' "${full}" \
+            | head -n 6000 > "${out}/contexts/connect-call-contexts.txt" || true
+
+          objdump -d -M intel --no-show-raw-insn \
+            --start-address=0x6fb470 --stop-address=0x6fb900 "${client}" \
+            > "${out}/BE-callback-setup.txt"
+
+          {
+            echo '===== BE CALLBACK SETUP CALLS ====='
+            grep -n -B 18 -A 32 -E '(call|lea).*' "${out}/BE-callback-setup.txt" || true
+            echo '===== BE STATE OFFSETS ====='
+            grep -n -B 10 -A 20 -E '\[[^]]+\+(0x28|0x30|0x48|0x49|0x4a|0x4b)\]' "${out}/BE-callback-setup.txt" || true
+          } > "${out}/BE-callback-focus.txt"
+
+          python3 - "${client}" "${out}/BE-callback-setup.txt" "${out}"/functions/*.txt > "${out}/referenced-data.txt" <<'PY'
           import re, sys
           from elftools.elf.elffile import ELFFile
           binary, *inputs = sys.argv[1:]
@@ -210,20 +217,20 @@ jobs:
           chmod -R a+rX "${out}"
           SCRIPT
 
-      - name: Copy route branch report
+      - name: Copy route-selector report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-route-branch-types"
+          out="${RUNNER_TEMP}/tibia-tcp-route-selector"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/route-branch-types/." "${out}/"
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/tcp-route-selector/." "${out}/"
 
-      - name: Upload route branch report
+      - name: Upload route-selector report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-route-branch-types
-          path: ${{ runner.temp }}/tibia-route-branch-types
+          name: tibia-linux-tcp-route-selector
+          path: ${{ runner.temp }}/tibia-tcp-route-selector
           retention-days: 1
