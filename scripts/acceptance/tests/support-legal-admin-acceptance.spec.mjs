@@ -123,7 +123,7 @@ test('@portal-support-legal administrator publication, legal version, Polish tra
 
   let response = await page.goto('/en/support');
   expect(response?.status()).toBe(200);
-  await expect(page.getByText('This content is not published.')).toBeVisible();
+  await expect(page.getByText('This editorial page is not currently published.')).toBeVisible();
 
   await page.goto('/admin/support-content/support/edit');
   await page.getByLabel('Publish at').fill('2000-01-01T00:00');
@@ -158,7 +158,7 @@ test('@portal-support-legal administrator publication, legal version, Polish tra
 
   response = await page.goto('/pl/support');
   expect(response?.status()).toBe(200);
-  await expect(page.getByText('This translation is temporarily unavailable.')).toBeVisible();
+  await expect(page.getByText('This page is not available in the selected language.')).toBeVisible();
   await expect(page.getByText('Pomoc akceptacyjna')).toHaveCount(0);
 
   await page.goto(translationHref);
