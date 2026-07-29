@@ -1,4 +1,4 @@
-name: Tibia Linux TCP Qt metaobject and socket entrypoints
+name: Tibia Linux focused TCP metacall trace
 
 on:
   pull_request:
@@ -14,12 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  decode:
-    name: Decode TCP slots and socket callsites
+  trace:
+    name: Trace TCP metacall and socket callbacks
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Generate focused TCP report
+      - name: Generate focused report
         shell: bash
         run: |
           set -euo pipefail
@@ -29,191 +29,111 @@ jobs:
           set -euo pipefail
           apk add --no-cache binutils coreutils grep >/dev/null
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
-
           run_id="$(cat /analysis/latest-client-analysis-run-id)"
           client="/analysis/client-analysis/${run_id}/download/client"
-          out="/analysis/client-analysis/${run_id}/report/tcp-qt-metaobject"
+          out="/analysis/client-analysis/${run_id}/report/focused-tcp-metacall"
           rm -rf "${out}" && mkdir -p "${out}/functions"
 
           readelf -Ws "${client}" | c++filt | grep -Ei 'Q(AbstractSocket|TcpSocket|HostAddress|IODevice|Network)|connectToHost|disconnectFromHost|abort\(|write\(|read\(' > "${out}/qt-network-symbols.txt" || true
-          objdump -d -M intel --no-show-raw-insn --start-address=0xdd07e0 --stop-address=0xdd1500 "${client}" > "${out}/tcp-static-metacall-window.txt"
+          objdump -d -M intel --no-show-raw-insn --start-address=0xdd07e0 --stop-address=0xdd1200 "${client}" > "${out}/tcp-static-metacall.txt"
+          objdump -s --start-address=0x1d4a800 --stop-address=0x1d4b800 "${client}" > "${out}/tcp-meta-string-region.txt"
 
           python3 - "${client}" "${out}" <<'PY'
-          import pathlib, struct, sys
+          import pathlib,struct,sys
           from elftools.elf.elffile import ELFFile
           from elftools.dwarf.callframe import FDE
-
-          binary, out_dir = sys.argv[1:]
-          target_text = 'tibia::network::TGameserverTCPConnection'
-          with open(binary, 'rb') as f:
-              blob = f.read(); f.seek(0)
-              elf = ELFFile(f); sections = list(elf.iter_sections())
-
-              def v2o(va):
-                  for sec in sections:
-                      start=int(sec['sh_addr']); size=int(sec['sh_size'])
-                      if start <= va < start+size:
-                          return int(sec['sh_offset']) + va-start, sec.name
-                  return None, None
-              def o2v(off):
-                  for sec in sections:
-                      start=int(sec['sh_offset']); size=int(sec['sh_size'])
-                      if start <= off < start+size:
-                          return int(sec['sh_addr']) + off-start, sec.name
-                  return None, None
-              def u32(va):
-                  off,_=v2o(va)
-                  return None if off is None or off+4>len(blob) else struct.unpack_from('<I',blob,off)[0]
-              def rawq(va):
-                  off,_=v2o(va)
-                  return None if off is None or off+8>len(blob) else struct.unpack_from('<Q',blob,off)[0]
-
-              resolved={}
-              reloc_rows=[]
-              for sec in sections:
-                  if sec['sh_type'] != 'SHT_RELA': continue
-                  linked=elf.get_section(sec['sh_link']) if sec['sh_link'] else None
-                  for rel in sec.iter_relocations():
-                      slot=int(rel['r_offset']); typ=int(rel['r_info_type']); add=int(rel['r_addend']) if rel.is_RELA() else 0
-                      value=None; sym_name=''
-                      if typ==8: value=add
-                      elif linked is not None and int(rel['r_info_sym']):
-                          sym=linked.get_symbol(int(rel['r_info_sym'])); sv=int(sym['st_value']); sym_name=sym.name
-                          if sv: value=sv+add
-                      if value is not None:
-                          resolved[slot]=value; reloc_rows.append((slot,value,typ,sym_name))
-              def qword(va): return resolved.get(va, rawq(va))
-
+          binary,out=sys.argv[1:]
+          targets=[0xdd07e0,0xb45500,0xdc4370,0xb40340,0xb3e300,0xb3dca0,0xb3dd20,
+                   0xb403c0,0xb3d580,0xb3d630,0xb3d6c0,0xb55da0,0xb55ea0,0xb3fa30,0xb3d6d0,
+                   0x7db630,0x7db640]
+          with open(binary,'rb') as f:
+              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
               fdes=[]
               try:
                   for e in elf.get_dwarf_info().EH_CFI_entries():
                       if isinstance(e,FDE):
                           s=int(e['initial_location']); fdes.append((s,s+int(e['address_range'])))
               except Exception: pass
-              def frange(addr):
-                  matches=[x for x in fdes if x[0] <= addr < x[1]]
-                  return min(matches,key=lambda x:x[1]-x[0]) if matches else (addr,addr+0x5000)
+              rows=[]
+              for a in targets:
+                  m=[x for x in fdes if x[0]<=a<x[1]]
+                  s,e=min(m,key=lambda x:x[1]-x[0]) if m else (a,a+0x6000)
+                  rows.append((a,s,e))
+              pathlib.Path(out,'ranges.tsv').write_text(''.join(f'{a:x}\t{s:x}\t{e:x}\n' for a,s,e in rows))
 
-              occurrences=[]; start=0
-              needle=target_text.encode()
-              while True:
-                  off=blob.find(needle,start)
-                  if off<0: break
-                  va,sec=o2v(off); occurrences.append((off,va,sec)); start=off+1
-
-              def decode_stringdata(base):
+              # Find compact Qt string-table candidates that contain the exact known class string.
+              def v2o(v):
+                  for sec in secs:
+                      a=int(sec['sh_addr']); z=int(sec['sh_size'])
+                      if a<=v<a+z: return int(sec['sh_offset'])+v-a,sec.name
+                  return None,None
+              def u32(v):
+                  o,_=v2o(v)
+                  return None if o is None or o+4>len(blob) else struct.unpack_from('<I',blob,o)[0]
+              target=0x1d4b150; target_len=len(b'tibia::network::TGameserverTCPConnection')
+              candidates=[]
+              for base in range(target-0x10000,target+1,4):
                   first=u32(base)
-                  if first is None or first==0 or first%8: return None
+                  if first is None or first==0 or first%8: continue
                   count=first//8
-                  if not 1 <= count <= 4096: return None
-                  strings=[]
+                  if not 1<=count<=1024: continue
+                  hit=False
                   for i in range(count):
                       rel=u32(base+i*8); ln=u32(base+i*8+4)
-                      if rel is None or ln is None or ln>10000: return None
-                      off,_=v2o(base+rel)
-                      if off is None or off+ln>len(blob): return None
-                      try: strings.append(blob[off:off+ln].decode('utf-8'))
-                      except UnicodeDecodeError: return None
-                  return strings
+                      if rel is None or ln is None: break
+                      if base+rel==target and ln==target_len: hit=True; break
+                  if hit: candidates.append((base,count))
+              lines=[]
+              for base,count in candidates:
+                  lines.append(f'candidate base=0x{base:x} count={count}')
+                  for i in range(count):
+                      rel=u32(base+i*8); ln=u32(base+i*8+4)
+                      if rel is None or ln is None or ln>2000: break
+                      o,_=v2o(base+rel)
+                      if o is None: break
+                      try: text=blob[o:o+ln].decode('utf-8')
+                      except UnicodeDecodeError: text='<non-utf8>'
+                      lines.append(f'  [{i}] rel=0x{rel:x} len={ln} text={text!r}')
+              pathlib.Path(out,'string-table-candidates.txt').write_text('\n'.join(lines)+'\n')
 
-              candidates=[]
-              for _off, text_va, _sec in occurrences:
-                  lo=max(0,text_va-0x20000)
-                  for base in range(lo-(lo%4), text_va+1, 4):
-                      strings=decode_stringdata(base)
-                      if strings and target_text in strings:
-                          candidates.append((base,strings))
-              unique={b:s for b,s in candidates}
-
-              lines=[]; selected=[]
-              lines.append('TARGET_OCCURRENCES')
-              for row in occurrences: lines.append(' '.join(str(x) for x in row))
-              lines.append('')
-              for base,strings in sorted(unique.items()):
-                  lines.append(f'===== STRINGDATA 0x{base:x} count={len(strings)} =====')
-                  for i,s in enumerate(strings): lines.append(f'string[{i}]={s!r}')
-                  refs=[r for r in reloc_rows if r[1]==base]
-                  lines.append(f'relocation_refs={len(refs)}')
-                  for slot,value,typ,sym in refs:
-                      lines.append(f'ref slot=0x{slot:x} value=0x{value:x} type={typ} sym={sym!r}')
-                      lines.append('neighborhood:')
-                      for delta in range(-0x20,0x48,8):
-                          a=slot+delta; v=qword(a)
-                          lines.append(f'  0x{a:x}: {None if v is None else hex(v)} section={None if v is None else v2o(v)[1]}')
-                      # staticMetaObject layout normally puts metadata at +8 and metacall at +16 relative to stringdata pointer.
-                      metadata=qword(slot+8); metacall=qword(slot+16)
-                      if metadata and v2o(metadata)[1] in ('.rodata','.data.rel.ro'):
-                          header=[u32(metadata+i*4) for i in range(14)]
-                          lines.append('metadata=0x%x header=%s' % (metadata,' '.join('None' if x is None else hex(x) for x in header)))
-                          if all(x is not None for x in header):
-                              method_count=header[4]; method_data=header[5]; signal_count=header[13]
-                              lines.append(f'method_count={method_count} method_data={method_data} signal_count={signal_count}')
-                              if 0 <= method_count <= 256 and method_data < 100000:
-                                  for i in range(method_count):
-                                      e=[u32(metadata+(method_data+i*6+j)*4) for j in range(6)]
-                                      name_idx=e[0] if e else None
-                                      name=strings[name_idx] if name_idx is not None and name_idx < len(strings) else None
-                                      lines.append(f'method[{i}] name_index={name_idx} name={name!r} entry={e}')
-                          if metacall and v2o(metacall)[1]=='.text':
-                              s,e=frange(metacall); selected.append(('static_metacall',metacall,s,e))
-                              lines.append(f'metacall=0x{metacall:x} range=0x{s:x}-0x{e:x}')
-                  lines.append('')
-              pathlib.Path(out_dir,'decoded-metaobject.txt').write_text('\n'.join(lines)+'\n')
-              pathlib.Path(out_dir,'selected-ranges.tsv').write_text(''.join(f'{n}\t{a:x}\t{s:x}\t{e:x}\n' for n,a,s,e in selected))
+              # Resolve every relocation pointing to a candidate base or the known metacall.
+              refs=[]
+              wanted={x[0] for x in candidates}|{0xdd07e0}
+              for sec in secs:
+                  if sec['sh_type']!='SHT_RELA': continue
+                  linked=elf.get_section(sec['sh_link']) if sec['sh_link'] else None
+                  for rel in sec.iter_relocations():
+                      add=int(rel['r_addend']) if rel.is_RELA() else 0; typ=int(rel['r_info_type']); val=None; sym=''
+                      if typ==8: val=add
+                      elif linked is not None and int(rel['r_info_sym']):
+                          sy=linked.get_symbol(int(rel['r_info_sym'])); sv=int(sy['st_value']); sym=sy.name
+                          if sv: val=sv+add
+                      if val in wanted: refs.append((int(rel['r_offset']),val,typ,sym))
+              pathlib.Path(out,'candidate-relocations.txt').write_text(''.join(f'slot=0x{s:x} value=0x{v:x} type={t} sym={n}\n' for s,v,t,n in refs))
           PY
 
-          while IFS="$(printf '\t')" read -r name address start end; do
-            [ -n "${address}" ] || continue
-            max_end=$((0x${start}+0x12000)); actual_end=$((0x${end}))
-            [ "${actual_end}" -le "${max_end}" ] || actual_end="${max_end}"
-            objdump -d -M intel --no-show-raw-insn --start-address="0x${start}" --stop-address="$(printf '0x%x' "${actual_end}")" "${client}" > "${out}/functions/${name}-0x${address}.txt"
-          done < "${out}/selected-ranges.tsv"
-
-          # Extract complete functions for known network-packet vtable targets and state helpers.
-          python3 - "${client}" "${out}" <<'PY'
-          import pathlib,sys
-          from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-          binary,out=sys.argv[1:]
-          targets=[0xb403c0,0xb3d580,0xb3d630,0xb3d6c0,0xb55da0,0xb55ea0,0xb3fa30,0xb3d6d0,0x7db630,0x7db640,0xdd07e0]
-          with open(binary,'rb') as f:
-              elf=ELFFile(f); fdes=[]
-              try:
-                  for e in elf.get_dwarf_info().EH_CFI_entries():
-                      if isinstance(e,FDE):
-                          s=int(e['initial_location']); fdes.append((s,s+int(e['address_range'])))
-              except Exception: pass
-          rows=[]
-          for a in targets:
-              m=[x for x in fdes if x[0]<=a<x[1]]
-              s,e=min(m,key=lambda x:x[1]-x[0]) if m else (a,a+0x8000)
-              rows.append((a,s,e))
-          pathlib.Path(out,'network-target-ranges.tsv').write_text(''.join(f'{a:x}\t{s:x}\t{e:x}\n' for a,s,e in rows))
-          PY
           while IFS="$(printf '\t')" read -r address start end; do
-            max_end=$((0x${start}+0x18000)); actual_end=$((0x${end}))
-            [ "${actual_end}" -le "${max_end}" ] || actual_end="${max_end}"
-            objdump -d -M intel --no-show-raw-insn --start-address="0x${start}" --stop-address="$(printf '0x%x' "${actual_end}")" "${client}" > "${out}/functions/network-target-0x${address}.txt"
-          done < "${out}/network-target-ranges.tsv"
-
-          grep -RniE 'connectToHost|disconnectFromHost|QTcpSocket|QAbstractSocket|QHostAddress|QIODevice|call[[:space:]]|\+0x1[0-9a-f]|\+0x2[0-9a-f]|\+0x3[0-9a-f]' "${out}/functions" > "${out}/focused-index.txt" || true
+            actual_end=$((0x${end})); max_end=$((0x${start}+0x14000)); [ "${actual_end}" -le "${max_end}" ] || actual_end="${max_end}"
+            objdump -d -M intel --no-show-raw-insn --start-address="0x${start}" --stop-address="$(printf '0x%x' "${actual_end}")" "${client}" > "${out}/functions/0x${address}.txt"
+          done < "${out}/ranges.tsv"
+          grep -RniE 'connectToHost|disconnectFromHost|QAbstractSocket|QTcpSocket|QHostAddress|QIODevice|call[[:space:]]|cmp|test|cmov|sete|setne' "${out}/functions" > "${out}/focused-index.txt" || true
           chmod -R a+rX "${out}"
           SCRIPT
 
-      - name: Copy focused TCP report
+      - name: Copy report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-tcp-qt-metaobject"
+          out="${RUNNER_TEMP}/tibia-focused-tcp-metacall"
           rm -rf "${out}" && mkdir -p "${out}"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "${cid}" >/dev/null 2>&1 || true' EXIT
-          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/tcp-qt-metaobject/." "${out}/"
+          docker cp "${cid}:/analysis/client-analysis/${run_id}/report/focused-tcp-metacall/." "${out}/"
 
-      - name: Upload focused TCP report
+      - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-tcp-qt-metaobject
-          path: ${{ runner.temp }}/tibia-tcp-qt-metaobject
+          name: tibia-linux-focused-tcp-metacall
+          path: ${{ runner.temp }}/tibia-focused-tcp-metacall
           retention-days: 1
