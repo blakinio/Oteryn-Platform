@@ -1,4 +1,4 @@
-name: Tibia Linux locate actual GameserverDualConnection metaobject
+name: Tibia Linux identify dual-connection entry vtable
 on:
   pull_request:
     branches: [main]
@@ -9,9 +9,9 @@ permissions:
 jobs:
   trace:
     runs-on: oteryn-staging
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
-      - name: Locate and decode
+      - name: Identify entry class and start method
         shell: bash
         run: |
           set -euo pipefail
@@ -21,12 +21,14 @@ jobs:
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
           run_id=$(cat /analysis/latest-client-analysis-run-id)
           client=/analysis/client-analysis/${run_id}/download/client
-          out=/analysis/client-analysis/${run_id}/report/actual-dual-metaobject
-          rm -rf "$out" && mkdir -p "$out"
+          out=/analysis/client-analysis/${run_id}/report/entry-vtable
+          rm -rf "$out" && mkdir -p "$out/functions"
           python3 - "$client" "$out" <<'PY'
           import pathlib,struct,sys
           from elftools.elf.elffile import ELFFile
-          binary,out=sys.argv[1:]; target='tibia::network::TGameserverDualConnection'
+          from elftools.dwarf.callframe import FDE
+          binary,out=sys.argv[1:]
+          known={0xb3fa30:'url',0xb3d6c0:'state',0xb55da0:'isConnected',0xb55ea0:'isDisconnected',0xb3d580:'nested100',0xb3d630:'aux68',0xb3d6d0:'aux60'}
           with open(binary,'rb') as f:
               blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
               def v2o(v):
@@ -34,87 +36,90 @@ jobs:
                       a=int(s['sh_addr']);z=int(s['sh_size'])
                       if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
                   return None,None
-              def o2v(o):
-                  for s in secs:
-                      a=int(s['sh_offset']);z=int(s['sh_size'])
-                      if a<=o<a+z:return int(s['sh_addr'])+o-a,s.name
-                  return None,None
-              def u32(v):
-                  o,_=v2o(v);return None if o is None or o+4>len(blob) else struct.unpack_from('<I',blob,o)[0]
               def rawq(v):
                   o,_=v2o(v);return None if o is None or o+8>len(blob) else struct.unpack_from('<Q',blob,o)[0]
-              rels=[];resolved={}
+              resolved={}
               for s in secs:
                   if s['sh_type']!='SHT_RELA':continue
                   linked=elf.get_section(s['sh_link']) if s['sh_link'] else None
                   for r in s.iter_relocations():
-                      slot=int(r['r_offset']);typ=int(r['r_info_type']);add=int(r['r_addend']) if r.is_RELA() else 0;val=None;sname=''
+                      slot=int(r['r_offset']);typ=int(r['r_info_type']);add=int(r['r_addend']) if r.is_RELA() else 0;val=None
                       if typ==8:val=add
                       elif linked is not None and int(r['r_info_sym']):
-                          sy=linked.get_symbol(int(r['r_info_sym']));sv=int(sy['st_value']);sname=sy.name
+                          sy=linked.get_symbol(int(r['r_info_sym']));sv=int(sy['st_value'])
                           if sv:val=sv+add
-                      if val is not None:resolved[slot]=val;rels.append((slot,val,typ,sname))
+                      if val is not None:resolved[slot]=val
               def q(v):return resolved.get(v,rawq(v))
-              occ=[];st=0;needle=target.encode()
-              while True:
-                  o=blob.find(needle,st)
-                  if o<0:break
-                  occ.append(o2v(o));st=o+1
-              def decode(base):
-                  first=u32(base)
-                  if not first or first%8:return None
-                  n=first//8
-                  if not 1<=n<=4096:return None
-                  arr=[]
-                  for i in range(n):
-                      rel=u32(base+i*8);ln=u32(base+i*8+4)
-                      if rel is None or ln is None or ln>20000:return None
-                      o,_=v2o(base+rel)
-                      if o is None or o+ln>len(blob):return None
-                      try:arr.append(blob[o:o+ln].decode('utf-8'))
-                      except:return None
-                  return arr
-              candidates={}
-              for va,sec in occ:
-                  for base in range(max(0,va-0x20000)&~3,va+1,4):
-                      arr=decode(base)
-                      if arr and target in arr:candidates[base]=arr
-              lines=[f'occurrences={occ}']
-              ranges=[]
-              for base,arr in sorted(candidates.items()):
-                  lines.append(f'===== base=0x{base:x} count={len(arr)} =====')
-                  for i,s in enumerate(arr):lines.append(f'string[{i}]={s!r}')
-                  for slot,val,typ,sname in rels:
-                      if val!=base:continue
-                      lines.append(f'REF slot=0x{slot:x} type={typ} sym={sname!r}')
-                      for d in range(-0x30,0x70,8):
-                          a=slot+d;v=q(a);lines.append(f'  0x{a:x}: {None if v is None else hex(v)} section={None if v is None else v2o(v)[1]}')
-                      md=q(slot+8);mc=q(slot+16)
-                      if md:
-                          h=[u32(md+i*4) for i in range(14)]
-                          lines.append(f'MD=0x{md:x} header={h}')
-                          if all(x is not None for x in h):
-                              cnt,off,sig=h[4],h[5],h[13];lines.append(f'method_count={cnt} method_data={off} signal_count={sig}')
-                              if 0<=cnt<=256:
-                                  for i in range(cnt):
-                                      e=[u32(md+(off+i*6+j)*4) for j in range(6)];ni=e[0];name=arr[ni] if ni<len(arr) else None
-                                      lines.append(f'method[{i}] name={name!r} entry={e}')
-                      if mc and v2o(mc)[1]=='.text':ranges.append(mc);lines.append(f'MC=0x{mc:x}')
-              pathlib.Path(out,'located.txt').write_text('\n'.join(lines)+'\n')
-              pathlib.Path(out,'metacalls.txt').write_text('\n'.join(f'{x:x}' for x in sorted(set(ranges)))+'\n')
+              def cstr(v,limit=1000):
+                  o,sec=v2o(v)
+                  if o is None:return None,sec
+                  e=blob.find(b'\0',o,min(len(blob),o+limit))
+                  if e<=o:return None,sec
+                  try:return blob[o:e].decode('utf-8'),sec
+                  except:return None,sec
+              fdes=[]
+              try:
+                  for e in elf.get_dwarf_info().EH_CFI_entries():
+                      if isinstance(e,FDE):
+                          a=int(e['initial_location']);fdes.append((a,a+int(e['address_range'])))
+              except:pass
+              def frange(a):
+                  m=[x for x in fdes if x[0]<=a<x[1]]
+                  return min(m,key=lambda x:x[1]-x[0]) if m else (a,a+0x10000)
+              candidates=[]
+              for s in secs:
+                  if s.name not in ('.data.rel.ro','.data','.rodata'):continue
+                  start=int(s['sh_addr']);end=start+int(s['sh_size'])
+                  for p in range(start,end,8):
+                      vals=[q(p+i*8) for i in range(32)]
+                      hits={v for v in vals if v in known}
+                      if len(hits)>=4:
+                          candidates.append((p,hits,vals))
+              # dedupe overlapping windows, infer vptr by requiring offset-to-top/typeinfo before first known cluster
+              seen=set();lines=[];rows=[]
+              for p,hits,vals in candidates:
+                  key=min((p+i*8) for i,v in enumerate(vals) if v in known)
+                  if key in seen:continue
+                  seen.add(key)
+                  lines.append(f'WINDOW base=0x{p:x} hits={[known[x] for x in hits]}')
+                  for i,v in enumerate(vals):lines.append(f'  +0x{i*8:x} 0x{p+i*8:x} -> {None if v is None else hex(v)} {known.get(v,"")} section={None if v is None else v2o(v)[1]}')
+                  # Search backward for Itanium header and score following 40 slots.
+                  for vp in range(max(int(s["sh_addr"]) if False else p-0x100,p-0x100),p+0x20,8):
+                      off=q(vp-16);ti=q(vp-8)
+                      if off not in (0,None):continue
+                      if not ti or v2o(ti)[1]!='.data.rel.ro':continue
+                      np=q(ti+8);name,sec=cstr(np) if np else (None,None)
+                      arr=[q(vp+i*8) for i in range(40)]
+                      score=sum(v in known for v in arr)
+                      if score>=4:
+                          lines.append(f'VTABLE vp=0x{vp:x} score={score} typeinfo=0x{ti:x} name={name!r}')
+                          for i,v in enumerate(arr):
+                              lines.append(f' slot={i} off=0x{i*8:x} target={None if v is None else hex(v)} {known.get(v,"")} section={None if v is None else v2o(v)[1]}')
+                              if v and v2o(v)[1]=='.text':
+                                  a,b=frange(v);rows.append((f'vslot{i}',v,a,b))
+                          start_target=arr[12] if len(arr)>12 else None
+                          lines.append(f'SLOT12_START={None if start_target is None else hex(start_target)}')
+                  lines.append('')
+              pathlib.Path(out,'identified.txt').write_text('\n'.join(lines)+'\n')
+              uniq={a:(n,a,s,e) for n,a,s,e in rows}
+              pathlib.Path(out,'ranges.tsv').write_text(''.join(f'{n}\t{a:x}\t{s:x}\t{e:x}\n' for n,a,s,e in uniq.values()))
           PY
-          while read a; do [ -n "$a" ] && objdump -d -M intel --no-show-raw-insn --start-address=0x$a --stop-address=$((0x$a+0x5000)) "$client" > "$out/metacall-0x$a.txt"; done < "$out/metacalls.txt"
+          while IFS="$(printf '\t')" read -r n a s e; do
+            actual=$((0x$e)); max=$((0x$s+0x20000)); [ "$actual" -le "$max" ] || actual=$max
+            objdump -d -M intel --no-show-raw-insn --start-address=0x$s --stop-address=$(printf '0x%x' "$actual") "$client" > "$out/functions/${n}-0x${a}.txt"
+          done < "$out/ranges.tsv"
+          grep -RniE 'connectToHost|QTcpSocket|QAbstractSocket|QUrl|QHostAddress|QIODevice|write|read|cmp|test|cmov|sete|setne|call[[:space:]]' "$out/functions" > "$out/focus.txt" || true
           chmod -R a+rX "$out"
           SCRIPT
       - name: Copy
         shell: bash
         run: |
-          out=$RUNNER_TEMP/actual-dual-metaobject; rm -rf "$out"; mkdir -p "$out"
+          out=$RUNNER_TEMP/entry-vtable; rm -rf "$out"; mkdir -p "$out"
           run_id=$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)
           cid=$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true); trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/actual-dual-metaobject/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/${run_id}/report/entry-vtable/." "$out/"
       - uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-actual-dual-metaobject
-          path: ${{ runner.temp }}/actual-dual-metaobject
+          name: tibia-linux-entry-vtable
+          path: ${{ runner.temp }}/entry-vtable
           retention-days: 1
