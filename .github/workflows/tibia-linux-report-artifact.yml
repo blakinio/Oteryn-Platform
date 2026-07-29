@@ -1,4 +1,4 @@
-name: Tibia Linux identify dual-connection entry vtable
+name: Tibia Linux direct entry vtable resolution
 on:
   pull_request:
     branches: [main]
@@ -6,12 +6,15 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: tibia-linux-dual-connection-entry
+  cancel-in-progress: true
 jobs:
   trace:
     runs-on: oteryn-staging
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
-      - name: Identify entry class and start method
+      - name: Resolve vtable
         shell: bash
         run: |
           set -euo pipefail
@@ -21,16 +24,15 @@ jobs:
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
           run_id=$(cat /analysis/latest-client-analysis-run-id)
           client=/analysis/client-analysis/${run_id}/download/client
-          out=/analysis/client-analysis/${run_id}/report/entry-vtable
+          out=/analysis/client-analysis/${run_id}/report/direct-entry-vtable
           rm -rf "$out" && mkdir -p "$out/functions"
           python3 - "$client" "$out" <<'PY'
           import pathlib,struct,sys
           from elftools.elf.elffile import ELFFile
           from elftools.dwarf.callframe import FDE
-          binary,out=sys.argv[1:]
-          known={0xb3fa30:'url',0xb3d6c0:'state',0xb55da0:'isConnected',0xb55ea0:'isDisconnected',0xb3d580:'nested100',0xb3d630:'aux68',0xb3d6d0:'aux60'}
+          binary,out=sys.argv[1:]; TARGET=0xb3fa30
           with open(binary,'rb') as f:
-              blob=f.read(); f.seek(0); elf=ELFFile(f); secs=list(elf.iter_sections())
+              blob=f.read();f.seek(0);elf=ELFFile(f);secs=list(elf.iter_sections())
               def v2o(v):
                   for s in secs:
                       a=int(s['sh_addr']);z=int(s['sh_size'])
@@ -38,7 +40,7 @@ jobs:
                   return None,None
               def rawq(v):
                   o,_=v2o(v);return None if o is None or o+8>len(blob) else struct.unpack_from('<Q',blob,o)[0]
-              resolved={}
+              resolved={};target_slots=[]
               for s in secs:
                   if s['sh_type']!='SHT_RELA':continue
                   linked=elf.get_section(s['sh_link']) if s['sh_link'] else None
@@ -48,14 +50,16 @@ jobs:
                       elif linked is not None and int(r['r_info_sym']):
                           sy=linked.get_symbol(int(r['r_info_sym']));sv=int(sy['st_value'])
                           if sv:val=sv+add
-                      if val is not None:resolved[slot]=val
+                      if val is not None:
+                          resolved[slot]=val
+                          if val==TARGET:target_slots.append(slot)
               def q(v):return resolved.get(v,rawq(v))
               def cstr(v,limit=1000):
                   o,sec=v2o(v)
                   if o is None:return None,sec
                   e=blob.find(b'\0',o,min(len(blob),o+limit))
                   if e<=o:return None,sec
-                  try:return blob[o:e].decode('utf-8'),sec
+                  try:return blob[o:e].decode(),sec
                   except:return None,sec
               fdes=[]
               try:
@@ -66,60 +70,41 @@ jobs:
               def frange(a):
                   m=[x for x in fdes if x[0]<=a<x[1]]
                   return min(m,key=lambda x:x[1]-x[0]) if m else (a,a+0x10000)
-              candidates=[]
-              for s in secs:
-                  if s.name not in ('.data.rel.ro','.data','.rodata'):continue
-                  start=int(s['sh_addr']);end=start+int(s['sh_size'])
-                  for p in range(start,end,8):
-                      vals=[q(p+i*8) for i in range(32)]
-                      hits={v for v in vals if v in known}
-                      if len(hits)>=4:
-                          candidates.append((p,hits,vals))
-              # dedupe overlapping windows, infer vptr by requiring offset-to-top/typeinfo before first known cluster
-              seen=set();lines=[];rows=[]
-              for p,hits,vals in candidates:
-                  key=min((p+i*8) for i,v in enumerate(vals) if v in known)
-                  if key in seen:continue
-                  seen.add(key)
-                  lines.append(f'WINDOW base=0x{p:x} hits={[known[x] for x in hits]}')
-                  for i,v in enumerate(vals):lines.append(f'  +0x{i*8:x} 0x{p+i*8:x} -> {None if v is None else hex(v)} {known.get(v,"")} section={None if v is None else v2o(v)[1]}')
-                  # Search backward for Itanium header and score following 40 slots.
-                  for vp in range(max(int(s["sh_addr"]) if False else p-0x100,p-0x100),p+0x20,8):
-                      off=q(vp-16);ti=q(vp-8)
-                      if off not in (0,None):continue
+              known={0xb403c0:'start',0xb3d580:'disconnect',0xb3d630:'reset',0xb3d6c0:'state',0xb55da0:'connected',0xb55ea0:'disconnected',0xb3fa30:'url',0xb3d6d0:'event'}
+              lines=[f'target_slots={[hex(x) for x in target_slots]}'];rows=[]
+              for slot in target_slots:
+                  lines.append(f'===== TARGET SLOT 0x{slot:x} =====')
+                  for vp in range(slot-0x100,slot+8,8):
+                      if q(vp-16)!=0:continue
+                      ti=q(vp-8)
                       if not ti or v2o(ti)[1]!='.data.rel.ro':continue
                       np=q(ti+8);name,sec=cstr(np) if np else (None,None)
-                      arr=[q(vp+i*8) for i in range(40)]
-                      score=sum(v in known for v in arr)
-                      if score>=4:
-                          lines.append(f'VTABLE vp=0x{vp:x} score={score} typeinfo=0x{ti:x} name={name!r}')
-                          for i,v in enumerate(arr):
-                              lines.append(f' slot={i} off=0x{i*8:x} target={None if v is None else hex(v)} {known.get(v,"")} section={None if v is None else v2o(v)[1]}')
-                              if v and v2o(v)[1]=='.text':
-                                  a,b=frange(v);rows.append((f'vslot{i}',v,a,b))
-                          start_target=arr[12] if len(arr)>12 else None
-                          lines.append(f'SLOT12_START={None if start_target is None else hex(start_target)}')
-                  lines.append('')
-              pathlib.Path(out,'identified.txt').write_text('\n'.join(lines)+'\n')
+                      arr=[q(vp+i*8) for i in range(28)]
+                      if TARGET not in arr:continue
+                      lines.append(f'VPTR=0x{vp:x} TYPEINFO=0x{ti:x} NAME={name!r}')
+                      for i,v in enumerate(arr):
+                          lines.append(f'slot={i} offset=0x{i*8:x} target={None if v is None else hex(v)} label={known.get(v,"")} section={None if v is None else v2o(v)[1]}')
+                          if v and v2o(v)[1]=='.text':
+                              a,b=frange(v);rows.append((f'slot{i}',v,a,b))
+              pathlib.Path(out,'vtable.txt').write_text('\n'.join(lines)+'\n')
               uniq={a:(n,a,s,e) for n,a,s,e in rows}
               pathlib.Path(out,'ranges.tsv').write_text(''.join(f'{n}\t{a:x}\t{s:x}\t{e:x}\n' for n,a,s,e in uniq.values()))
           PY
           while IFS="$(printf '\t')" read -r n a s e; do
-            actual=$((0x$e)); max=$((0x$s+0x20000)); [ "$actual" -le "$max" ] || actual=$max
+            actual=$((0x$e));max=$((0x$s+0x16000));[ "$actual" -le "$max" ] || actual=$max
             objdump -d -M intel --no-show-raw-insn --start-address=0x$s --stop-address=$(printf '0x%x' "$actual") "$client" > "$out/functions/${n}-0x${a}.txt"
           done < "$out/ranges.tsv"
-          grep -RniE 'connectToHost|QTcpSocket|QAbstractSocket|QUrl|QHostAddress|QIODevice|write|read|cmp|test|cmov|sete|setne|call[[:space:]]' "$out/functions" > "$out/focus.txt" || true
           chmod -R a+rX "$out"
           SCRIPT
       - name: Copy
         shell: bash
         run: |
-          out=$RUNNER_TEMP/entry-vtable; rm -rf "$out"; mkdir -p "$out"
+          out=$RUNNER_TEMP/direct-entry-vtable;rm -rf "$out";mkdir -p "$out"
           run_id=$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)
-          cid=$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true); trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/entry-vtable/." "$out/"
+          cid=$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true);trap 'docker rm -f "$cid" >/dev/null 2>&1||true' EXIT
+          docker cp "$cid:/analysis/client-analysis/${run_id}/report/direct-entry-vtable/." "$out/"
       - uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-entry-vtable
-          path: ${{ runner.temp }}/entry-vtable
+          name: tibia-linux-direct-entry-vtable
+          path: ${{ runner.temp }}/direct-entry-vtable
           retention-days: 1
