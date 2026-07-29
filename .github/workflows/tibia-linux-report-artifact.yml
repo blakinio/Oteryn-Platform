@@ -1,4 +1,4 @@
-name: Tibia Linux TCP connect and login message trace
+name: Tibia Linux login handler and protobuf fields
 
 on:
   pull_request:
@@ -10,16 +10,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-tcp-login-message-trace
+  group: tibia-linux-login-handler-fields
   cancel-in-progress: true
 
 jobs:
-  trace:
-    name: Trace TCP connect and login message construction
+  decode:
+    name: Decode login handler signals and message fields
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 12
     steps:
-      - name: Analyze TCP vtable and login protobuf classes
+      - name: Decode Qt metaobject and descriptor regions
         shell: bash
         run: |
           set -euo pipefail
@@ -27,19 +27,16 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils grep >/dev/null
+          apk add --no-cache binutils coreutils >/dev/null
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
           run_id=$(cat /analysis/latest-client-analysis-run-id)
           client=/analysis/client-analysis/${run_id}/download/client
-          out=/analysis/client-analysis/${run_id}/report/tcp-login-final
-          rm -rf "$out" && mkdir -p "$out/functions"
-
-          strings -a -t x "$client" | grep -E 'TLoginProtocolMessageHandler|GameclientMessage(Login|SecondaryLogin)|GameserverMessageLogin(Challenge|Success|Error|Wait|Advice)|sessionkey|charactername|challenge|account|clientversion|assetversion' > "$out/relevant-strings.txt" || true
+          out=/analysis/client-analysis/${run_id}/report/login-handler-fields-final
+          rm -rf "$out" && mkdir -p "$out"
 
           python3 - "$client" "$out" <<'PY'
-          import pathlib, re, struct, subprocess, sys
+          import pathlib, struct, sys
           from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
 
           binary,out_dir=sys.argv[1:]
           with open(binary,'rb') as f:
@@ -56,144 +53,95 @@ jobs:
                           sym=linked.get_symbol(int(rel['r_info_sym'])); base=int(sym['st_value'])
                           if base: val=base+add
                       if val is not None: resolved[slot]=val
-              fdes=[]
-              try:
-                  for e in elf.get_dwarf_info().EH_CFI_entries():
-                      if isinstance(e,FDE):
-                          s=int(e['initial_location']); fdes.append((s,s+int(e['address_range'])))
-              except Exception: pass
 
           def locate(va):
               for sec in sections:
                   a=int(sec['sh_addr']); n=int(sec['sh_size'])
                   if a<=va<a+n:return int(sec['sh_offset'])+va-a,sec.name
               return None,None
+          def u32(va):
+              off,_=locate(va); return None if off is None else struct.unpack_from('<I',blob,off)[0]
           def qword(va):
               if va in resolved:return resolved[va]
-              off,_=locate(va)
-              return None if off is None else struct.unpack_from('<Q',blob,off)[0]
-          def cstr(va,limit=1000):
-              off,sec=locate(va)
-              if off is None:return None,sec
-              end=blob.find(b'\0',off,min(len(blob),off+limit))
-              if end<=off:return None,sec
-              try:return blob[off:end].decode('utf-8'),sec
-              except:return None,sec
-          def frange(addr):
-              m=[x for x in fdes if x[0]<=addr<x[1]]
-              return min(m,key=lambda x:x[1]-x[0]) if m else (addr,addr+0x5000)
-          def disasm(name,addr,cap=0x18000):
-              s,e=frange(addr); e=min(e,s+cap)
-              text=subprocess.check_output(['objdump','-d','-M','intel','--no-show-raw-insn',f'--start-address=0x{s:x}',f'--stop-address=0x{e:x}',binary],text=True,errors='replace')
-              pathlib.Path(out_dir,'functions',f'{name}-0x{addr:x}.txt').write_text(text)
-              return s,e,text
+              off,_=locate(va); return None if off is None else struct.unpack_from('<Q',blob,off)[0]
+          def decode_stringdata(base):
+              first=u32(base)
+              if not first or first%8:return []
+              count=first//8
+              if count<1 or count>2000:return []
+              out=[]
+              for i in range(count):
+                  rel=u32(base+i*8); size=u32(base+i*8+4)
+                  if rel is None or size is None or size>10000:return []
+                  off,_=locate(base+rel)
+                  if off is None:return []
+                  out.append(blob[off:off+size].decode('utf-8','replace'))
+              return out
 
-          # Exact TCP QObject vptr from its constructor. Resolve the connect virtual at +0xf8.
-          tcp_vptr=0x3082b38
-          rows=[f'TCP_VPTR=0x{tcp_vptr:x}']
-          for i in range(0,40):
-              t=qword(tcp_vptr+i*8)
-              rows.append(f'slot={i} off=0x{i*8:x} target={None if t is None else hex(t)} section={None if t is None else locate(t)[1]}')
-          connect_target=qword(tcp_vptr+0xf8)
-          rows.append(f'CONNECT_SLOT31={None if connect_target is None else hex(connect_target)}')
-          pathlib.Path(out_dir,'tcp-vtable.txt').write_text('\n'.join(rows)+'\n')
-          if connect_target: disasm('tcp-connect-slot31',connect_target)
+          static=0x3082fa0
+          stringdata=qword(static+8); metadata=qword(static+16); metacall=qword(static+24)
+          strings=decode_stringdata(stringdata)
+          rows=[f'static=0x{static:x}',f'stringdata=0x{stringdata:x}',f'metadata=0x{metadata:x}',f'metacall=0x{metacall:x}',f'string_count={len(strings)}']
+          for i,s in enumerate(strings):rows.append(f'string[{i}]={s!r}')
+          if metadata:
+              hdr=[u32(metadata+i*4) for i in range(14)]
+              rows.append('metadata_header='+' '.join(hex(x or 0) for x in hdr))
+              method_count=hdr[4] or 0; method_data=hdr[5] or 0; signal_count=hdr[13] or 0
+              rows.append(f'method_count={method_count} method_data={method_data} signal_count={signal_count}')
+              for i in range(method_count):
+                  entry=[u32(metadata+(method_data+i*6+j)*4) for j in range(6)]
+                  ni=entry[0] if entry else None
+                  name=strings[ni] if ni is not None and ni<len(strings) else None
+                  rows.append(f'method[{i}] name_index={ni} name={name!r} entry={entry}')
+          pathlib.Path(out_dir,'handler-metaobject.txt').write_text('\n'.join(rows)+'\n')
 
-          # Find RTTI/typeinfo/vtables by exact embedded class names.
-          names=[
-              'N5tibia14authentication28TLoginProtocolMessageHandlerE',
-              'N5tibia8protobuf8protocol22GameclientMessageLoginE',
-              'N5tibia8protobuf8protocol31GameclientMessageSecondaryLoginE',
-          ]
-          discoveries=[]; targets=[]
-          for raw_name in names:
-              needle=raw_name.encode()+b'\0'; pos=blob.find(needle)
-              discoveries.append(f'name={raw_name} file_offset={pos}')
-              if pos<0: continue
-              name_va=None
-              for sec in sections:
-                  so=int(sec['sh_offset']); sn=int(sec['sh_size'])
-                  if so<=pos<so+sn:
-                      name_va=int(sec['sh_addr'])+pos-so; break
-              discoveries.append(f'  name_va=0x{name_va:x}')
-              ti_slots=[slot for slot,val in resolved.items() if val==name_va]
-              for slot in ti_slots:
-                  discoveries.append(f'  typeinfo_name_ref_slot=0x{slot:x}')
-                  ti=slot-8
-                  ti_refs=[s for s,v in resolved.items() if v==ti]
-                  for vr in ti_refs:
-                      vptr=vr+8
-                      discoveries.append(f'    typeinfo=0x{ti:x} vtable_ref=0x{vr:x} vptr=0x{vptr:x}')
-                      for i in range(0,30):
-                          t=qword(vptr+i*8)
-                          if t and locate(t)[1]=='.text':
-                              targets.append((raw_name,i,t))
-          pathlib.Path(out_dir,'rtti-discovery.txt').write_text('\n'.join(discoveries)+'\n')
-
-          seen=set(); target_rows=[]
-          for label,i,t in targets:
-              target_rows.append(f'{label}\tslot={i}\ttarget=0x{t:x}')
-              if t not in seen:
-                  disasm(f'rtti-slot{i}',t,0x8000); seen.add(t)
-          pathlib.Path(out_dir,'rtti-targets.tsv').write_text('\n'.join(target_rows)+'\n')
-
-          # Scan code for references to discovered vptrs/typeinfo and relevant descriptor strings.
-          objdump=subprocess.check_output(['objdump','-d','-M','intel','--no-show-raw-insn',binary],text=True,errors='replace')
-          interesting=[]
-          addr_set=set()
-          for line in discoveries:
-              addr_set.update(int(x,16) for x in re.findall(r'0x([0-9a-f]+)',line))
-          # Known readable descriptor/name addresses from strings report.
-          for needle in (b'tibia::protobuf::protocol::GameclientMessageLogin\0', b'tibia::protobuf::protocol::GameclientMessageSecondaryLogin\0', b'tibia::authentication::TLoginProtocolMessageHandler\0'):
-              start=0
-              while True:
-                  p=blob.find(needle,start)
-                  if p<0: break
-                  for sec in sections:
-                      so=int(sec['sh_offset']); sn=int(sec['sh_size'])
-                      if so<=p<so+sn: addr_set.add(int(sec['sh_addr'])+p-so); break
-                  start=p+1
-          for line in objdump.splitlines():
-              m=re.search(r'#\s*([0-9a-fA-F]+)',line)
-              if m and int(m.group(1),16) in addr_set:
-                  interesting.append(line)
-          pathlib.Path(out_dir,'code-xrefs.txt').write_text('\n'.join(interesting)+'\n')
+          # Dump printable strings and hex around known embedded descriptor field-name offsets.
+          regions=[('login-fields',0x2887200,0x900),('login-fields-wide',0x2887000,0x1800),('character-fields',0x28a5000,0x1000),('protobuf-names',0x1cbef00,0x2600)]
+          for name,off,size in regions:
+              data=blob[off:off+size]
+              pathlib.Path(out_dir,f'{name}.hex.txt').write_text(''.join(f'{off+i:08x}  '+data[i:i+16].hex(' ')+'\n' for i in range(0,len(data),16)))
+              found=[]; start=0
+              for i,b in enumerate(data+b'\0'):
+                  if 32<=b<127:
+                      continue
+                  if i-start>=2:
+                      raw=data[start:i]
+                      try:found.append(f'0x{off+start:x}\t{raw.decode("ascii")}')
+                      except:pass
+                  start=i+1
+              pathlib.Path(out_dir,f'{name}.strings.txt').write_text('\n'.join(found)+'\n')
           PY
 
           {
-            echo '===== TCP VTABLE ====='; cat "$out/tcp-vtable.txt"
-            echo '===== TCP CONNECT FUNCTION ====='; cat "$out"/functions/tcp-connect-slot31-* 2>/dev/null || true
-            echo '===== RTTI DISCOVERY ====='; cat "$out/rtti-discovery.txt"
-            echo '===== RTTI TARGETS ====='; cat "$out/rtti-targets.tsv"
-            echo '===== CODE XREFS ====='; cat "$out/code-xrefs.txt"
-            echo '===== RELEVANT STRINGS ====='; cat "$out/relevant-strings.txt"
+            echo '===== HANDLER METAOBJECT ====='; cat "$out/handler-metaobject.txt"
+            for f in "$out"/*.strings.txt; do echo "===== $(basename "$f") ====="; cat "$f"; done
           } > "$out/concise.txt"
           chmod -R a+rX "$out"
           SCRIPT
 
-      - name: Print concise findings
+      - name: Print decoded fields
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 sh -lc '
             run_id=$(cat /analysis/latest-client-analysis-run-id)
-            sed -n "1,7000p" /analysis/client-analysis/${run_id}/report/tcp-login-final/concise.txt
+            cat /analysis/client-analysis/${run_id}/report/login-handler-fields-final/concise.txt
           '
 
       - name: Copy report
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-tcp-login-final"
+          out="${RUNNER_TEMP}/tibia-login-handler-fields"
           rm -rf "$out" && mkdir -p "$out"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/tcp-login-final/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/${run_id}/report/login-handler-fields-final/." "$out/"
 
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-tcp-login-final
-          path: ${{ runner.temp }}/tibia-tcp-login-final
+          name: tibia-linux-login-handler-fields
+          path: ${{ runner.temp }}/tibia-login-handler-fields
           retention-days: 1
