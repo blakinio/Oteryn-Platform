@@ -1,0 +1,150 @@
+name: Tibia Linux bounded protobuf BattlEye
+
+on:
+  pull_request:
+    branches: [main]
+    paths: [.github/workflows/tibia-linux-protobuf-battleye-bounded.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tibia-linux-protobuf-battleye-bounded-v2
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: oteryn-staging
+    timeout-minutes: 10
+    steps:
+      - name: Extract bounded evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            python:3.13-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils coreutils >/dev/null
+          pip install --no-cache-dir protobuf >/dev/null
+          run_id=$(cat /analysis/latest-client-analysis-run-id)
+          root=/analysis/client-analysis/${run_id}
+          client=${root}/download/client
+          out=${root}/report/protobuf-battleye-bounded-v2
+          rm -rf "$out" && mkdir -p "$out/functions"
+          test "$(sha256sum "$client" | awk '{print $1}')" = "8b25d65ece158723dbb50a1b592c1ec8a3247a650fcd2d299bebdfd133cb5752"
+          dump(){ objdump -d -M intel --start-address="$2" --stop-address="$3" "$client" > "$out/functions/$1.txt"; }
+          dump be-callback-send 0x7418f0 0x741b50
+          dump be-callback-state 0x741b50 0x741de0
+          dump be-callback-receive 0x741de0 0x742100
+          dump be-session-dispatch 0x6f8000 0x6f86a0
+          dump be-setup 0x6fadb0 0x6fc700
+          dump login-builder 0xe19700 0xe1a740
+          dump login-handler 0xcf1600 0xcf1b80
+          dump login-success 0xe10df0 0xe11040
+          dump dual-packet 0xb487f0 0xb48ab0
+          dump tcp-connect 0xb403c0 0xb40800
+          python3 - "$client" "$out" <<'PY'
+          import json,sys
+          from pathlib import Path
+          from google.protobuf import descriptor_pb2
+          from google.protobuf.message import DecodeError
+          p=Path(sys.argv[1]); out=Path(sys.argv[2]); data=p.read_bytes()
+          targets=['GameclientMessageLogin','GameclientMessageSecondaryLogin','GameserverMessageLoginChallenge','GameserverMessageLoginSuccess']
+          def varint(buf,pos):
+            v=s=0
+            for i in range(10):
+              b=buf[pos+i]; v|=(b&127)<<s
+              if b<128:return v,pos+i+1
+              s+=7
+            raise ValueError
+          contexts=[]
+          for n in targets+['clientsessionid','charactername','sessionkey','challenge']:
+            needle=n.encode(); pos=0
+            while True:
+              pos=data.find(needle,pos)
+              if pos<0:break
+              chunk=data[max(0,pos-768):min(len(data),pos+3072)]
+              strings=[]; cur=[]
+              for b in chunk:
+                if 32<=b<127:cur.append(chr(b))
+                else:
+                  if len(cur)>=3:strings.append(''.join(cur))
+                  cur=[]
+              if len(cur)>=3:strings.append(''.join(cur))
+              contexts.append({'needle':n,'offset':hex(pos),'strings':strings})
+              pos+=len(needle)
+          starts=[]; pos=0
+          while True:
+            pos=data.find(b'.proto',pos)
+            if pos<0:break
+            for back in range(2,260):
+              s=pos-back
+              if s<0 or data[s]!=10:continue
+              try:n,q=varint(data,s+1)
+              except Exception:continue
+              if q+n==pos+6 and 1<=n<=250:
+                raw=data[q:q+n]
+                if all(32<=x<127 for x in raw):starts.append((s,raw.decode()))
+            pos+=6
+          parsed=[]
+          for s,name in sorted(set(starts)):
+            if not any(t.encode() in data[s:min(len(data),s+1500000)] for t in targets):continue
+            endings=[]
+            for marker in (b'\x62\x06proto2',b'\x62\x06proto3'):
+              q=s
+              while True:
+                q=data.find(marker,q,min(len(data),s+1500000))
+                if q<0:break
+                endings.append(q+len(marker));q+=1
+            for e in sorted(set(endings)):
+              fd=descriptor_pb2.FileDescriptorProto()
+              try:fd.ParseFromString(data[s:e])
+              except DecodeError:continue
+              msgs=[]
+              for m in fd.message_type:
+                if m.name in targets or 'Login' in m.name or 'Challenge' in m.name:
+                  msgs.append({'name':m.name,'fields':[{'number':f.number,'name':f.name,'label':f.label,'type':f.type,'type_name':f.type_name} for f in m.field]})
+              if not msgs:continue
+              parsed.append({'start':hex(s),'end':hex(e),'file':fd.name,'package':fd.package,'syntax':fd.syntax,'messages':msgs,'enums':[{'name':x.name,'values':[{'name':v.name,'number':v.number} for v in x.value]} for x in fd.enum_type if 'MessageType' in x.name]})
+              break
+          (out/'contexts.json').write_text(json.dumps(contexts,indent=2,ensure_ascii=False))
+          (out/'descriptors.json').write_text(json.dumps(parsed,indent=2,ensure_ascii=False))
+          lines=[f'contexts={len(contexts)}',f'descriptors={len(parsed)}']
+          for fd in parsed:
+            lines.append(f"descriptor {fd['file']} package={fd['package']} syntax={fd['syntax']}")
+            for m in fd['messages']:
+              lines.append('message '+m['name'])
+              for f in m['fields']:lines.append(f"  {f['number']} {f['name']} label={f['label']} type={f['type']} type_name={f['type_name']}")
+          (out/'summary.txt').write_text('\n'.join(lines)+'\n')
+          PY
+          grep -RInE 'call|QMetaObject|connectToHost|7418f0|741b50|741de0' "$out/functions" > "$out/calls.txt" || true
+          chmod -R a+rX "$out"
+          SCRIPT
+      - name: Print summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 sh -lc '
+            run_id=$(cat /analysis/latest-client-analysis-run-id)
+            out=/analysis/client-analysis/${run_id}/report/protobuf-battleye-bounded-v2
+            cat "$out/summary.txt"
+            echo files=$(find "$out" -type f | wc -l)
+            echo bytes=$(du -sb "$out" | cut -f1)
+          '
+      - name: Copy report
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/tibia-linux-protobuf-battleye-bounded-v2"
+          rm -rf "$out" && mkdir -p "$out"
+          run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/analysis/client-analysis/${run_id}/report/protobuf-battleye-bounded-v2/." "$out/"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tibia-linux-protobuf-battleye-bounded-v2
+          path: ${{ runner.temp }}/tibia-linux-protobuf-battleye-bounded-v2
+          retention-days: 1
