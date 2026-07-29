@@ -1,4 +1,4 @@
-name: Tibia Linux persisted analysis inventory
+name: Tibia Linux dual connection manager findings
 
 on:
   pull_request:
@@ -10,16 +10,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-analysis-inventory
+  group: tibia-linux-dual-connection-findings
   cancel-in-progress: true
 
 jobs:
   report:
-    name: Inventory persisted route reports
+    name: Print dual connection manager findings
     runs-on: oteryn-staging
     timeout-minutes: 7
     steps:
-      - name: List reports and search route evidence
+      - name: Print focused persisted reports
         shell: bash
         run: |
           set -euo pipefail
@@ -29,10 +29,47 @@ jobs:
               set -eu
               run_id=$(cat /analysis/latest-client-analysis-run-id)
               root=/analysis/client-analysis/${run_id}/report
-              echo "===== REPORT DIRECTORIES ====="
-              find "$root" -mindepth 1 -maxdepth 2 -type d -print | sort
-              echo "===== MATCHING FILES ====="
-              grep -RIlE "useProtectedNetworkRoute|ProtectedWorldAddress|UnprotectedWorldAddress|externaladdressprotected|externaladdressunprotected|anticheatprotection|BattlEyeActivationTimestamp|BattlEyeInitiallyActive|0x1a0|0x1b8|0x1bc|0x1c0|0x1d8|0x1da|0xbc0|0xbd8|0xbdc|0xbe0|0xbf8|0xbfa" "$root" | sort | head -n 400
-              echo "===== ROUTE MATCHES ====="
-              grep -RniE "useProtectedNetworkRoute|ProtectedWorldAddress|UnprotectedWorldAddress|externaladdressprotected|externaladdressunprotected|anticheatprotection|BattlEyeActivationTimestamp|BattlEyeInitiallyActive" "$root" | head -n 1000 || true
+
+              echo "===== DUAL CONNECTION MANAGER FILES ====="
+              find "$root/dual-connection-manager" -maxdepth 2 -type f -print | sort
+              for f in "$root/dual-connection-manager/vtable-map.txt" \
+                       "$root/dual-connection-manager/code-xrefs.txt" \
+                       "$root/dual-connection-manager/session-network-construction-window.txt"; do
+                test -f "$f" || continue
+                echo "===== $f ====="
+                sed -n "1,1200p" "$f"
+              done
+
+              echo "===== GAMESERVER DUAL CLASS FILES ====="
+              find "$root/gameserver-dual-connection-class" -maxdepth 2 -type f -print | sort
+              for f in "$root/gameserver-dual-connection-class"/*.txt; do
+                test -f "$f" || continue
+                echo "===== $f ====="
+                sed -n "1,1200p" "$f"
+              done
+
+              echo "===== ACTUAL DUAL METAOBJECT ====="
+              find "$root/actual-dual-metaobject" -maxdepth 2 -type f -print | sort
+              for f in "$root/actual-dual-metaobject"/*.txt; do
+                test -f "$f" || continue
+                echo "===== $f ====="
+                sed -n "1,1200p" "$f"
+              done
+
+              echo "===== FOCUSED TCP METACALL ====="
+              find "$root/focused-tcp-metacall" -maxdepth 2 -type f -print | sort
+              for f in "$root/focused-tcp-metacall"/*.txt; do
+                test -f "$f" || continue
+                echo "===== $f ====="
+                sed -n "1,1200p" "$f"
+              done
+
+              echo "===== PROTECTED ROUTE SELECTION ====="
+              for f in "$root/protected-route-selection/route-selection-index.txt" \
+                       "$root/protected-route-selection/session-meta-builder.txt" \
+                       "$root/protected-route-selection/session-meta-referenced-data.txt"; do
+                test -f "$f" || continue
+                echo "===== $f ====="
+                sed -n "1,1600p" "$f"
+              done
             '
