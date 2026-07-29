@@ -74,7 +74,7 @@ The ready Platform-to-Canary binding remains immutable. Self-service import, unl
 
 PR #298 merged the approved read-only community-data boundary as `7533b12b1e1c6d266c6bf5a8800e584fad23a01e` after all 11 exact-final-head workflows passed. Canary mutation, guild administration, selectable achievements, world-transfer history, polls and public enforcement publication remain excluded until authoritative ownership and privacy contracts exist.
 
-Still not benchmark-complete: Issue #307 delivers owner-editable Platform comments, character-level privacy and optional main-character selection, while selected achievements, deletion/restore, rename and controlled transfer remain #277. Customer commerce remains #278. Structured authoritative spell/NPC/quest/achievement catalogues remain #301, while optional map/hunt/discovery decisions remain #302.
+PR #308 merged the Platform-owned Issue #307 profile-preference slice as `86847d0068e470274b6c3ee5523fe41cbb9663af` after all 11 exact-final-head workflows passed. Selected achievements, deletion/restore, rename and controlled transfer remain #277. Customer commerce remains #278. Structured authoritative spell/NPC/quest/achievement catalogues remain #301, while optional map/hunt/discovery decisions remain #302.
 
 ### CMS and community publishing
 
@@ -149,11 +149,11 @@ Completed focused slices:
 - #279 — Platform-owned support and moderation lifecycle, merged in PR #293;
 - #280 — read-only community statistics and guild discovery with privacy-aware profiles, merged in PR #298;
 - #281 — first versioned item/weapon/creature/loot Game Catalog scope delivered by PR #272 and evidence ownership closed by PR #303;
-- #307 — Platform-owned character comments, per-character privacy and optional main-character selection in PR #308.
+- #307 — Platform-owned character comments, per-character privacy and optional main-character selection, merged in PR #308.
 
 Open focused backlog:
 
-- #277 — character management and public profiles;
+- #277 — character deletion/restore, rename, controlled transfer and authoritative achievement selection;
 - #278 — premium, coins and entitlement commerce;
 - #301 — authoritative spell/NPC/quest/achievement catalogue expansion;
 - #302 — optional maps, hunt tools and server-specific discovery planning.
@@ -182,12 +182,12 @@ Repository and exact-revision E2E work has hardened the native-auth direction, b
 
 ## Current active task
 
-`OTERYN-20260729-character-profile-preferences` in draft PR #308 delivers Issue #307, the Platform-owned profile-preference slice of parent #277, without Canary mutation.
+None. Issue #307 is closed and its task is archived. Start any remaining #277 mutation lifecycle only through a new bounded task and separately reviewed operation-specific ownership contract.
 
 ## Recommended sequence
 
-1. Complete PR #308 / Issue #307 exact-head evidence and archive its task; keep parent #277 open for separately contracted mutation lifecycles.
-2. Define explicit operation-specific contracts before implementing character rename, deletion, restoration or transfer.
+1. Define explicit operation-specific Platform/Canary contracts before implementing character rename, deletion, restoration or transfer; generic continuation does not authorize those writes.
+2. Resolve authoritative achievement ownership/source before adding selected public achievements.
 3. Keep #278 disabled until a dedicated payment ADR, threat model and provider lifecycle are reviewed.
 4. Start #301 only after an additive authoritative producer contract is approved; treat #302 as optional product discovery.
 5. Resume #91 only after explicit production deployment/verification authorization and required production evidence access exist.
@@ -200,7 +200,6 @@ PR #298 completed Issue #280's approved read-only boundary: categorized/vocation
 
 PR #303 completed Issue #281's accepted first scope by reconciling the versioned item/weapon/creature/loot delivery from PR #272 with the 43-capability benchmark. Exact final head `7c6bd2b46f3c29d5a2bd4862d59614fcaec423bc` passed all eight required workflows before squash merge `e1df0608eb6a8321f47fe51da65233a613a27b25`. Deferred spells/NPCs/quests/achievements remain #301, optional map/hunt/discovery decisions remain #302, and no runtime, Canary, producer, activation or production change occurred.
 
+## Character profile preferences delivery
 
-## Character profile preferences candidate
-
-Draft PR #308 implements the Platform-owned Issue #307 slice: bounded escaped owner comments, per-character effective visibility, filtered related-character association, optional single main-character selection, audit events, real-MariaDB race evidence and EN/PL desktop/tablet/mobile browser acceptance. Canary remains read-only; rename, deletion, restore, transfer and selected achievements remain outside this contract, and no production claim is made.
+PR #308 completed Issue #307's Platform-owned profile-preference boundary: bounded escaped owner comments, per-character effective visibility, filtered related-character association, optional single main-character selection, bounded audit events and localized owner/public states. Exact final head `3797a094cfa522f5147d624786f49fee5027c77b` passed all 11 required workflows before squash merge `86847d0068e470274b6c3ee5523fe41cbb9663af`. Community Data proved the two-process real-MariaDB race and zero-retry Chromium desktop/tablet/mobile EN/PL lifecycle. Canary remained read-only; parent #277 remains open and no production claim was made.
