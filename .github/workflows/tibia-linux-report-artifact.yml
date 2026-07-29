@@ -75,7 +75,7 @@ jobs:
             find "$src" -type f -print0 | while IFS= read -r -d '' f; do
               mime=$(file -b --mime-type "$f")
               case "$mime" in
-                text/*|application/json|application/xml|application/x-empty)
+                text/*|application/json|application/xml|application/x-empty|inode/x-empty)
                   rel=${f#${src}/}
                   mkdir -p "$out/reports/$name/$(dirname "$rel")"
                   cp "$f" "$out/reports/$name/$rel"
