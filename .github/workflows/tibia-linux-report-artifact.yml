@@ -15,11 +15,11 @@ concurrency:
 
 jobs:
   analyze:
-    name: Extract focused static evidence
+    name: Extract bounded static evidence
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Analyze descriptors callbacks and callers
+      - name: Extract callbacks descriptors and framing
         shell: bash
         run: |
           set -euo pipefail
@@ -27,217 +27,159 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             python:3.13-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils file >/dev/null
-          pip install --no-cache-dir pyelftools capstone protobuf >/dev/null
+          apk add --no-cache binutils coreutils file >/dev/null
+          pip install --no-cache-dir pyelftools protobuf >/dev/null
 
           run_id=$(cat /analysis/latest-client-analysis-run-id)
           root=/analysis/client-analysis/${run_id}
           client=${root}/download/client
           out=${root}/report/protobuf-battleye-final
           rm -rf "$out"
-          mkdir -p "$out/functions" "$out/callers"
+          mkdir -p "$out/functions"
           test "$(sha256sum "$client" | awk '{print $1}')" = "8b25d65ece158723dbb50a1b592c1ec8a3247a650fcd2d299bebdfd133cb5752"
 
-          cat > /tmp/analyze.py <<'PY'
+          dump() {
+            name=$1 start=$2 stop=$3
+            objdump -d -M intel --start-address="$start" --stop-address="$stop" "$client" > "$out/functions/$name.txt"
+          }
+
+          # Exact adjacent callback boundaries observed in the Init parameter block.
+          dump BE-callback-7418f0 0x7418f0 0x741b50
+          dump BE-callback-741b50 0x741b50 0x741de0
+          dump BE-callback-741de0 0x741de0 0x742100
+          dump BE-session-dispatch-6f8000 0x6f8000 0x6f86a0
+          dump BE-setup-6fadb0 0x6fadb0 0x6fc700
+
+          # Login builder, handler dispatch, generated serializers and response handlers.
+          dump login-builder-e19700 0xe19700 0xe1a740
+          dump login-handler-metacall-cf1600 0xcf1600 0xcf1b80
+          dump login-generated-bd10e0 0xbd10e0 0xbd1a80
+          dump login-generated-bd18d0 0xbd18d0 0xbd2200
+          dump secondary-generated-1763930 0x1763930 0x1764200
+          dump secondary-generated-17a7470 0x17a7470 0x17a7d00
+          dump login-success-e10df0 0xe10df0 0xe11040
+          dump dual-packet-b487f0 0xb487f0 0xb48ab0
+          dump tcp-connect-b403c0 0xb403c0 0xb40800
+
+          cat > /tmp/parse.py <<'PY'
           from __future__ import annotations
-          import json, re, struct, subprocess
+          import json
           from pathlib import Path
           from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-          from capstone import Cs, CS_ARCH_X86, CS_MODE_64
-          from capstone.x86 import X86_OP_IMM, X86_OP_MEM, X86_REG_RIP
           from google.protobuf import descriptor_pb2
           from google.protobuf.message import DecodeError
 
-          client = Path(__import__('sys').argv[1])
-          out = Path(__import__('sys').argv[2])
-          data = client.read_bytes()
-
-          with client.open('rb') as fh:
-              elf = ELFFile(fh)
-              loads = []
-              for seg in elf.iter_segments():
-                  if seg['p_type'] == 'PT_LOAD':
-                      loads.append((int(seg['p_vaddr']), int(seg['p_offset']), int(seg['p_filesz'])))
-              text = elf.get_section_by_name('.text')
-              text_va = int(text['sh_addr']); text_bytes = text.data()
-              fdes = []
-              dwarf = elf.get_dwarf_info()
-              for entry in dwarf.EH_CFI_entries():
-                  if isinstance(entry, FDE):
-                      start = int(entry['initial_location'])
-                      end = start + int(entry['address_range'])
-                      fdes.append((start, end))
-              fdes.sort()
-
-          def va_to_off(va: int) -> int:
-              for v, o, n in loads:
-                  if v <= va < v+n:
-                      return o + va-v
-              raise ValueError(hex(va))
-
-          def containing_fde(addr: int):
-              lo, hi = 0, len(fdes)
-              while lo < hi:
-                  mid = (lo+hi)//2
-                  if fdes[mid][0] <= addr: lo = mid+1
-                  else: hi = mid
-              if lo:
-                  s,e = fdes[lo-1]
-                  if s <= addr < e: return s,e
-              return None
-
-          def disasm_range(start: int, end: int, path: Path):
-              cmd = ['objdump','-d','-M','intel','--start-address',hex(start),'--stop-address',hex(end),str(client)]
-              path.write_text(subprocess.run(cmd, check=True, text=True, capture_output=True).stdout)
-
-          # Exact callback and key control-flow functions.
-          exact = {
-              'BE_callback_1': 0x7418f0,
-              'BE_callback_2': 0x741b50,
-              'BE_callback_3': 0x741de0,
-              'BE_session_dispatch': 0x6f8000,
-              'BE_setup_Init': 0x6fadb0,
-              'login_handler_metacall': 0xcf1600,
-              'dual_packet_received': 0xb487f0,
-              'tcp_connect': 0xb403c0,
+          client=Path(__import__('sys').argv[1]); out=Path(__import__('sys').argv[2]); data=client.read_bytes()
+          targets={
+            'GameclientMessageLogin','GameclientMessageSecondaryLogin',
+            'GameserverMessageLoginChallenge','GameserverMessageLoginSuccess'
           }
-          idx = []
-          for name, addr in exact.items():
-              rng = containing_fde(addr) or (addr, addr+0x500)
-              idx.append({'name':name,'target':hex(addr),'start':hex(rng[0]),'end':hex(rng[1])})
-              disasm_range(*rng, out/'functions'/f'{name}-{addr:x}.txt')
-          (out/'function-index.json').write_text(json.dumps(idx, indent=2))
 
-          md = Cs(CS_ARCH_X86, CS_MODE_64); md.detail = True
-          targets = {
-              0x30c64c0:'GameclientMessageLogin_vptr',
-              0x30c4648:'GameclientMessageSecondaryLogin_vptr',
-              0x3082fa0:'TLoginProtocolMessageHandler_metaobject',
-              0x1cceb44:'GameclientMessageLogin_descriptor_name',
-              0x1cd14c0:'GameclientMessageSecondaryLogin_descriptor_name',
-              0x1cca6dc:'GameserverMessageLoginChallenge_descriptor_name',
-          }
-          hits = []
-          for ins in md.disasm(text_bytes, text_va):
-              resolved = []
-              for op in ins.operands:
-                  if op.type == X86_OP_IMM:
-                      resolved.append(int(op.imm) & ((1<<64)-1))
-                  elif op.type == X86_OP_MEM and op.mem.base == X86_REG_RIP:
-                      resolved.append(ins.address + ins.size + op.mem.disp)
-              for value in resolved:
-                  if value in targets:
-                      hits.append({'at':ins.address,'target':value,'kind':targets[value], 'instruction':f'{ins.mnemonic} {ins.op_str}'})
+          def varint(buf,p):
+            v=0; s=0
+            for i in range(10):
+              if p+i>=len(buf): raise ValueError
+              b=buf[p+i]; v|=(b&127)<<s
+              if not b&128: return v,p+i+1
+              s+=7
+            raise ValueError
 
-          # Direct callers of key generated protobuf methods and Qt activation.
-          direct_call_targets = {
-              0x1761e10:'login_New', 0x17570c0:'login_Clear', 0x175c000:'login_Parse',
-              0x17117d0:'protobuf_Serialize', 0xbd10e0:'login_app_slot18', 0xbd18d0:'login_app_slot19',
-              0x1761f30:'secondary_New', 0x17571d0:'secondary_Clear', 0x175c1d0:'secondary_Parse',
-              0x1763930:'secondary_app_slot18', 0x17a7470:'secondary_app_slot19',
-              0x4ddda0:'QMetaObject_activate',
-          }
-          for ins in md.disasm(text_bytes, text_va):
-              if ins.mnemonic == 'call' and ins.operands and ins.operands[0].type == X86_OP_IMM:
-                  dest = int(ins.operands[0].imm) & ((1<<64)-1)
-                  if dest in direct_call_targets:
-                      hits.append({'at':ins.address,'target':dest,'kind':'call_'+direct_call_targets[dest], 'instruction':f'{ins.mnemonic} {ins.op_str}'})
-
-          # Keep only unique FDEs containing interesting references; disassemble bounded set.
-          ranges = {}
-          for h in hits:
-              rng = containing_fde(h['at'])
-              if rng and rng[1]-rng[0] <= 0x12000:
-                  ranges.setdefault(rng, []).append(h)
-          caller_index = []
-          for num, ((s,e), rhits) in enumerate(sorted(ranges.items())[:120]):
-              kinds = sorted({h['kind'] for h in rhits})
-              caller_index.append({'start':hex(s),'end':hex(e),'size':e-s,'kinds':kinds,'hits':[{**h,'at':hex(h['at']),'target':hex(h['target'])} for h in rhits]})
-              disasm_range(s,e,out/'callers'/f'{num:03d}-{s:x}-{e:x}.txt')
-          (out/'caller-index.json').write_text(json.dumps(caller_index, indent=2))
-
-          # Raw locations and printable context around relevant protobuf names.
-          needles = [b'GameclientMessageLogin', b'GameclientMessageSecondaryLogin', b'GameserverMessageLoginChallenge', b'clientsessionid', b'charactername', b'sessionkey']
-          contexts = []
-          for needle in needles:
-              pos = 0
-              while True:
-                  pos = data.find(needle, pos)
-                  if pos < 0: break
-                  before = max(0,pos-768); after=min(len(data),pos+len(needle)+1536)
-                  chunk=data[before:after]
-                  strings=[m.group().decode('utf-8','replace') for m in re.finditer(rb'[ -~]{3,}',chunk)]
-                  contexts.append({'needle':needle.decode(),'file_offset':hex(pos),'strings':strings})
-                  pos += 1
-          (out/'protobuf-string-contexts.json').write_text(json.dumps(contexts, indent=2, ensure_ascii=False))
-
-          def read_varint(buf, p):
-              value=0; shift=0
-              for i in range(10):
-                  if p+i >= len(buf): raise ValueError
-                  b=buf[p+i]; value |= (b&0x7f)<<shift
-                  if not b&0x80: return value,p+i+1
-                  shift += 7
-              raise ValueError
-
-          # Locate and parse serialized FileDescriptorProto blobs ending in syntax=proto2/proto3.
-          parsed=[]; seen=set()
-          target_names={'GameclientMessageLogin','GameclientMessageSecondaryLogin','GameserverMessageLoginChallenge','GameserverMessageLoginSuccess'}
-          starts=[]
-          for p,b in enumerate(data):
-              if b != 0x0a: continue
-              try: n,q=read_varint(data,p+1)
+          # Candidate FileDescriptorProto starts are field-1 strings ending in .proto.
+          starts=[]; pos=0
+          while True:
+            pos=data.find(b'.proto',pos)
+            if pos<0: break
+            for back in range(2,260):
+              s=pos-back
+              if s<0 or data[s]!=0x0a: continue
+              try: n,q=varint(data,s+1)
               except ValueError: continue
-              if 1 <= n <= 240 and q+n <= len(data):
-                  name=data[q:q+n]
-                  if name.endswith(b'.proto') and all(32 <= c < 127 for c in name): starts.append(p)
-          endings=[]
-          for marker in (b'\x62\x06proto3',b'\x62\x06proto2'):
-              p=0
+              if q+n==pos+6 and 1<=n<=250:
+                raw=data[q:q+n]
+                if all(32<=c<127 for c in raw): starts.append((s,raw.decode('ascii','replace')))
+            pos+=6
+          starts=sorted(set(starts))
+
+          parsed=[]; seen=set()
+          for s,name in starts:
+            limit=min(len(data),s+1_500_000)
+            ends=[]
+            for marker in (b'\x62\x06proto2',b'\x62\x06proto3'):
+              p=s
               while True:
-                  p=data.find(marker,p)
-                  if p<0: break
-                  endings.append(p+len(marker)); p += 1
-          for s in starts:
-              for e in endings:
-                  if not (s < e <= min(len(data),s+2_000_000)): continue
-                  blob=data[s:e]
-                  if not any(n.encode() in blob for n in target_names): continue
-                  fd=descriptor_pb2.FileDescriptorProto()
-                  try: fd.ParseFromString(blob)
-                  except DecodeError: continue
-                  names={m.name for m in fd.message_type}
-                  if not names & target_names: continue
-                  key=(fd.name, s, e)
-                  if key in seen: continue
-                  seen.add(key)
-                  item={'file_offset_start':hex(s),'file_offset_end':hex(e),'name':fd.name,'package':fd.package,'syntax':fd.syntax,'messages':[],'enums':[]}
-                  for m in fd.message_type:
-                      if m.name in target_names or 'Login' in m.name or 'Challenge' in m.name:
-                          item['messages'].append({'name':m.name,'fields':[{'name':f.name,'number':f.number,'label':f.label,'type':f.type,'type_name':f.type_name,'oneof_index':f.oneof_index if f.HasField('oneof_index') else None,'default':f.default_value} for f in m.field]})
-                  for en in fd.enum_type:
-                      if 'GameclientMessageType' in en.name or 'GameserverMessageType' in en.name:
-                          item['enums'].append({'name':en.name,'values':[{'name':v.name,'number':v.number} for v in en.value]})
-                  parsed.append(item)
-          (out/'parsed-protobuf-descriptors.json').write_text(json.dumps(parsed, indent=2, ensure_ascii=False))
+                p=data.find(marker,p,limit)
+                if p<0: break
+                ends.append(p+len(marker)); p+=1
+            for e in sorted(set(ends)):
+              blob=data[s:e]
+              if not any(t.encode() in blob for t in targets): continue
+              fd=descriptor_pb2.FileDescriptorProto()
+              try: fd.ParseFromString(blob)
+              except DecodeError: continue
+              if not fd.name.endswith('.proto'): continue
+              all_messages=[]
+              def walk(prefix, msgs):
+                for m in msgs:
+                  full=(prefix+'.'+m.name).strip('.')
+                  all_messages.append((full,m))
+                  walk(full,m.nested_type)
+              walk('',fd.message_type)
+              if not any(m.name in targets for _,m in all_messages): continue
+              key=(s,e,fd.name)
+              if key in seen: continue
+              seen.add(key)
+              item={'start':hex(s),'end':hex(e),'file':fd.name,'package':fd.package,'syntax':fd.syntax,'messages':[],'enums':[]}
+              for full,m in all_messages:
+                if m.name in targets or 'Login' in m.name or 'Challenge' in m.name:
+                  item['messages'].append({'name':full,'fields':[{
+                    'name':f.name,'number':f.number,'label':descriptor_pb2.FieldDescriptorProto.Label.Name(f.label),
+                    'type':descriptor_pb2.FieldDescriptorProto.Type.Name(f.type),'type_name':f.type_name,
+                    'default':f.default_value,'oneof_index':f.oneof_index if f.HasField('oneof_index') else None
+                  } for f in m.field]})
+              for en in fd.enum_type:
+                if 'MessageType' in en.name or 'Login' in en.name:
+                  item['enums'].append({'name':en.name,'values':[{'name':v.name,'number':v.number} for v in en.value]})
+              parsed.append(item)
 
-          # Compact evidence summary.
-          summary=[]
-          summary.append(f'parsed_descriptors={len(parsed)}')
+          # Raw printable contexts are useful even if the descriptor is split or custom-packed.
+          contexts=[]
+          for needle in [b'GameclientMessageLogin',b'GameclientMessageSecondaryLogin',b'GameserverMessageLoginChallenge',b'clientsessionid',b'charactername',b'sessionkey']:
+            p=0
+            while True:
+              p=data.find(needle,p)
+              if p<0: break
+              a=max(0,p-512); b=min(len(data),p+2048)
+              chunk=data[a:b]
+              strings=[]; cur=[]
+              for x in chunk:
+                if 32<=x<127: cur.append(chr(x))
+                else:
+                  if len(cur)>=3: strings.append(''.join(cur))
+                  cur=[]
+              if len(cur)>=3: strings.append(''.join(cur))
+              contexts.append({'needle':needle.decode(),'offset':hex(p),'strings':strings})
+              p+=len(needle)
+
+          (out/'descriptor-candidates.json').write_text(json.dumps({'starts':[{'offset':hex(s),'name':n} for s,n in starts],'parsed':parsed},indent=2,ensure_ascii=False))
+          (out/'string-contexts.json').write_text(json.dumps(contexts,indent=2,ensure_ascii=False))
+
+          lines=[f'candidate_proto_starts={len(starts)}',f'parsed_target_descriptors={len(parsed)}']
           for fd in parsed:
-              summary.append(f"descriptor={fd['name']} package={fd['package']} syntax={fd['syntax']}")
-              for m in fd['messages']:
-                  summary.append('message '+m['name'])
-                  for f in m['fields']:
-                      summary.append(f"  field {f['number']} {f['name']} label={f['label']} type={f['type']} type_name={f['type_name']}")
-              for en in fd['enums']:
-                  summary.append('enum '+en['name']+' '+', '.join(f"{v['name']}={v['number']}" for v in en['values']))
-          summary.append(f'interesting_xrefs={len(hits)} caller_functions={len(caller_index)}')
-          (out/'summary.txt').write_text('\n'.join(summary)+'\n')
+            lines.append(f"descriptor {fd['file']} package={fd['package']} syntax={fd['syntax']} start={fd['start']} end={fd['end']}")
+            for m in fd['messages']:
+              lines.append('message '+m['name'])
+              for f in m['fields']:
+                lines.append(f"  {f['number']} {f['name']} {f['label']} {f['type']} {f['type_name']}")
+            for en in fd['enums']:
+              lines.append('enum '+en['name']+' '+', '.join(f"{v['name']}={v['number']}" for v in en['values']))
+          (out/'summary.txt').write_text('\n'.join(lines)+'\n')
           PY
+          python /tmp/parse.py "$client" "$out"
 
-          python /tmp/analyze.py "$client" "$out"
+          {
+            echo '===== DIRECT CALLS / POINTERS IN FOCUSED FUNCTIONS ====='
+            grep -RInE 'call|7418f0|741b50|741de0|QMetaObject|Serialize|connectToHost' "$out/functions" | head -n 6000 || true
+          } > "$out/focused-index.txt"
           chmod -R a+rX "$out"
           SCRIPT
 
