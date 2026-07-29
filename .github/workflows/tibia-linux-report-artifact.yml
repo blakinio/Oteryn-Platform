@@ -1,68 +1,55 @@
-name: Tibia Linux world endpoint enrichment trace
+name: Tibia Linux connection route-slot findings
+
 on:
   pull_request:
     branches: [main]
     paths: [.github/workflows/tibia-linux-report-artifact.yml]
   workflow_dispatch:
+
 permissions:
   contents: read
+
 concurrency:
-  group: tibia-linux-world-enrichment
+  group: tibia-linux-connection-route-slot-findings
   cancel-in-progress: true
+
 jobs:
-  trace:
+  report:
+    name: Print persisted route-slot findings
     runs-on: oteryn-staging
-    timeout-minutes: 12
+    timeout-minutes: 7
     steps:
-      - name: Extract functions
+      - name: Print focused findings
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm -i --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' python:3.12-alpine sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils coreutils grep >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
-          run_id=$(cat /analysis/latest-client-analysis-run-id)
-          client=/analysis/client-analysis/${run_id}/download/client
-          out=/analysis/client-analysis/${run_id}/report/world-enrichment
-          rm -rf "$out" && mkdir -p "$out/functions"
-          python3 - "$client" "$out" <<'PY'
-          import pathlib,sys
-          from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-          binary,out=sys.argv[1:]
-          targets=[0xe1b509,0x69c406,0x6f12dd,0xe0fcf0,0x6fd210,0x6fadb0]
-          with open(binary,'rb') as f:
-              elf=ELFFile(f);fdes=[]
-              try:
-                  for e in elf.get_dwarf_info().EH_CFI_entries():
-                      if isinstance(e,FDE):
-                          a=int(e['initial_location']);fdes.append((a,a+int(e['address_range'])))
-              except:pass
-          rows=[]
-          for a in targets:
-              m=[x for x in fdes if x[0]<=a<x[1]]
-              s,e=min(m,key=lambda x:x[1]-x[0]) if m else (a-0x4000,a+0x10000)
-              rows.append((a,s,e))
-          pathlib.Path(out,'ranges.tsv').write_text(''.join(f'{a:x}\t{s:x}\t{e:x}\n' for a,s,e in rows))
-          PY
-          while IFS="$(printf '\t')" read -r a s e; do
-            actual=$((0x$e));max=$((0x$s+0x30000));[ "$actual" -le "$max" ] || actual=$max
-            objdump -d -M intel --no-show-raw-insn --start-address=0x$s --stop-address=$(printf '0x%x' "$actual") "$client" > "$out/functions/target-0x$a-range-0x$s.txt"
-          done < "$out/ranges.tsv"
-          objdump -d -M intel --no-show-raw-insn "$client" | grep -n -B 80 -A 120 -E '(call[[:space:]]+e1b[0-9a-f]+|318d3d0|318d3f0|31e87c0|289ce17)' > "$out/xrefs.txt" || true
-          grep -RniE '(318d3d0|318d3f0|31e87c0|ProtectedWorldAddress|UnprotectedWorldAddress|useProtectedNetworkRoute|\[r..\+0x20\]|\[r..\+0x38\]|\[r..\+0x50\]|\[r..\+0x54\]|\[r..\+0x74\]|cmp|test|cmov|sete|setne|call[[:space:]])' "$out/functions" > "$out/focus.txt" || true
-          chmod -R a+rX "$out"
-          SCRIPT
-      - name: Copy
-        shell: bash
-        run: |
-          out=$RUNNER_TEMP/world-enrichment;rm -rf "$out";mkdir -p "$out"
-          run_id=$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)
-          cid=$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true);trap 'docker rm -f "$cid" >/dev/null 2>&1||true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/world-enrichment/." "$out/"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tibia-linux-world-enrichment
-          path: ${{ runner.temp }}/world-enrichment
-          retention-days: 1
+          docker run --rm \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
+            alpine:3.22 sh -lc '
+              set -eu
+              run_id=$(cat /analysis/latest-client-analysis-run-id)
+              report=/analysis/client-analysis/${run_id}/report/connection-controller-route-slot
+              test -d "$report"
+
+              echo "===== FILES ====="
+              find "$report" -maxdepth 2 -type f -print | sort
+
+              echo "===== CRITICAL VTABLE MAP ====="
+              sed -n "/===== CRITICAL SLOTS =====/,$p" "$report/vtable-map.txt"
+
+              echo "===== CONNECTION CONTROLLER HEADER ====="
+              sed -n "/===== ConnectionController/,/===== GameserverGameSessionHighSlots/p" "$report/vtable-map.txt" | head -n 100
+
+              echo "===== CRITICAL FOCUS ====="
+              cat "$report/critical-focus.txt"
+
+              echo "===== REFERENCED DATA ====="
+              cat "$report/referenced-data.txt"
+
+              echo "===== SLOT12 FUNCTION ====="
+              for f in "$report"/functions/ConnectionController-slot12-*; do
+                test -f "$f" || continue
+                echo "FILE=$f"
+                cat "$f"
+              done
+            '
