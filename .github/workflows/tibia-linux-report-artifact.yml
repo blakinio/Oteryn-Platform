@@ -1,4 +1,4 @@
-name: Tibia Linux direct entry vtable resolution
+name: Tibia Linux world endpoint enrichment trace
 on:
   pull_request:
     branches: [main]
@@ -7,104 +7,62 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: tibia-linux-dual-connection-entry
+  group: tibia-linux-world-enrichment
   cancel-in-progress: true
 jobs:
   trace:
     runs-on: oteryn-staging
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
-      - name: Resolve vtable
+      - name: Extract functions
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm -i --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' python:3.12-alpine sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache binutils coreutils >/dev/null
+          apk add --no-cache binutils coreutils grep >/dev/null
           pip install --no-cache-dir pyelftools==0.32 >/dev/null
           run_id=$(cat /analysis/latest-client-analysis-run-id)
           client=/analysis/client-analysis/${run_id}/download/client
-          out=/analysis/client-analysis/${run_id}/report/direct-entry-vtable
+          out=/analysis/client-analysis/${run_id}/report/world-enrichment
           rm -rf "$out" && mkdir -p "$out/functions"
           python3 - "$client" "$out" <<'PY'
-          import pathlib,struct,sys
+          import pathlib,sys
           from elftools.elf.elffile import ELFFile
           from elftools.dwarf.callframe import FDE
-          binary,out=sys.argv[1:]; TARGET=0xb3fa30
+          binary,out=sys.argv[1:]
+          targets=[0xe1b509,0x69c406,0x6f12dd,0xe0fcf0,0x6fd210,0x6fadb0]
           with open(binary,'rb') as f:
-              blob=f.read();f.seek(0);elf=ELFFile(f);secs=list(elf.iter_sections())
-              def v2o(v):
-                  for s in secs:
-                      a=int(s['sh_addr']);z=int(s['sh_size'])
-                      if a<=v<a+z:return int(s['sh_offset'])+v-a,s.name
-                  return None,None
-              def rawq(v):
-                  o,_=v2o(v);return None if o is None or o+8>len(blob) else struct.unpack_from('<Q',blob,o)[0]
-              resolved={};target_slots=[]
-              for s in secs:
-                  if s['sh_type']!='SHT_RELA':continue
-                  linked=elf.get_section(s['sh_link']) if s['sh_link'] else None
-                  for r in s.iter_relocations():
-                      slot=int(r['r_offset']);typ=int(r['r_info_type']);add=int(r['r_addend']) if r.is_RELA() else 0;val=None
-                      if typ==8:val=add
-                      elif linked is not None and int(r['r_info_sym']):
-                          sy=linked.get_symbol(int(r['r_info_sym']));sv=int(sy['st_value'])
-                          if sv:val=sv+add
-                      if val is not None:
-                          resolved[slot]=val
-                          if val==TARGET:target_slots.append(slot)
-              def q(v):return resolved.get(v,rawq(v))
-              def cstr(v,limit=1000):
-                  o,sec=v2o(v)
-                  if o is None:return None,sec
-                  e=blob.find(b'\0',o,min(len(blob),o+limit))
-                  if e<=o:return None,sec
-                  try:return blob[o:e].decode(),sec
-                  except:return None,sec
-              fdes=[]
+              elf=ELFFile(f);fdes=[]
               try:
                   for e in elf.get_dwarf_info().EH_CFI_entries():
                       if isinstance(e,FDE):
                           a=int(e['initial_location']);fdes.append((a,a+int(e['address_range'])))
               except:pass
-              def frange(a):
-                  m=[x for x in fdes if x[0]<=a<x[1]]
-                  return min(m,key=lambda x:x[1]-x[0]) if m else (a,a+0x10000)
-              known={0xb403c0:'start',0xb3d580:'disconnect',0xb3d630:'reset',0xb3d6c0:'state',0xb55da0:'connected',0xb55ea0:'disconnected',0xb3fa30:'url',0xb3d6d0:'event'}
-              lines=[f'target_slots={[hex(x) for x in target_slots]}'];rows=[]
-              for slot in target_slots:
-                  lines.append(f'===== TARGET SLOT 0x{slot:x} =====')
-                  for vp in range(slot-0x100,slot+8,8):
-                      if q(vp-16)!=0:continue
-                      ti=q(vp-8)
-                      if not ti or v2o(ti)[1]!='.data.rel.ro':continue
-                      np=q(ti+8);name,sec=cstr(np) if np else (None,None)
-                      arr=[q(vp+i*8) for i in range(28)]
-                      if TARGET not in arr:continue
-                      lines.append(f'VPTR=0x{vp:x} TYPEINFO=0x{ti:x} NAME={name!r}')
-                      for i,v in enumerate(arr):
-                          lines.append(f'slot={i} offset=0x{i*8:x} target={None if v is None else hex(v)} label={known.get(v,"")} section={None if v is None else v2o(v)[1]}')
-                          if v and v2o(v)[1]=='.text':
-                              a,b=frange(v);rows.append((f'slot{i}',v,a,b))
-              pathlib.Path(out,'vtable.txt').write_text('\n'.join(lines)+'\n')
-              uniq={a:(n,a,s,e) for n,a,s,e in rows}
-              pathlib.Path(out,'ranges.tsv').write_text(''.join(f'{n}\t{a:x}\t{s:x}\t{e:x}\n' for n,a,s,e in uniq.values()))
+          rows=[]
+          for a in targets:
+              m=[x for x in fdes if x[0]<=a<x[1]]
+              s,e=min(m,key=lambda x:x[1]-x[0]) if m else (a-0x4000,a+0x10000)
+              rows.append((a,s,e))
+          pathlib.Path(out,'ranges.tsv').write_text(''.join(f'{a:x}\t{s:x}\t{e:x}\n' for a,s,e in rows))
           PY
-          while IFS="$(printf '\t')" read -r n a s e; do
-            actual=$((0x$e));max=$((0x$s+0x16000));[ "$actual" -le "$max" ] || actual=$max
-            objdump -d -M intel --no-show-raw-insn --start-address=0x$s --stop-address=$(printf '0x%x' "$actual") "$client" > "$out/functions/${n}-0x${a}.txt"
+          while IFS="$(printf '\t')" read -r a s e; do
+            actual=$((0x$e));max=$((0x$s+0x30000));[ "$actual" -le "$max" ] || actual=$max
+            objdump -d -M intel --no-show-raw-insn --start-address=0x$s --stop-address=$(printf '0x%x' "$actual") "$client" > "$out/functions/target-0x$a-range-0x$s.txt"
           done < "$out/ranges.tsv"
+          objdump -d -M intel --no-show-raw-insn "$client" | grep -n -B 80 -A 120 -E '(call[[:space:]]+e1b[0-9a-f]+|318d3d0|318d3f0|31e87c0|289ce17)' > "$out/xrefs.txt" || true
+          grep -RniE '(318d3d0|318d3f0|31e87c0|ProtectedWorldAddress|UnprotectedWorldAddress|useProtectedNetworkRoute|\[r..\+0x20\]|\[r..\+0x38\]|\[r..\+0x50\]|\[r..\+0x54\]|\[r..\+0x74\]|cmp|test|cmov|sete|setne|call[[:space:]])' "$out/functions" > "$out/focus.txt" || true
           chmod -R a+rX "$out"
           SCRIPT
       - name: Copy
         shell: bash
         run: |
-          out=$RUNNER_TEMP/direct-entry-vtable;rm -rf "$out";mkdir -p "$out"
+          out=$RUNNER_TEMP/world-enrichment;rm -rf "$out";mkdir -p "$out"
           run_id=$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)
           cid=$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true);trap 'docker rm -f "$cid" >/dev/null 2>&1||true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/direct-entry-vtable/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/${run_id}/report/world-enrichment/." "$out/"
       - uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-direct-entry-vtable
-          path: ${{ runner.temp }}/direct-entry-vtable
+          name: tibia-linux-world-enrichment
+          path: ${{ runner.temp }}/world-enrichment
           retention-days: 1
