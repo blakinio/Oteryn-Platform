@@ -1,4 +1,4 @@
-name: Tibia Linux dual connection route trace
+name: Tibia Linux persisted transport report bundle
 
 on:
   pull_request:
@@ -10,133 +10,49 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-dual-connection-route-trace
+  group: tibia-linux-transport-report-bundle
   cancel-in-progress: true
 
 jobs:
-  trace:
-    name: Trace primary and secondary connection routes
+  export:
+    name: Export persisted transport reports
     runs-on: oteryn-staging
-    timeout-minutes: 15
+    timeout-minutes: 10
     steps:
-      - name: Disassemble focused route-manager functions
+      - name: Copy selected text reports
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            python:3.12-alpine sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils coreutils grep >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
-          run_id=$(cat /analysis/latest-client-analysis-run-id)
-          client=/analysis/client-analysis/${run_id}/download/client
-          out=/analysis/client-analysis/${run_id}/report/dual-route-final
-          rm -rf "$out" && mkdir -p "$out/functions"
-
-          c++filt < <(readelf -Ws "$client" | grep -Ei 'connectToHost|QHostAddress|QAbstractSocket|QTcpSocket|QUrl' || true) > "$out/network-imports.txt" || true
-
-          python3 - "$client" "$out" <<'PY'
-          import pathlib, re, struct, subprocess, sys
-          from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-
-          binary,out_dir=sys.argv[1:]
-          targets={
-            'checkForStateChange':0xb47f90,
-            'processDisconnectEvents_or_prestep':0xb48ab0,
-            'onConnectionConnected':0xb482c0,
-            'onConnectionDisconnected':0xb48520,
-            'onConnectionError':0xb48680,
-            'onPacketReceived':0xb487f0,
-            'onOptimizeConnectionStabilityChanged':0xb491d0,
-            'dual_ctor_candidate':0xb53d60,
-            'dual_vslot3':0xb54e00,
-            'dual_vslot4':0xb550f0,
-            'dual_vslot12':0xb55110,
-            'dual_vslot15':0xb552a0,
-            'dual_vslot16':0xb55690,
-            'dual_vslot17':0xb482b0,
-            'dual_vslot18':0xb3eca0,
-            'extra_ctor1':0xb48630,
-            'extra_ctor2':0xb49480,
-          }
-          with open(binary,'rb') as f:
-            blob=f.read(); f.seek(0); elf=ELFFile(f); sections=list(elf.iter_sections())
-            fdes=[]
-            try:
-              for e in elf.get_dwarf_info().EH_CFI_entries():
-                if isinstance(e,FDE):
-                  s=int(e['initial_location']); fdes.append((s,s+int(e['address_range'])))
-            except Exception: pass
-
-          def frange(addr):
-            m=[x for x in fdes if x[0]<=addr<x[1]]
-            return min(m,key=lambda x:x[1]-x[0]) if m else (addr,addr+0x4000)
-          def locate(va):
-            for sec in sections:
-              a=int(sec['sh_addr']); n=int(sec['sh_size'])
-              if a<=va<a+n:return int(sec['sh_offset'])+va-a,sec.name
-            return None,None
-          index=[]; all_refs=set()
-          for name,addr in targets.items():
-            s,e=frange(addr); e=min(e,s+0x12000)
-            dis=subprocess.check_output(['objdump','-d','-M','intel','--no-show-raw-insn',f'--start-address=0x{s:x}',f'--stop-address=0x{e:x}',binary],text=True,errors='replace')
-            pathlib.Path(out_dir,'functions',f'{name}-0x{addr:x}.txt').write_text(dis)
-            calls=[(int(a,16),int(b,16)) for a,b in re.findall(r'^\s*([0-9a-f]+):\s+call\s+([0-9a-f]+)',dis,re.M)]
-            refs=set(int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)',dis)); all_refs|=refs
-            index.append(f'{name}\ttarget=0x{addr:x}\trange=0x{s:x}-0x{e:x}\tcalls={len(calls)}')
-          pathlib.Path(out_dir,'index.txt').write_text('\n'.join(index)+'\n')
-
-          rows=[]
-          for va in sorted(all_refs):
-            off,sec=locate(va)
-            if off is None: continue
-            end=blob.find(b'\0',off,min(len(blob),off+900)); val=None
-            if end>off:
-              raw=blob[off:end]
-              if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>0.9:
-                val=raw.decode('utf-8','replace')
-            if val or sec in ('.data.rel.ro','.rodata'):
-              rows.append(f'0x{va:x}\t{sec}\t{val!r}')
-          pathlib.Path(out_dir,'referenced-data.txt').write_text('\n'.join(rows)+'\n')
-          PY
-
-          {
-            echo '===== INDEX ====='; cat "$out/index.txt"
-            echo '===== NETWORK IMPORTS ====='; cat "$out/network-imports.txt"
-            echo '===== REFERENCED STRINGS ====='; grep -E "(primary|secondary|protect|unprotect|connect|disconnect|stability|url|host|port|battle|error|packet)" "$out/referenced-data.txt" | head -n 1200 || true
-            for f in "$out"/functions/*.txt; do
-              echo "===== $(basename "$f") ====="
-              grep -n -B 18 -A 45 -E '(connectToHost|QHostAddress|QUrl|QTcpSocket|QAbstractSocket|\[r..\+0x[0-9a-f]+\]|call[[:space:]]|cmp|test|cmov|sete|setne)' "$f" | head -n 2500 || true
-            done
-          } > "$out/concise.txt"
-          chmod -R a+rX "$out"
-          SCRIPT
-
-      - name: Print concise route report
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 sh -lc '
-            run_id=$(cat /analysis/latest-client-analysis-run-id)
-            sed -n "1,6000p" /analysis/client-analysis/${run_id}/report/dual-route-final/concise.txt
-          '
-
-      - name: Copy route report
-        shell: bash
-        run: |
-          set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-dual-route-final"
+          out="${RUNNER_TEMP}/tibia-linux-transport-reports"
           rm -rf "$out" && mkdir -p "$out"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/dual-route-final/." "$out/"
+          for dir in \
+            actual-dual-metaobject \
+            direct-entry-vtable \
+            dual-connection-manager \
+            dual-route-final \
+            entry-vtable \
+            focused-tcp-metacall \
+            gameserver-dual-connection-class \
+            parser-network-trace \
+            protected-route-selection \
+            runtime-route-consumer \
+            session-network-construction \
+            tcp-qt-metaobject \
+            tcp-route-selector \
+            world-address-consumers \
+            world-record-connection-trace; do
+            mkdir -p "$out/$dir"
+            docker cp "$cid:/analysis/client-analysis/${run_id}/report/$dir/." "$out/$dir/" 2>/dev/null || rmdir "$out/$dir" 2>/dev/null || true
+          done
+          find "$out" -type f -printf '%p %s bytes\n' | sort > "$out/manifest.txt"
+          cat "$out/manifest.txt"
 
-      - name: Upload route report
+      - name: Upload transport reports
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-dual-route-final
-          path: ${{ runner.temp }}/tibia-dual-route-final
+          name: tibia-linux-transport-reports
+          path: ${{ runner.temp }}/tibia-linux-transport-reports
           retention-days: 1
