@@ -1,4 +1,4 @@
-name: Tibia Linux persisted slot12 function
+name: Tibia Linux slot12 RTTI resolution
 
 on:
   pull_request:
@@ -10,31 +10,84 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-connection-controller-slot12
+  group: tibia-linux-slot12-rtti
   cancel-in-progress: true
 
 jobs:
   report:
-    name: Print persisted slot12 function
+    name: Resolve slot12 RTTI and vtables
     runs-on: oteryn-staging
     timeout-minutes: 7
     steps:
-      - name: Print exact function and focused lines
+      - name: Resolve types and referenced strings
         shell: bash
         run: |
           set -euo pipefail
-          docker run --rm \
+          docker run --rm -i \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
-            alpine:3.22 sh -lc '
-              set -eu
-              run_id=$(cat /analysis/latest-client-analysis-run-id)
-              report=/analysis/client-analysis/${run_id}/report/connection-controller-route-slot
-              func=$report/functions/ConnectionController-slot12-0xc49630.txt
-              test -f "$func"
-              echo "===== STATS ====="
-              wc -l -c "$func"
-              echo "===== FUNCTION ====="
-              cat "$func"
-              echo "===== FOCUSED ====="
-              grep -n -B 15 -A 40 -E "(call[[:space:]]|cmp|test|cmov|sete|setne|QHostAddress|QTcpSocket|connect|BattlEye|0x1a0|0x1b8|0x1bc|0x1c0|0x1d8|0x1da|0xbc0|0xbd8|0xbdc|0xbe0|0xbf8|0xbfa)" "$func" || true
-            '
+            python:3.12-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          pip install --no-cache-dir pyelftools==0.32 >/dev/null
+          run_id=$(cat /analysis/latest-client-analysis-run-id)
+          client=/analysis/client-analysis/${run_id}/download/client
+          python3 - "$client" <<'PY'
+          import struct, sys
+          from elftools.elf.elffile import ELFFile
+
+          binary=sys.argv[1]
+          with open(binary,'rb') as f:
+              blob=f.read(); f.seek(0); elf=ELFFile(f); sections=list(elf.iter_sections())
+              resolved={}
+              for sec in sections:
+                  if sec['sh_type']!='SHT_RELA': continue
+                  linked=elf.get_section(sec['sh_link']) if sec['sh_link'] else None
+                  for rel in sec.iter_relocations():
+                      slot=int(rel['r_offset']); typ=int(rel['r_info_type']); add=int(rel['r_addend']) if rel.is_RELA() else 0
+                      val=None
+                      if typ==8: val=add
+                      elif linked is not None and int(rel['r_info_sym']):
+                          sym=linked.get_symbol(int(rel['r_info_sym'])); base=int(sym['st_value'])
+                          if base: val=base+add
+                      if val is not None: resolved[slot]=val
+
+          def locate(va):
+              for sec in sections:
+                  a=int(sec['sh_addr']); n=int(sec['sh_size'])
+                  if a<=va<a+n: return int(sec['sh_offset'])+va-a,sec.name
+              return None,None
+          def qword(va):
+              if va in resolved: return resolved[va]
+              off,_=locate(va)
+              return None if off is None else struct.unpack_from('<Q',blob,off)[0]
+          def cstr(va,limit=800):
+              off,sec=locate(va)
+              if off is None:return None,sec
+              end=blob.find(b'\0',off,min(len(blob),off+limit))
+              if end<=off:return None,sec
+              try:return blob[off:end].decode('utf-8'),sec
+              except:return None,sec
+          def typeinfo(addr):
+              namep=qword(addr+8); name,sec=cstr(namep) if namep else (None,None)
+              return namep,name,sec
+          def vtable(vptr,count=20):
+              ti=qword(vptr-8); top=qword(vptr-16)
+              print(f'VPTR 0x{vptr:x} offset_to_top={top} typeinfo={None if ti is None else hex(ti)}')
+              if ti:
+                  np,n,s=typeinfo(ti); print(f'  type_name_ptr={None if np is None else hex(np)} section={s} name={n!r}')
+              for i in range(count):
+                  t=qword(vptr+i*8)
+                  print(f'  slot={i:02d} off=0x{i*8:x} target={None if t is None else hex(t)}')
+
+          print('===== DYNAMIC CAST TYPEINFOS =====')
+          for a in (0x3075008,0x3075200):
+              np,n,s=typeinfo(a); print(f'typeinfo=0x{a:x} name_ptr={None if np is None else hex(np)} section={s} name={n!r}')
+
+          print('===== VTABLES =====')
+          for a in (0x2f5ebf8,0x2f5ebb8,0x2f72e08,0x2f72720,0x2f72420):
+              vtable(a,18)
+
+          print('===== REFERENCED DATA =====')
+          for a in (0x292df88,0x29517c0,0x20a4304,0x312da88,0xcaea20):
+              s,sec=cstr(a); print(f'addr=0x{a:x} section={sec} string={s!r} qword={qword(a)}')
+          PY
+          SCRIPT
