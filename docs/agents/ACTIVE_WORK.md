@@ -4,10 +4,11 @@ Convenience index only. Individual active task records, live PRs and Git state a
 
 ## Active tasks
 
-- `OTERYN-20260729-character-profile-preferences` — deliver Issue #307 Platform-owned owner comments, per-character field visibility and one-main-character preference without Canary mutation; parent #277 remains open for rename/delete/restore/transfer.
+- None.
 
 ## Closed acceptance and release-preparation follow-ups
 
+- PR #308 / `86847d0068e470274b6c3ee5523fe41cbb9663af` — delivered Platform-owned owner comments, per-character effective visibility, filtered related-character association, optional single main-character selection, audit events and EN/PL responsive acceptance after all 11 exact-final-head workflows passed; Issue #307 closed while parent #277 remained open, and no Canary or production mutation occurred.
 - PR #303 / `e1df0608eb6a8321f47fe51da65233a613a27b25` — reconciled Issue #281 to the authoritative item/weapon/creature/loot Game Catalog scope delivered by PR #272, preserved unsupported knowledge gaps under #277/#301/#302 and closed #281 after all eight exact-final-head workflows passed; no runtime, Canary, external-repository or production mutation occurred.
 - PR #300 / `7f2c37ca2a2447623705f60dffc08a34b9c755d3` — archived the completed community-data task, cleared ACTIVE_WORK and reconciled project state after Issue #280 closure.
 - PR #298 / `7533b12b1e1c6d266c6bf5a8800e584fad23a01e` — bounded read-only highscore categories, privacy-aware rich character profiles, latest deaths/kill statistics, guild directory/search, explicit optional-feature policy and EN/PL responsive acceptance merged after every exact-final-head workflow passed; Issue #280 closed without Canary mutation or a production-verification claim.
@@ -73,19 +74,19 @@ Repository and staging evidence remains valid only for its documented boundaries
 - **Portal Completeness: COMPLETE AGAINST THE VERSIONED DELIVERED-SURFACE CONTRACT (Issue #240 closed)**
 - **Product Completeness Benchmark: COMPLETE AS AN AUDIT; REQUIRED PRODUCT GAP #277 REMAINS OPEN, #278 IS MANDATORY BEFORE COMMERCE, #281 FIRST SCOPE IS COMPLETE, AND #301/#302 TRACK DEFERRED KNOWLEDGE**
 - **Benchmark Product Completeness: NOT YET ACHIEVED**
-- **Functional Acceptance: community-data exact-head CI, strict ledgers and zero-retry lifecycle passed through PR #298**
-- **Visual / UX Acceptance: community-data English/Polish desktop/tablet/mobile evidence and complete E2E/Visual UX passed through PR #298**
+- **Functional Acceptance: character-profile preferences exact-final-head CI, strict ledgers, real-MariaDB concurrency and zero-retry browser lifecycle passed through PR #308**
+- **Visual / UX Acceptance: character-profile preference English/Polish desktop/tablet/mobile evidence and complete E2E/Visual UX passed through PR #308**
 - **Public Website Expansion Programme: implementation and machine-ledger closure merged**
 - **Emulated Edge Security: STAGING_PROVEN**
 - **Synology Production Target Preflight: STAGING_PROVEN**
 - **Production Go-Live Gate: PENDING PRODUCTION VERIFICATION**
 - **Production Verification: REQUIRED BEFORE GO-LIVE**
 
-The latest verified final-portal staging refresh identity is `583cae5f430998b2bbdf5e60b59d93f09ec6f4c8` from PR #267 and deployment run `30335161092`. Later marketplace, account-security, Game Catalog, support/moderation and community-data evidence is repository/isolated-acceptance proof unless a deployment-specific record says otherwise. No repository, staging, local-target or emulation evidence may be promoted to `PRODUCTION_PROVEN`.
+The latest verified final-portal staging refresh identity is `583cae5f430998b2bbdf5e60b59d93f09ec6f4c8` from PR #267 and deployment run `30335161092`. Later marketplace, account-security, Game Catalog, support/moderation, community-data and character-profile evidence is repository/isolated-acceptance proof unless a deployment-specific record says otherwise. No repository, staging, local-target or emulation evidence may be promoted to `PRODUCTION_PROVEN`.
 
 ## Next work
 
-The active task delivers Issue #307 as the Platform-owned privacy/comment/main-character slice of parent #277. Remaining implementation trackers are #277 character mutation lifecycle, #301 authoritative structured catalogue expansion and #302 optional knowledge/discovery planning. Issue #278 is mandatory before commercial activation; #244 and #91 remain separate presentation and production trackers.
+Remaining implementation trackers are #277 character mutation/achievement lifecycle, #301 authoritative structured catalogue expansion and #302 optional knowledge/discovery planning. Issue #278 is mandatory before commercial activation; #244 and #91 remain separate presentation and production trackers. Any #277 mutation requires a new bounded task and explicit operation-specific Platform/Canary ownership contract before writes are authorized.
 
 ## Remaining cross-repository dependency
 
