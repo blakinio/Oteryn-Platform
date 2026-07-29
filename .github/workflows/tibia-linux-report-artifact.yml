@@ -1,4 +1,4 @@
-name: Tibia Linux report inventory
+name: Tibia Linux focused report recovery
 
 on:
   pull_request:
@@ -10,16 +10,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: tibia-linux-report-inventory
+  group: tibia-linux-focused-report-recovery
   cancel-in-progress: true
 
 jobs:
-  inventory:
-    name: Inventory persistent static-analysis reports
+  recover:
+    name: Recover existing text-only analysis reports
     runs-on: oteryn-staging
     timeout-minutes: 12
     steps:
-      - name: Build persistent report inventory
+      - name: Stage selected persistent reports
         shell: bash
         run: |
           set -euo pipefail
@@ -27,77 +27,83 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
             alpine:3.22 sh -s <<'SCRIPT'
           set -euo pipefail
-          apk add --no-cache coreutils file findutils grep >/dev/null
+          apk add --no-cache coreutils file findutils >/dev/null
 
           run_id=$(cat /analysis/latest-client-analysis-run-id)
           root=/analysis/client-analysis/${run_id}
-          client=${root}/download/client
           reports=${root}/report
-          out=${reports}/analysis-inventory
+          client=${root}/download/client
+          out=${reports}/focused-report-recovery
           rm -rf "$out"
-          mkdir -p "$out"
+          mkdir -p "$out/reports"
 
-          test -f "$client"
-          test -d "$reports"
+          test "$(sha256sum "$client" | awk '{print $1}')" = "8b25d65ece158723dbb50a1b592c1ec8a3247a650fcd2d299bebdfd133cb5752"
+
+          selected='actual-dual-metaobject
+          auth-helper-flow
+          connection-controller-route-slot
+          connection-controller-slot12-final
+          dual-connection-manager
+          dual-metaobject
+          dual-route-final
+          focused-tcp-metacall
+          gameserver-dual-connection-class
+          gameserver-login-functions
+          gameserver-route-accessors
+          login-handler-fields-final
+          parser-network-trace
+          parser-vtable-transport
+          playdata-gameserver-flow
+          protected-route-policy-final
+          protected-route-selection
+          qlibrary-slices
+          qt-gameserver-login
+          route-branch-types
+          runtime-route-consumer
+          tcp-login-final
+          tcp-qt-metaobject
+          tcp-route-selector
+          world-address-consumers
+          world-enrichment
+          world-record-connection-trace'
+
+          printf '%s\n' "$selected" | sed 's/^[[:space:]]*//' | while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            src=${reports}/${name}
+            [ -d "$src" ] || { echo "missing required report directory: $name" >&2; exit 1; }
+            mkdir -p "$out/reports/$name"
+            find "$src" -type f -print0 | while IFS= read -r -d '' f; do
+              mime=$(file -b --mime-type "$f")
+              case "$mime" in
+                text/*|application/json|application/xml|application/x-empty)
+                  rel=${f#${src}/}
+                  mkdir -p "$out/reports/$name/$(dirname "$rel")"
+                  cp "$f" "$out/reports/$name/$rel"
+                  ;;
+                *)
+                  echo "refusing non-text report: $f ($mime)" >&2
+                  exit 1
+                  ;;
+              esac
+            done
+          done
+
+          bytes=$(du -sb "$out/reports" | awk '{print $1}')
+          files=$(find "$out/reports" -type f | wc -l)
+          [ "$bytes" -le 20000000 ] || { echo "selected report set exceeds 20 MB: $bytes" >&2; exit 1; }
 
           {
             printf 'run_id\t%s\n' "$run_id"
-            printf 'client_path\t%s\n' "$client"
-            printf 'client_size\t%s\n' "$(stat -c %s "$client")"
             printf 'client_sha256\t%s\n' "$(sha256sum "$client" | awk '{print $1}')"
-            printf 'client_file\t%s\n' "$(file -b "$client")"
-            printf 'report_total_bytes\t%s\n' "$(du -sb "$reports" | awk '{print $1}')"
-            printf 'report_file_count\t%s\n' "$(find "$reports" -type f | wc -l)"
-          } > "$out/client-and-volume.tsv"
+            printf 'report_bytes\t%s\n' "$bytes"
+            printf 'report_files\t%s\n' "$files"
+          } > "$out/manifest.tsv"
 
-          {
-            printf 'bytes\tfiles\tdirectory\n'
-            find "$reports" -mindepth 1 -maxdepth 1 -type d ! -name analysis-inventory -print0 \
-              | sort -z \
-              | while IFS= read -r -d '' dir; do
-                  bytes=$(du -sb "$dir" | awk '{print $1}')
-                  files=$(find "$dir" -type f | wc -l)
-                  printf '%s\t%s\t%s\n' "$bytes" "$files" "$(basename "$dir")"
-                done
-          } > "$out/directories.tsv"
-
-          {
-            printf 'bytes\tmime\tpath\n'
-            find "$reports" -type f ! -path "$out/*" -print0 \
-              | sort -z \
-              | while IFS= read -r -d '' f; do
-                  printf '%s\t%s\t%s\n' \
-                    "$(stat -c %s "$f")" \
-                    "$(file -b --mime-type "$f")" \
-                    "${f#${reports}/}"
-                done
-          } > "$out/files.tsv"
-
-          relevant='dual-route-final|dual-connection-manager|gameserver-dual-connection-class|actual-dual-metaobject|focused-tcp-metacall|protected-route-selection|tcp-route-selector|tcp-connection-vtable|tcp-constructor|route-read-accessors|session-meta-builder-focused|session-meta-controlflow|auth-playdata-helper|gameserver-login-functions|battleye-module|battleye-client-loader|battleye-loader-callers|battleye-init-path|protected-route-policy-final'
-          awk -F '\t' -v re="$relevant" 'NR == 1 || $3 ~ "^(" re ")/"' "$out/files.tsv" > "$out/relevant-files.tsv"
-
-          find "$reports" -type f ! -path "$out/*" -size -8M \
-            \( -name '*.txt' -o -name '*.md' -o -name '*.json' -o -name '*.tsv' -o -name '*.csv' -o -name '*.log' \) \
-            -print0 \
-            | xargs -0 -r grep -InaE --binary-files=without-match \
-                'TGameserverDualConnection|TDualConnectionUrlInfo|TGameserverTCPConnection|connectToHost|Request connection to gameserver|ProtectedWorldAddress|UnprotectedWorldAddress|externaladdressprotected|externaladdressunprotected|externalportprotected|externalportunprotected|useProtectedNetworkRoute|EConnectionsUsed|optimizeConnectionStability|BEClient|BattlEye|packetReceived|secondaryConnected|onConnectionConnected|onStartGameServerLoginStateEntered|connectClientToGameserver|onConnectClientToGameserver|challenge|session key|sessionkey|character|RSA|XTEA' \
-            | head -n 12000 > "$out/key-marker-hits.txt" || true
-
-          {
-            cat "$out/client-and-volume.tsv"
-            echo
-            cat "$out/directories.tsv"
-            echo
-            echo 'Relevant files:'
-            tail -n +2 "$out/relevant-files.tsv" | wc -l
-            echo 'Marker hits:'
-            wc -l < "$out/key-marker-hits.txt"
-          } > "$out/summary.txt"
-
+          find "$out/reports" -type f -printf '%P\t%s\n' | sort > "$out/files.tsv"
           chmod -R a+rX "$out"
           SCRIPT
 
-      - name: Print inventory summary
+      - name: Print recovery manifest
         shell: bash
         run: |
           set -euo pipefail
@@ -105,30 +111,25 @@ jobs:
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
             alpine:3.22 sh -lc '
               run_id=$(cat /analysis/latest-client-analysis-run-id)
-              out=/analysis/client-analysis/${run_id}/report/analysis-inventory
-              cat "$out/summary.txt"
-              echo
-              echo "Largest report directories:"
-              { head -n 1 "$out/directories.tsv"; tail -n +2 "$out/directories.tsv" | sort -nr | head -n 40; }
-              echo
-              echo "Relevant files:"
-              head -n 200 "$out/relevant-files.tsv"
+              out=/analysis/client-analysis/${run_id}/report/focused-report-recovery
+              cat "$out/manifest.tsv"
+              cut -f1 "$out/files.tsv" | sed "s#/.*##" | sort | uniq -c
             '
 
-      - name: Copy inventory
+      - name: Copy selected reports
         shell: bash
         run: |
           set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-linux-analysis-inventory"
+          out="${RUNNER_TEMP}/tibia-linux-focused-reports"
           rm -rf "$out" && mkdir -p "$out"
           run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
           cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
           trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/analysis-inventory/." "$out/"
+          docker cp "$cid:/analysis/client-analysis/${run_id}/report/focused-report-recovery/." "$out/"
 
-      - name: Upload inventory
+      - name: Upload selected reports
         uses: actions/upload-artifact@v4
         with:
-          name: tibia-linux-analysis-inventory
-          path: ${{ runner.temp }}/tibia-linux-analysis-inventory
+          name: tibia-linux-focused-reports
+          path: ${{ runner.temp }}/tibia-linux-focused-reports
           retention-days: 1
