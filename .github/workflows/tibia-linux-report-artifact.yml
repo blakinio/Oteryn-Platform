@@ -1,4 +1,4 @@
-name: Tibia Linux connection controller slot12 trace
+name: Tibia Linux persisted slot12 function
 
 on:
   pull_request:
@@ -14,119 +14,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  trace:
-    name: Trace connection controller slot12
+  report:
+    name: Print persisted slot12 function
     runs-on: oteryn-staging
-    timeout-minutes: 12
+    timeout-minutes: 7
     steps:
-      - name: Analyze function and direct callees
-        shell: bash
-        run: |
-          set -euo pipefail
-          docker run --rm -i \
-            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
-            python:3.12-alpine sh -s <<'SCRIPT'
-          set -euo pipefail
-          apk add --no-cache binutils coreutils grep >/dev/null
-          pip install --no-cache-dir pyelftools==0.32 >/dev/null
-
-          run_id=$(cat /analysis/latest-client-analysis-run-id)
-          client=/analysis/client-analysis/${run_id}/download/client
-          out=/analysis/client-analysis/${run_id}/report/connection-controller-slot12-final
-          rm -rf "$out" && mkdir -p "$out/callees"
-
-          python3 - "$client" "$out" <<'PY'
-          import pathlib, re, subprocess, sys
-          from elftools.elf.elffile import ELFFile
-          from elftools.dwarf.callframe import FDE
-
-          binary, out_dir = sys.argv[1:]
-          target = 0xc49630
-          with open(binary, 'rb') as f:
-              blob = f.read(); f.seek(0); elf = ELFFile(f); sections = list(elf.iter_sections())
-              fdes=[]
-              try:
-                  for e in elf.get_dwarf_info().EH_CFI_entries():
-                      if isinstance(e,FDE):
-                          s=int(e['initial_location']); fdes.append((s,s+int(e['address_range'])))
-              except Exception:
-                  pass
-          matches=[r for r in fdes if r[0] <= target < r[1]]
-          start,end=min(matches,key=lambda x:x[1]-x[0]) if matches else (target,target+0x5000)
-          pathlib.Path(out_dir,'range.txt').write_text(f'target=0x{target:x}\nstart=0x{start:x}\nend=0x{end:x}\nsize=0x{end-start:x}\n')
-          dis=subprocess.check_output(['objdump','-d','-M','intel','--no-show-raw-insn',f'--start-address=0x{start:x}',f'--stop-address=0x{end:x}',binary],text=True,errors='replace')
-          pathlib.Path(out_dir,'slot12-full.txt').write_text(dis)
-
-          calls=[]
-          for m in re.finditer(r'^\s*([0-9a-f]+):\s+call\s+([0-9a-f]+)',dis,re.M):
-              calls.append((int(m.group(1),16),int(m.group(2),16)))
-          pathlib.Path(out_dir,'direct-calls.tsv').write_text(''.join(f'{site:x}\t{dst:x}\n' for site,dst in calls))
-
-          def va_to_offset(va):
-              for sec in sections:
-                  a=int(sec['sh_addr']); n=int(sec['sh_size'])
-                  if a <= va < a+n:
-                      return int(sec['sh_offset']) + va-a, sec.name
-              return None,None
-          refs=sorted(set(int(x,16) for x in re.findall(r'#\s*([0-9a-fA-F]+)',dis)))
-          rows=[]
-          for va in refs:
-              off,sec=va_to_offset(va)
-              if off is None: continue
-              end0=blob.find(b'\0',off,min(len(blob),off+800))
-              value=None
-              if end0>off:
-                  raw=blob[off:end0]
-                  if raw and sum(32<=b<127 or b in (9,10,13) for b in raw)/len(raw)>0.9:
-                      value=raw.decode('utf-8','replace')
-              rows.append(f'va=0x{va:x}\tsection={sec}\tstring={value!r}')
-          pathlib.Path(out_dir,'referenced-data.txt').write_text('\n'.join(rows)+'\n')
-          PY
-
-          while IFS="$(printf '\t')" read -r site dst; do
-            [ -n "$dst" ] || continue
-            start=$((0x$dst)); stop=$((start+0x1800))
-            objdump -d -M intel --no-show-raw-insn --start-address="0x$dst" --stop-address="$(printf '0x%x' "$stop")" "$client" > "$out/callees/callsite-0x${site}-target-0x${dst}.txt" || true
-          done < "$out/direct-calls.tsv"
-
-          {
-            echo '===== RANGE ====='
-            cat "$out/range.txt"
-            echo '===== SLOT12 FOCUS ====='
-            grep -n -B 12 -A 30 -E '(\[r..\+0x1a0\]|\[r..\+0x1b8\]|\[r..\+0x1bc\]|\[r..\+0x1c0\]|\[r..\+0x1d8\]|\[r..\+0x1da\]|\[r..\+0xbc0\]|\[r..\+0xbd8\]|\[r..\+0xbdc\]|\[r..\+0xbe0\]|\[r..\+0xbf8\]|\[r..\+0xbfa\]|QHostAddress|QTcpSocket|connect|BattlEye|cmp|test|cmov|sete|setne|call[[:space:]])' "$out/slot12-full.txt" || true
-            echo '===== DIRECT CALLS ====='
-            cat "$out/direct-calls.tsv"
-            echo '===== REFERENCED DATA ====='
-            cat "$out/referenced-data.txt"
-          } > "$out/concise.txt"
-          chmod -R a+rX "$out"
-          SCRIPT
-
-      - name: Print concise result
+      - name: Print exact function and focused lines
         shell: bash
         run: |
           set -euo pipefail
           docker run --rm \
             --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' \
             alpine:3.22 sh -lc '
+              set -eu
               run_id=$(cat /analysis/latest-client-analysis-run-id)
-              cat /analysis/client-analysis/${run_id}/report/connection-controller-slot12-final/concise.txt
+              report=/analysis/client-analysis/${run_id}/report/connection-controller-route-slot
+              func=$report/functions/ConnectionController-slot12-0xc49630.txt
+              test -f "$func"
+              echo "===== STATS ====="
+              wc -l -c "$func"
+              echo "===== FUNCTION ====="
+              cat "$func"
+              echo "===== FOCUSED ====="
+              grep -n -B 15 -A 40 -E "(call[[:space:]]|cmp|test|cmov|sete|setne|QHostAddress|QTcpSocket|connect|BattlEye|0x1a0|0x1b8|0x1bc|0x1c0|0x1d8|0x1da|0xbc0|0xbd8|0xbdc|0xbe0|0xbf8|0xbfa)" "$func" || true
             '
-
-      - name: Copy report
-        shell: bash
-        run: |
-          set -euo pipefail
-          out="${RUNNER_TEMP}/tibia-connection-controller-slot12"
-          rm -rf "$out" && mkdir -p "$out"
-          run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
-          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
-          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
-          docker cp "$cid:/analysis/client-analysis/${run_id}/report/connection-controller-slot12-final/." "$out/"
-
-      - name: Upload report
-        uses: actions/upload-artifact@v4
-        with:
-          name: tibia-linux-connection-controller-slot12
-          path: ${{ runner.temp }}/tibia-connection-controller-slot12
-          retention-days: 1
