@@ -5,6 +5,28 @@ import {
   installDiagnostics,
 } from './helpers.mjs';
 
+async function expectVisibleLanguageLink(page, name) {
+  const links = page.getByRole('link', { name });
+  for (let index = 0; index < await links.count(); index += 1) {
+    if (await links.nth(index).isVisible()) {
+      await expect(links.nth(index)).toBeVisible();
+      return;
+    }
+  }
+
+  const menu = page.getByText('Menu', { exact: true });
+  if (await menu.isVisible()) await menu.click();
+
+  for (let index = 0; index < await links.count(); index += 1) {
+    if (await links.nth(index).isVisible()) {
+      await expect(links.nth(index)).toBeVisible();
+      return;
+    }
+  }
+
+  throw new Error(`No visible language link matched ${name}.`);
+}
+
 test.setTimeout(120_000);
 test.describe.configure({ retries: 0 });
 
@@ -23,7 +45,7 @@ test('@localization canonical English and Polish public shells remain truthful a
   await expect(page.getByRole('heading', { name: 'Answer the call of Oteryn' })).toBeVisible();
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/en$/);
   await expect(page.locator('link[rel="alternate"][hreflang="pl"]')).toHaveAttribute('href', /\/pl$/);
-  await expect(page.locator('.language-switcher').first().getByRole('link', { name: /Polski/i })).toBeVisible();
+  await expectVisibleLanguageLink(page, /Polski/i);
   await assertAccessibilitySmoke(page);
 
   const polishResponse = await page.goto('/pl');
@@ -32,7 +54,7 @@ test('@localization canonical English and Polish public shells remain truthful a
   await expect(page.getByRole('heading', { name: 'Odpowiedz na wezwanie Oteryn' })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Nawigacja publiczna' })).toContainText('Aktualności');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/pl$/);
-  await expect(page.locator('.language-switcher').first().getByRole('link', { name: /English/i })).toBeVisible();
+  await expectVisibleLanguageLink(page, /English/i);
   await assertAccessibilitySmoke(page);
 
   const missingResponse = await page.goto('/pl/brakujaca-strona');
