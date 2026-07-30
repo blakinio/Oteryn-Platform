@@ -1,0 +1,156 @@
+name: Tibia Linux bounded callback semantics
+
+on:
+  push:
+    branches: [ci/OTERYN-20260727-tibia-linux-runner-analysis]
+    paths: [.github/workflows/tibia-linux-runner-analysis.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tibia-linux-callback-semantics-v3
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    runs-on: oteryn-staging
+    timeout-minutes: 10
+    steps:
+      - name: Extract callback semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -i \
+            --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis' \
+            python:3.13-alpine sh -s <<'SCRIPT'
+          set -euo pipefail
+          apk add --no-cache binutils coreutils >/dev/null
+          pip install --no-cache-dir pyelftools >/dev/null
+          run_id=$(cat /analysis/latest-client-analysis-run-id)
+          root=/analysis/client-analysis/${run_id}
+          client=${root}/download/client
+          out=${root}/report/be-callback-semantics-v3
+          rm -rf "$out" && mkdir -p "$out"
+          test "$(sha256sum "$client" | awk '{print $1}')" = "8b25d65ece158723dbb50a1b592c1ec8a3247a650fcd2d299bebdfd133cb5752"
+
+          objdump -d -M intel --start-address=0x741750 --stop-address=0x742100 "$client" > "$out/callback-region.txt"
+          objdump -d -M intel --start-address=0x6fb2d0 --stop-address=0x6fb490 "$client" > "$out/init-callsite.txt"
+          objdump -s --start-address=0x1c94c70 --stop-address=0x1c94cc0 "$client" > "$out/init-strings-hexdump.txt"
+          objdump -s --start-address=0x1c9a1d0 --stop-address=0x1c9a240 "$client" > "$out/log-prefix-hexdump.txt"
+          objdump -s --start-address=0x1c9b450 --stop-address=0x1c9b520 "$client" > "$out/state-strings-hexdump.txt"
+
+          python3 - "$client" "$out" <<'PY'
+          import json, sys
+          from pathlib import Path
+          from elftools.elf.elffile import ELFFile
+
+          binary = Path(sys.argv[1])
+          out = Path(sys.argv[2])
+          addresses = [
+              0x1c94c8f, 0x1c94c94,
+              0x1c9a202,
+              0x1c9b498, 0x1c9b4d8,
+              0x307aa80, 0x307aaf8,
+              0x318d7a0, 0x318d7a8,
+          ]
+
+          with binary.open('rb') as fh:
+              elf = ELFFile(fh)
+              segments = [s for s in elf.iter_segments() if s['p_type'] == 'PT_LOAD']
+              raw = binary.read_bytes()
+
+          def va_to_offset(va):
+              for seg in segments:
+                  start = int(seg['p_vaddr'])
+                  end = start + int(seg['p_filesz'])
+                  if start <= va < end:
+                      return int(seg['p_offset']) + (va - start)
+              return None
+
+          def cstring_at(va, limit=512):
+              off = va_to_offset(va)
+              if off is None:
+                  return None
+              end = raw.find(b'\0', off, min(len(raw), off + limit))
+              if end < 0:
+                  end = min(len(raw), off + limit)
+              data = raw[off:end]
+              try:
+                  return data.decode('utf-8')
+              except UnicodeDecodeError:
+                  return data.decode('latin-1', errors='replace')
+
+          exact = []
+          for va in addresses:
+              off = va_to_offset(va)
+              exact.append({
+                  'virtual_address': hex(va),
+                  'file_offset': None if off is None else hex(off),
+                  'cstring': cstring_at(va),
+                  'bytes_64': None if off is None else raw[off:off+64].hex(),
+              })
+
+          candidates = []
+          for needle in (b'BattlEye', b'BEClient', b'restart', b'Restart', b'packet', b'Packet'):
+              pos = 0
+              while True:
+                  pos = raw.find(needle, pos)
+                  if pos < 0:
+                      break
+                  start = pos
+                  while start > 0 and raw[start-1] not in b'\0\n\r':
+                      start -= 1
+                  end = raw.find(b'\0', pos, min(len(raw), pos + 512))
+                  if end < 0:
+                      end = min(len(raw), pos + 512)
+                  text = raw[start:end].decode('latin-1', errors='replace')
+                  candidates.append({'needle': needle.decode(), 'file_offset': hex(pos), 'text': text})
+                  pos += len(needle)
+
+          (out / 'exact-addresses.json').write_text(json.dumps(exact, indent=2, ensure_ascii=False))
+          (out / 'candidate-strings.json').write_text(json.dumps(candidates, indent=2, ensure_ascii=False))
+
+          summary = [
+              'client_sha256=8b25d65ece158723dbb50a1b592c1ec8a3247a650fcd2d299bebdfd133cb5752',
+              'callback_0=0x7418f0',
+              'callback_1=0x741de0',
+              'callback_2=0x741b50',
+          ]
+          for item in exact:
+              if item['cstring']:
+                  summary.append(f"{item['virtual_address']}={item['cstring']}")
+          (out / 'summary.txt').write_text('\n'.join(summary) + '\n')
+          PY
+          chmod -R a+rX "$out"
+          SCRIPT
+
+      - name: Print summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 sh -lc '
+            run_id=$(cat /analysis/latest-client-analysis-run-id)
+            out=/analysis/client-analysis/${run_id}/report/be-callback-semantics-v3
+            cat "$out/summary.txt"
+            echo files=$(find "$out" -type f | wc -l)
+            echo bytes=$(du -sb "$out" | cut -f1)
+          '
+
+      - name: Copy report
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="${RUNNER_TEMP}/be-callback-semantics-v3"
+          rm -rf "$out" && mkdir -p "$out"
+          run_id="$(docker run --rm --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 cat /analysis/latest-client-analysis-run-id)"
+          cid="$(docker create --mount 'type=volume,src=oteryn-tibia-linux-analysis,dst=/analysis,readonly' alpine:3.22 true)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true' EXIT
+          docker cp "$cid:/analysis/client-analysis/${run_id}/report/be-callback-semantics-v3/." "$out/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: be-callback-semantics-v3
+          path: ${{ runner.temp }}/be-callback-semantics-v3
+          retention-days: 1
