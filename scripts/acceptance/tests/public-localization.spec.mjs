@@ -5,7 +5,7 @@ import {
   installDiagnostics,
 } from './helpers.mjs';
 
-async function expectVisibleLanguageLink(page, name) {
+async function expectVisibleLink(page, name) {
   const links = page.getByRole('link', { name });
   for (let index = 0; index < await links.count(); index += 1) {
     if (await links.nth(index).isVisible()) {
@@ -24,7 +24,7 @@ async function expectVisibleLanguageLink(page, name) {
     }
   }
 
-  throw new Error(`No visible language link matched ${name}.`);
+  throw new Error(`No visible link matched ${name}.`);
 }
 
 test.setTimeout(120_000);
@@ -45,16 +45,16 @@ test('@localization canonical English and Polish public shells remain truthful a
   await expect(page.getByRole('heading', { name: 'Answer the call of Oteryn' })).toBeVisible();
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/en$/);
   await expect(page.locator('link[rel="alternate"][hreflang="pl"]')).toHaveAttribute('href', /\/pl$/);
-  await expectVisibleLanguageLink(page, /Polski/i);
+  await expectVisibleLink(page, /Polski/i);
   await assertAccessibilitySmoke(page);
 
   const polishResponse = await page.goto('/pl');
   expect(polishResponse?.status()).toBe(200);
   await expect(page.locator('html')).toHaveAttribute('lang', 'pl');
   await expect(page.getByRole('heading', { name: 'Odpowiedz na wezwanie Oteryn' })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Nawigacja publiczna' })).toContainText('Aktualności');
+  await expectVisibleLink(page, 'Aktualności');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', /\/pl$/);
-  await expectVisibleLanguageLink(page, /English/i);
+  await expectVisibleLink(page, /English/i);
   await assertAccessibilitySmoke(page);
 
   const missingResponse = await page.goto('/pl/brakujaca-strona');
