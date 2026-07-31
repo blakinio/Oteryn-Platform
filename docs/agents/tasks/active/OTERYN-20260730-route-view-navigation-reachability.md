@@ -86,7 +86,7 @@ conflicts:
 changed_paths:
   - docs/agents/tasks/active/OTERYN-20260730-route-view-navigation-reachability.md
   - docs/testing/PORTAL_ROUTE_VIEW_NAVIGATION_EVIDENCE.json
-  - docs/testing/PRODUCT_COMPLEESS_FRONTEND_AUDIT_2026-07-30.md
+  - docs/testing/PRODUCT_COMPLETENESS_FRONTEND_AUDIT_2026-07-30.md
   - scripts/acceptance/coverage/inspect-route-view-navigation.php
   - scripts/acceptance/coverage/run-route-view-navigation.mjs
   - scripts/acceptance/coverage/test-route-view-navigation.mjs
