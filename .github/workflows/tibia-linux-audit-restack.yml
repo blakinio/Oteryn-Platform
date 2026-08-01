@@ -1,0 +1,79 @@
+name: Tibia Linux audit one-shot restack
+
+on:
+  push:
+    branches:
+      - ci/OTERYN-20260727-tibia-linux-runner-analysis
+    paths:
+      - .github/workflows/tibia-linux-audit-restack.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tibia-linux-audit-restack
+  cancel-in-progress: false
+
+jobs:
+  restack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact triggering head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Rebuild the four-file audit diff on current main
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          TARGET_BRANCH: ci/OTERYN-20260727-tibia-linux-runner-analysis
+          BACKUP_BRANCH: backup/OTERYN-20260727-tibia-linux-runner-analysis-pre-restack-20260801
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          files=(
+            docs/agents/reports/OTERYN-20260727-research-purpose-and-safety-scope.md
+            docs/agents/reports/OTERYN-20260727-tibia-linux-battleye-callback-addendum.md
+            docs/agents/reports/OTERYN-20260727-tibia-linux-protected-route-analysis.md
+            docs/agents/tasks/active/OTERYN-20260727-tibia-linux-runner-analysis.md
+          )
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main "$TARGET_BRANCH"
+
+          remote_head="$(git rev-parse "origin/$TARGET_BRANCH")"
+          test "$remote_head" = "$SOURCE_SHA"
+
+          if ! git ls-remote --exit-code --heads origin "$BACKUP_BRANCH" >/dev/null 2>&1; then
+            git push origin "$SOURCE_SHA:refs/heads/$BACKUP_BRANCH"
+          fi
+
+          snapshot="$(mktemp -d)"
+          trap 'rm -rf "$snapshot"' EXIT
+
+          for file in "${files[@]}"; do
+            mkdir -p "$snapshot/$(dirname "$file")"
+            git show "$SOURCE_SHA:$file" > "$snapshot/$file"
+          done
+
+          git switch --detach origin/main
+          git switch -c tibia-linux-audit-restack
+
+          for file in "${files[@]}"; do
+            mkdir -p "$(dirname "$file")"
+            cp "$snapshot/$file" "$file"
+            git add "$file"
+          done
+
+          git commit -m "docs: restack Tibia Linux interoperability audit"
+
+          mapfile -t actual < <(git diff --name-only origin/main...HEAD | sort)
+          mapfile -t expected < <(printf '%s\n' "${files[@]}" | sort)
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH" \
+            --force-with-lease="refs/heads/$TARGET_BRANCH:$SOURCE_SHA"
