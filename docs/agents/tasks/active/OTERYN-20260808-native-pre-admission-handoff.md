@@ -8,7 +8,10 @@ required_reads:
   - docs/agents/AGENTS.md
   - docs/agents/EXECUTION_PROTOCOL.md
   - docs/agents/BUILD_TEST_MATRIX.md
+  - docs/agents/SESSION_RECOVERY_AND_ORPHANED_EXECUTION.md
   - docs/architecture/ARCHITECTURE_AUTHORITY.md
+  - docs/architecture/adr/0028-platform-accountid-cross-boundary-identity.md
+  - docs/contracts/OTERYN_V2_ACCOUNT_IDENTITY_CONTRACT.md
   - docs/architecture/adr/0031-native-oteryn-v2-integration-boundary.md
   - docs/architecture/OTERYN_V2_INTEGRATION_ARCHITECTURE.md
   - docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md
@@ -26,12 +29,13 @@ Define the Platform-side semantic boundary for native pre-admission material han
 
 ## Acceptance criteria
 
-- [ ] Focused contract defines pre-admission purpose, authority, canonical identities, binding, freshness, expiry and replay semantics.
-- [ ] Pre-admission material is explicitly not canonical `GameSessionId`, gameplay lease or proof of final admission.
-- [ ] Issuance preconditions compose authoritative ticket redemption, character authorization, World Registry policy and fresh applicable runtime evidence.
-- [ ] Failure, ambiguity, duplicate/replay, channel-switch and reconnect boundaries fail closed without inventing Oteryn-v2 implementation.
-- [ ] Focused integration and Gateway/Identity documentation route to the contract without reactivating historical Platform gameplay authority.
-- [ ] Oteryn-v2 remains read-only; exact transport/encoding/signing/lease/fencing/GameSessionId wire format remain deferred.
+- [x] Focused contract defines pre-admission purpose, authority, canonical identities, binding, freshness, expiry and replay semantics.
+- [x] Pre-admission material is explicitly not canonical `GameSessionId`, gameplay lease or proof of final admission.
+- [x] Issuance preconditions compose authoritative ticket redemption, character authorization, World Registry policy and fresh applicable runtime evidence.
+- [x] Failure, ambiguity, duplicate/replay, channel-switch and reconnect boundaries fail closed without inventing Oteryn-v2 implementation.
+- [x] Focused integration and Gateway/Identity documentation route to the contract without reactivating historical Platform gameplay authority.
+- [x] Native account identity is reconciled with ADR 0028: native ticket/redeem authority uses canonical `AccountId`; delivered `canary_account_id` redeem v1 remains compatibility evidence only.
+- [x] Oteryn-v2 remains read-only; exact transport/encoding/signing/lease/fencing/GameSessionId wire format remain deferred.
 - [ ] Exact-head Agent Governance and repository-selected CI pass; full diff/review has zero unresolved material findings.
 - [x] Runtime/browser E2E is `NOT_APPLICABLE` because this task is architecture/documentation only.
 
@@ -43,7 +47,6 @@ owned_paths:
   - docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md
   - docs/architecture/OTERYN_V2_INTEGRATION_ARCHITECTURE.md
   - docs/agents/reports/OTERYN-20260808-native-pre-admission-handoff.md
-  - docs/agents/programs/OTERYN_PLATFORM_ARCHITECTURE_REVIEW.md
   - docs/agents/tasks/active/OTERYN-20260808-native-pre-admission-handoff.md
 modules:
   - Identity
@@ -52,6 +55,8 @@ modules:
   - architecture-governance
 dependencies:
   - Issue #888
+  - ADR 0028
+  - OTERY​N_V2_ACCOUNT_IDENTITY_CONTRACT
   - ADR 0031
   - Oteryn-v2 ADR-0003 read-only evidence
 blockers:
@@ -64,23 +69,23 @@ cross_repository_tasks:
 
 ```yaml
 checkpoint_version: 1
-updated_at: 2026-08-08T09:25:00+02:00
-head: pending-claim-commit
+updated_at: 2026-08-08T10:51:00+02:00
+head: d6a3f2d9dea946e3fffb1f1acd0a632ae7e50f39
 branch: docs/OTERYN-20260808-native-pre-admission-handoff
 pr: none
-status: investigating
-phase: analyze
+status: active
+phase: review-repair
 execution_mode: github_only
-invocation_started_at: 2026-08-08T09:23:00+02:00
-last_progress_at: 2026-08-08T09:25:00+02:00
+invocation_started_at: 2026-08-08T10:39:00+02:00
+last_progress_at: 2026-08-08T10:51:00+02:00
 ci_checks_for_current_head: 0
 ci_check_generation: none
 terminal_ci_wait_started_at: none
 terminal_ci_checks_for_current_generation: 0
 unchanged_state_checks: 0
 identical_failure_retries: 0
-repair_cycles_for_current_gate: 0
-context_reconstruction_attempts: 0
+repair_cycles_for_current_gate: 1
+context_reconstruction_attempts: 1
 stall_warnings: 0
 context_routes:
   - architecture
@@ -92,32 +97,77 @@ owned_paths:
   - docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md
   - docs/architecture/OTERYN_V2_INTEGRATION_ARCHITECTURE.md
   - docs/agents/reports/OTERYN-20260808-native-pre-admission-handoff.md
-  - docs/agents/programs/OTERYN_PLATFORM_ARCHITECTURE_REVIEW.md
   - docs/agents/tasks/active/OTERYN-20260808-native-pre-admission-handoff.md
 proven:
   - Platform ADR 0031 owns Identity, Game Login Ticket, World Registry and Gateway pre-admission orchestration while assigning final gameplay admission and authoritative admitted session/lease/fencing to Oteryn-v2.
   - Read-only Oteryn-v2 ADR-0003 makes the same authority distinction and explicitly distinguishes pre-admission material from canonical logical GameSessionId.
+  - ADR 0028 and OTERY​N_V2_ACCOUNT_IDENTITY_CONTRACT define canonical native AccountId as Platform-issued UUIDv7 and make canary_account_id legacy compatibility only.
+  - Delivered GAME_GATEWAY_IDENTITY_CONTRACT redeem v1 still binds/returns canary_account_id and therefore remains a compatibility implementation, not proof of a native AccountId-bearing redeem context.
   - Historical Platform native gameplay/Game Session v2 artifacts are reconciliation evidence only and cannot define current Oteryn-v2 admission/session authority.
+  - The orphaned predecessor branch already contained the focused semantic contract, Gateway routing clarification, integration-architecture update and review report.
 derived:
-  - A focused Platform semantic contract can close the Platform-side handoff ambiguity without selecting unfinished Oteryn-v2 wire or lease implementation.
+  - A focused Platform semantic contract closes the Platform-side handoff ambiguity without selecting unfinished Oteryn-v2 wire or lease implementation.
+  - Native implementation will require a separately authorized versioned Identity/Gateway redeem/login context that yields canonical AccountId before pre-admission issuance can be implemented safely.
 unknown:
-  - exact Oteryn-v2 FND-04 admission/session state machine, material transport/encoding/signing primitive, replay store, lease/fencing algorithm and canonical GameSessionId wire form
+  - exact native AccountId-bearing redeem/login-context endpoint/version/runtime implementation
+  - exact Oteryn-v2 FND-04 admission/session state machine
+  - material transport/encoding/signing primitive
+  - replay store and atomic consume implementation
+  - lease/fencing algorithm
+  - canonical GameSessionId wire form
 conflicts: []
 first_failure:
-  marker: none-observed
-  evidence: fresh overlap search found no open Platform Issue/PR owning this focused admission-handoff architecture scope
+  marker: accountid-vs-legacy-redeem-v1-authority-ambiguity
+  evidence: orphan-takeover review found branch wording depended on authoritative ticket redemption while delivered v1 exposes canary_account_id; ADR 0028 makes native AccountId authority narrower and canonical
 rejected_hypotheses:
   - Platform-issued pre-admission material is a canonical gameplay session
   - historical Platform native Game Session v2 bytes define the Oteryn-v2 target
+  - successful legacy Canary redeem v1 is sufficient proof of a native AccountId-bearing login context
+  - native AccountId may be reconstructed from canary_account_id as canonical authority
 changed_paths:
+  - docs/contracts/OTERYN_V2_PRE_ADMISSION_HANDOFF_CONTRACT.md
+  - docs/contracts/GAME_GATEWAY_IDENTITY_CONTRACT.md
+  - docs/architecture/OTERYN_V2_INTEGRATION_ARCHITECTURE.md
+  - docs/agents/reports/OTERYN-20260808-native-pre-admission-handoff.md
   - docs/agents/tasks/active/OTERYN-20260808-native-pre-admission-handoff.md
 validation:
-  - command: live overlap and authority preflight
+  - command: orphaned-session recovery preflight
     result: PASS
-    evidence: Issue #888 is the bounded owner; Oteryn-v2 is read-only and no overlapping Platform PR/Issue was found by admission/session/lease handoff search.
+    evidence: predecessor branch had no PR and no durable progress after 2026-08-08T09:29:35+02:00; existing branch was reused rather than duplicated
+  - command: authority review against ADR 0028, Account Identity contract, ADR 0031 and Oteryn-v2 ADR-0003
+    result: PASS
+    evidence: native AccountId authority and game-domain final admission authority are now explicitly separated from legacy Canary redeem/session semantics
+  - command: full changed-file semantic review
+    result: PASS
+    evidence: one material AccountId/redeem-v1 ambiguity was found and reconciled; zero unresolved material findings remain before final restack/CI
   - command: runtime/browser E2E
-    result: NOT_APPLICABLE
-    evidence: architecture/documentation only; no executable runtime or deployment behavior is authorized.
+    result: NOT_RUN
+    evidence: architecture/documentation only; no executable runtime or deployment behavior is authorized
 blockers: []
-next_action: Draft the focused Platform pre-admission semantic contract, reconcile Gateway/Identity and focused v2 architecture routing, then run full-diff review and exact-head validation.
+next_action: Open the recovered branch as a PR to current main, synchronize if GitHub reports divergence conflicts, then run exact-head required CI and final review before merge.
+```
+
+## Recovery checkpoint
+
+```yaml
+recovery:
+  policy_version: 1
+  generation: 2
+  session_id: github-20260808-1039-issue888-takeover
+  session_started_at: 2026-08-08T10:39:00+02:00
+  checkpointed_at: 2026-08-08T10:51:00+02:00
+  last_progress_at: 2026-08-08T10:51:00+02:00
+  phase: review-repair
+  exact_head: d6a3f2d9dea946e3fffb1f1acd0a632ae7e50f39
+  pull_request: none
+  active_operation: none
+  external_run_ids: []
+  operation_started_at: null
+  wait_deadline_at: null
+  check_generation: none
+  checks_used: 0
+  status: ready
+  safe_to_resume: true
+  resume_condition: branch remains exclusively owned and no competing PR appears
+  next_action: Open the recovered branch as a PR to current main; synchronize only if required by live mergeability, then validate exact head.
 ```
